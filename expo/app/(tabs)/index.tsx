@@ -236,8 +236,9 @@ export default function TestStreamScreen() {
         isCorrect,
       }).catch((err) => console.log('TestStream writeAnswer error', err));
 
-      const newScore = await updatePreparednessScore(userId, localPreparedness, isCorrect);
-      setLocalPreparedness(newScore);
+      updatePreparednessScore(userId, 1).then((newScore) => {
+        setLocalPreparedness(newScore);
+      }).catch((err) => console.log('TestStream updatePreparedness error', err));
       animateGaugePulse();
 
       if (isCorrect && profile) {
@@ -272,7 +273,7 @@ export default function TestStreamScreen() {
       }
     },
     [
-      userId, localPreparedness, localXp, localStreak, profile, totalAnswered,
+      userId, localXp, localStreak, profile, totalAnswered,
       ensureSession, writeBlockSession, targetLevel, questions.length,
       currentIndex, fetchMoreQuestions, refreshProfile, checkMilestones, animateGaugePulse,
     ]

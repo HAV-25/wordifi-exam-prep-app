@@ -1,6 +1,6 @@
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { Share } from 'lucide-react-native';
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, Pressable, ScrollView, Share as RNShare, StyleSheet, Text, View } from 'react-native';
 
 import { AudioPlayer } from '@/components/AudioPlayer';
@@ -8,6 +8,8 @@ import { QuestionCard } from '@/components/QuestionCard';
 import { ScoreRing } from '@/components/ScoreRing';
 import { StimulusCard } from '@/components/StimulusCard';
 import Colors from '@/constants/colors';
+import { updatePreparednessScore } from '@/lib/streamHelpers';
+import { useAuth } from '@/providers/AuthProvider';
 import type { AppQuestion } from '@/types/database';
 
 function performanceLabel(score: number): string {
@@ -31,6 +33,19 @@ function retestDateString(): string {
 }
 
 export default function SectionalResultsScreen() {
+  const { user } = useAuth();
+  const userId = user?.id ?? '';
+  const hasUpdatedPreparedness = useRef<boolean>(false);
+
+  useEffect(() => {
+    if (userId && !hasUpdatedPreparedness.current) {
+      hasUpdatedPreparedness.current = true;
+      updatePreparednessScore(userId, 5).catch((err) =>
+        console.log('SectionalResults updatePreparedness error', err)
+      );
+    }
+  }, [userId]);
+
   const params = useLocalSearchParams<{
     sessionId?: string;
     scorePct?: string;

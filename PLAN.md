@@ -13,7 +13,7 @@
 - **Swipe affordance cue** — Small upward chevron appears after answering, pulses once after 3 seconds of idle; auto-hides permanently after 10 total answers (stored locally)
 - **Smart queue** — Fetches 20 questions filtered by level, excluding questions answered in the last 30 days; pre-fetches 20 more when 5 remain; recycles with a banner when all questions are exhausted
 - **XP & streak** — XP awarded per correct answer (A1=5, A2=10, B1=15); streak updates daily; milestone toasts appear as non-blocking top banners (7-day, 30-day streak; XP milestones; first B1 correct)
-- **Preparedness score writes** — +2 correct / −1 incorrect, clamped 0–100, written to Supabase asynchronously (never blocks UI)
+- **Preparedness score writes** — +1 per question answered (regardless of correct/wrong), +5 on sectional test completion, +20 on mock test completion, clamped 0–100, written to Supabase asynchronously (never blocks UI). Decay: −1 per calendar day of inactivity (pg_cron). Score always read from `user_profiles.preparedness_score` in real time.
 - **Empty state** — When queue is exhausted: shows readiness gauge, streak, and two buttons: "Try Sectional Test" and "Come back tomorrow"
 - **First-launch welcome** — If no answer history exists, shows "Your first [Level] question. Swipe up when you're ready."
 
@@ -60,6 +60,6 @@
 
 **Stream helpers (updated)**
 - XP rates: A1=5, A2=10, B1=15 per correct answer
-- Preparedness delta: +2 correct, −1 incorrect
+- Preparedness delta: +1 per answer (stream), +5 per sectional completion, +20 per mock completion. Decay: −1/day inactivity (server-side pg_cron)
 - Batch XP/streak writes every 5 answers
 - 30-day deduplication window for queue

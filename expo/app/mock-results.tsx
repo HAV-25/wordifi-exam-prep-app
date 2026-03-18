@@ -1,6 +1,6 @@
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { AlertTriangle, BookOpen, ChevronDown, ChevronUp, Flag, Headphones, Share as ShareIcon } from 'lucide-react-native';
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   Modal,
@@ -19,6 +19,7 @@ import { ScoreRing } from '@/components/ScoreRing';
 import { StimulusCard } from '@/components/StimulusCard';
 import Colors from '@/constants/colors';
 import { submitQuestionReport } from '@/lib/mockHelpers';
+import { updatePreparednessScore } from '@/lib/streamHelpers';
 import { useAuth } from '@/providers/AuthProvider';
 import type { AppQuestion, StudyPlanItem } from '@/types/database';
 
@@ -82,6 +83,16 @@ export default function MockResultsScreen() {
 
   const { user } = useAuth();
   const userId = user?.id ?? '';
+  const hasUpdatedPreparedness = useRef<boolean>(false);
+
+  useEffect(() => {
+    if (userId && !hasUpdatedPreparedness.current) {
+      hasUpdatedPreparedness.current = true;
+      updatePreparednessScore(userId, 20).catch((err) =>
+        console.log('MockResults updatePreparedness error', err)
+      );
+    }
+  }, [userId]);
 
   const horenCorrect = Number(params.horenCorrect ?? '0');
   const horenTotal = Number(params.horenTotal ?? '0');
@@ -116,7 +127,7 @@ export default function MockResultsScreen() {
     catch { return []; }
   }, [params.studyPlan]);
 
-  const allQuestions = useMemo(() => [...horenQuestions, ...lesenQuestions], [horenQuestions, lesenQuestions]);
+  const _allQuestions = useMemo(() => [...horenQuestions, ...lesenQuestions], [horenQuestions, lesenQuestions]);
 
   const [lang, setLang] = useState<ExplanationLang>('EN');
   const [expandedStimulusIds, setExpandedStimulusIds] = useState<Set<string>>(new Set());

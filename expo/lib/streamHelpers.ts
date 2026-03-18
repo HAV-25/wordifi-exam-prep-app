@@ -211,10 +211,15 @@ export async function createStreamSession(params: {
 
 export async function updatePreparednessScore(
   userId: string,
-  currentScore: number,
-  isCorrect: boolean
+  delta: number = 1
 ): Promise<number> {
-  const delta = isCorrect ? 2 : -1;
+  const { data: profileData } = await supabase
+    .from('user_profiles')
+    .select('preparedness_score')
+    .eq('id', userId)
+    .single();
+
+  const currentScore = (profileData as { preparedness_score?: number } | null)?.preparedness_score ?? 0;
   const newScore = Math.max(0, Math.min(100, currentScore + delta));
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
