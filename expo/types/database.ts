@@ -43,6 +43,12 @@ export type StudyPlanItem = {
   resource: string;
 };
 
+export type StudyPlanJson = {
+  weekly_goal_sessions: number;
+  focus_section: 'Hören' | 'Lesen' | 'Both';
+  mock_test_dates: string[];
+};
+
 export type MockTest = {
   id: string;
   user_id: string;
@@ -88,6 +94,7 @@ export type UserProfile = {
   xp_total: number;
   credit_balance: number;
   referral_code: string | null;
+  study_plan_json: StudyPlanJson | null;
   created_at: string | null;
   updated_at: string | null;
 };
@@ -174,6 +181,7 @@ export type Database = {
           xp_total?: number;
           credit_balance?: number;
           referral_code?: string | null;
+          study_plan_json?: StudyPlanJson | null;
           created_at?: string | null;
           updated_at?: string | null;
         };

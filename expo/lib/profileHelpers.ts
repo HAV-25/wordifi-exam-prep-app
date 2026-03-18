@@ -1,7 +1,7 @@
 import type { User } from '@supabase/supabase-js';
 
 import { supabase } from '@/lib/supabaseClient';
-import type { ExamType, Level, UserProfile } from '@/types/database';
+import type { ExamType, Level, StudyPlanJson, UserProfile } from '@/types/database';
 
 export type OnboardingPayload = {
   targetLevel: Level;
@@ -104,4 +104,71 @@ export async function updateTargetLevel(userId: string, targetLevel: Level): Pro
   }
 
   return data as UserProfile;
+}
+
+export async function updateExamDate(userId: string, examDate: string | null): Promise<UserProfile> {
+  const { data, error } = await supabase
+    .from('user_profiles')
+    .update({ exam_date: examDate, updated_at: new Date().toISOString() })
+    .eq('id', userId)
+    .select('*')
+    .single();
+
+  if (error || !data) {
+    console.log('updateExamDate error', error);
+    throw error ?? new Error('Could not update exam date');
+  }
+
+  return data as UserProfile;
+}
+
+export async function updateStudyPlan(userId: string, plan: StudyPlanJson): Promise<UserProfile> {
+  const { data, error } = await supabase
+    .from('user_profiles')
+    .update({ study_plan_json: plan, updated_at: new Date().toISOString() } as never)
+    .eq('id', userId)
+    .select('*')
+    .single();
+
+  if (error || !data) {
+    console.log('updateStudyPlan error', error);
+    throw error ?? new Error('Could not update study plan');
+  }
+
+  return data as UserProfile;
+}
+
+export async function fetchUncompletedTeileCount(userId: string, level: string): Promise<number> {
+  const { data, error } = await supabase
+    .from('app_questions')
+    .select('section, teil')
+    .eq('level', level)
+    .eq('is_active', true);
+
+  if (error || !data) {
+    console.log('fetchUncompletedTeileCount questions error', error);
+    return 0;
+  }
+
+  const allTeile = new Set(data.map((q: { section: string; teil: number }) => `${q.section}-${q.teil}`));
+
+  const { data: sessions, error: sessError } = await supabase
+    .from('test_sessions')
+    .select('section, teil')
+    .eq('user_id', userId)
+    .eq('level', level)
+    .eq('session_type', 'sectional');
+
+  if (sessError) {
+    console.log('fetchUncompletedTeileCount sessions error', sessError);
+    return allTeile.size;
+  }
+
+  const completedTeile = new Set((sessions ?? []).map((s: { section: string; teil: number }) => `${s.section}-${s.teil}`));
+  let uncompleted = 0;
+  allTeile.forEach((t) => {
+    if (!completedTeile.has(t)) uncompleted++;
+  });
+
+  return uncompleted;
 }
