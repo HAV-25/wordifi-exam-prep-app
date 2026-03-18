@@ -11,6 +11,7 @@ import { LevelBadge } from '@/components/LevelBadge';
 import { ScoreRing } from '@/components/ScoreRing';
 import { StreakBadge } from '@/components/StreakBadge';
 import Colors from '@/constants/colors';
+import { formatXp, getBadgeTier, getNextBadgeTier } from '@/lib/badgeHelpers';
 import { updateExamDate, updateStudyPlan, fetchUncompletedTeileCount, updatePlayerName } from '@/lib/profileHelpers';
 import { useAuth } from '@/providers/AuthProvider';
 import type { StudyPlanJson } from '@/types/database';
@@ -203,7 +204,8 @@ export default function ProfileScreen() {
     );
   }
 
-  const progressToNextMilestone = Math.min(100, ((profile.xp_total % 50) / 50) * 100);
+  const badgeTier = getBadgeTier(profile.xp_total);
+  const nextBadgeTier = getNextBadgeTier(profile.xp_total);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -234,13 +236,30 @@ export default function ProfileScreen() {
 
         <View style={styles.row}>
           <StreakBadge count={profile.streak_count ?? 0} />
-          <View style={styles.xpBadge}><Text style={styles.xpText}>⭐ {profile.xp_total} XP</Text></View>
+          <View style={styles.xpBadge}><Text style={styles.xpText}>⭐ {formatXp(profile.xp_total)} XP</Text></View>
+          <View style={[styles.tierBadge, { backgroundColor: badgeTier.color }]}>
+            <Text style={styles.tierBadgeText}>{badgeTier.label}</Text>
+          </View>
         </View>
 
         <View style={styles.insightCard}>
           <View style={styles.insightHeader}><TrendingUp color={Colors.primary} size={18} /><Text style={styles.insightTitle}>Progress insights</Text></View>
-          <Text style={styles.insightBody}>You&apos;re {50 - (profile.xp_total % 50)} XP away from your next 50 XP milestone.</Text>
-          <View style={styles.progressTrack}><View style={[styles.progressFill, { width: `${progressToNextMilestone}%` }]} /></View>
+          {nextBadgeTier ? (
+            <Text style={styles.insightBody}>
+              {nextBadgeTier.minXp - profile.xp_total} XP to <Text style={{ fontWeight: '800' as const, color: nextBadgeTier.color }}>{nextBadgeTier.label}</Text> badge
+            </Text>
+          ) : (
+            <Text style={styles.insightBody}>You&apos;ve reached the highest badge tier! Keep practising to stay sharp.</Text>
+          )}
+          {nextBadgeTier ? (
+            <View style={styles.progressTrack}>
+              <View style={[styles.progressFill, { width: `${Math.min(100, (profile.xp_total / nextBadgeTier.minXp) * 100)}%`, backgroundColor: nextBadgeTier.color }]} />
+            </View>
+          ) : (
+            <View style={styles.progressTrack}>
+              <View style={[styles.progressFill, { width: '100%' }]} />
+            </View>
+          )}
         </View>
 
         <View style={styles.listCard}>
@@ -551,6 +570,8 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: 10 },
   xpBadge: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border, justifyContent: 'center' },
   xpText: { color: Colors.primary, fontWeight: '700' as const },
+  tierBadge: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999 },
+  tierBadgeText: { fontSize: 13, fontWeight: '800' as const, color: '#1a1a1a' },
   insightCard: { backgroundColor: Colors.primary, borderRadius: 24, padding: 18, gap: 12 },
   insightHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   insightTitle: { color: Colors.surface, fontWeight: '800' as const, fontSize: 17 },

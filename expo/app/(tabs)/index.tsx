@@ -23,6 +23,7 @@ import { PreparednessBottomSheet } from '@/components/PreparednessBottomSheet';
 import { ReportModal } from '@/components/ReportModal';
 import { StreamCard } from '@/components/StreamCard';
 import Colors from '@/constants/colors';
+import { didCrossBadgeThreshold, formatXp, getBadgeTier } from '@/lib/badgeHelpers';
 import {
   checkAndAwardBadges,
   createStreamSession,
@@ -242,6 +243,7 @@ export default function TestStreamScreen() {
       animateGaugePulse();
 
       if (isCorrect && profile) {
+        const oldXp = localXp;
         const { newXp, newStreak } = await updateXpAndStreak(userId, {
           ...profile,
           xp_total: localXp,
@@ -249,6 +251,12 @@ export default function TestStreamScreen() {
           last_active_date: profile.last_active_date,
         });
         setLocalXp(newXp);
+
+        const crossedBadge = didCrossBadgeThreshold(oldXp, newXp);
+        if (crossedBadge) {
+          showStreakToastBanner(`🏅 You reached ${crossedBadge.label}!`);
+        }
+
         if (newStreak !== localStreak) {
           setLocalStreak(newStreak);
           if (!hasUpdatedStreakRef.current) {
@@ -276,6 +284,7 @@ export default function TestStreamScreen() {
       userId, localXp, localStreak, profile, totalAnswered,
       ensureSession, writeBlockSession, targetLevel, questions.length,
       currentIndex, fetchMoreQuestions, refreshProfile, checkMilestones, animateGaugePulse,
+      showStreakToastBanner,
     ]
   );
 
@@ -404,6 +413,9 @@ export default function TestStreamScreen() {
     if (localPreparedness < 70) return '#EF9F27';
     return '#1D9E75';
   }, [localPreparedness]);
+
+  const badgeTier = useMemo(() => getBadgeTier(localXp), [localXp]);
+  const formattedXp = useMemo(() => formatXp(localXp), [localXp]);
 
   const handleReportPress = useCallback((qId: string) => {
     setReportQuestionId(qId);
@@ -534,7 +546,12 @@ export default function TestStreamScreen() {
         </Text>
         <View style={styles.statsRow}>
           <Text style={styles.statText}>🔥 {localStreak}</Text>
-          <Text style={styles.statText}>⭐ {localXp}</Text>
+          <View style={styles.xpRow}>
+            <Text style={styles.statText}>⭐ {formattedXp} XP</Text>
+            <View style={[styles.badgePill, { backgroundColor: badgeTier.color }]}>
+              <Text style={styles.badgePillText}>{badgeTier.label}</Text>
+            </View>
+          </View>
         </View>
       </View>
 
@@ -745,12 +762,28 @@ const styles = StyleSheet.create({
   },
   statsRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: 12,
   },
   statText: {
     color: Colors.textMuted,
     fontSize: 12,
     fontWeight: '700' as const,
+  },
+  xpRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  badgePill: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 99,
+  },
+  badgePillText: {
+    fontSize: 10,
+    fontWeight: '800' as const,
+    color: '#1a1a1a',
   },
   toast: {
     position: 'absolute',
