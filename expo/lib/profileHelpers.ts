@@ -138,6 +138,47 @@ export async function updateStudyPlan(userId: string, plan: StudyPlanJson): Prom
   return data as UserProfile;
 }
 
+export async function updatePlayerName(userId: string, playerName: string): Promise<void> {
+  const { error } = await supabase
+    .from('user_profiles')
+    .update({ player_name: playerName, updated_at: new Date().toISOString() } as never)
+    .eq('id', userId);
+
+  if (error) {
+    console.log('updatePlayerName error', error);
+    throw error;
+  }
+}
+
+export async function fetchLeaderboard(targetLevel: string): Promise<Array<{
+  player_name: string;
+  preparedness_score: number;
+  streak_count: number;
+  target_level: string;
+  id: string;
+}>> {
+  const { data, error } = await supabase
+    .from('user_profiles')
+    .select('id, player_name, preparedness_score, streak_count, target_level')
+    .eq('target_level', targetLevel)
+    .not('player_name', 'is', null)
+    .order('preparedness_score', { ascending: false })
+    .limit(50);
+
+  if (error) {
+    console.log('fetchLeaderboard error', error);
+    throw error;
+  }
+
+  return (data ?? []) as Array<{
+    player_name: string;
+    preparedness_score: number;
+    streak_count: number;
+    target_level: string;
+    id: string;
+  }>;
+}
+
 export async function fetchUncompletedTeileCount(userId: string, level: string): Promise<number> {
   const { data, error } = await supabase
     .from('app_questions')

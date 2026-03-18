@@ -95,8 +95,18 @@ export type UserProfile = {
   credit_balance: number;
   referral_code: string | null;
   study_plan_json: StudyPlanJson | null;
+  player_name: string | null;
   created_at: string | null;
   updated_at: string | null;
+};
+
+export type LeaderboardEntry = {
+  player_name: string;
+  preparedness_score: number;
+  streak_count: number;
+  target_level: string;
+  user_id: string;
+  rank: number;
 };
 
 export type TestSession = {
@@ -182,6 +192,7 @@ export type Database = {
           credit_balance?: number;
           referral_code?: string | null;
           study_plan_json?: StudyPlanJson | null;
+          player_name?: string | null;
           created_at?: string | null;
           updated_at?: string | null;
         };

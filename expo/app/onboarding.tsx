@@ -17,12 +17,15 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 import { AudioPlayer } from '@/components/AudioPlayer';
+import { PlayerNameModal } from '@/components/PlayerNameModal';
 import { ScoreRing } from '@/components/ScoreRing';
 import { StimulusCard } from '@/components/StimulusCard';
 import Colors from '@/constants/colors';
 import { signInWithEmail, signInWithGoogle, signUpWithEmail } from '@/lib/authHelpers';
-import { upsertOnboardingProfile } from '@/lib/profileHelpers';
+import { upsertOnboardingProfile, updatePlayerName } from '@/lib/profileHelpers';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/providers/AuthProvider';
 import type { AppQuestion, ExamType, Level } from '@/types/database';
@@ -69,6 +72,8 @@ export default function OnboardingScreen() {
   const [password, setPassword] = useState<string>('');
   const [isAuthLoading, setIsAuthLoading] = useState<boolean>(false);
   const [_isSaving, setIsSaving] = useState<boolean>(false);
+  const [showPlayerNameModal, setShowPlayerNameModal] = useState<boolean>(false);
+  const [pendingUserId, setPendingUserId] = useState<string | null>(null);
 
   const splashOpacity = useRef(new Animated.Value(0)).current;
   const splashScale = useRef(new Animated.Value(0.8)).current;
@@ -182,7 +187,19 @@ export default function OnboardingScreen() {
       if (authMode === 'signIn') {
         router.replace('/');
       } else {
-        setStep(9);
+        const existingProfile = await supabase
+          .from('user_profiles')
+          .select('player_name')
+          .eq('id', currentUser.id)
+          .maybeSingle();
+
+        const alreadySet = await AsyncStorage.getItem('wordifi_player_name_set');
+        if (existingProfile.data?.player_name || alreadySet === 'true') {
+          setStep(9);
+        } else {
+          setPendingUserId(currentUser.id);
+          setShowPlayerNameModal(true);
+        }
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
@@ -824,18 +841,42 @@ export default function OnboardingScreen() {
     </View>
   );
 
+  const handlePlayerNameConfirm = async (name: string) => {
+    setShowPlayerNameModal(false);
+    if (pendingUserId) {
+      try {
+        await updatePlayerName(pendingUserId, name);
+        await refreshProfile();
+      } catch (err) {
+        console.log('Failed to save player name', err);
+      }
+    }
+    setStep(9);
+  };
+
+  let content: React.ReactNode = null;
   switch (step) {
-    case 1: return renderStep1();
-    case 2: return renderStep2();
-    case 3: return renderStep3();
-    case 4: return renderStep4();
-    case 5: return renderStep5();
-    case 6: return renderStep6();
-    case 7: return renderStep7();
-    case 8: return renderStep8();
-    case 9: return renderStep9();
-    default: return renderStep2();
+    case 1: content = renderStep1(); break;
+    case 2: content = renderStep2(); break;
+    case 3: content = renderStep3(); break;
+    case 4: content = renderStep4(); break;
+    case 5: content = renderStep5(); break;
+    case 6: content = renderStep6(); break;
+    case 7: content = renderStep7(); break;
+    case 8: content = renderStep8(); break;
+    case 9: content = renderStep9(); break;
+    default: content = renderStep2(); break;
   }
+
+  return (
+    <>
+      {content}
+      <PlayerNameModal
+        visible={showPlayerNameModal}
+        onConfirm={handlePlayerNameConfirm}
+      />
+    </>
+  );
 }
 
 const styles = StyleSheet.create({

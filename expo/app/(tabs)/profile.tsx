@@ -1,8 +1,8 @@
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { router } from 'expo-router';
-import { AlertTriangle, Award, Calendar, CalendarDays, ChevronRight, GraduationCap, Headphones, BookOpen, LogOut, Minus, Plus, TrendingUp, X } from 'lucide-react-native';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { AlertTriangle, Award, Calendar, CalendarDays, ChevronRight, GraduationCap, Headphones, BookOpen, LogOut, Minus, Plus, Trophy, TrendingUp, User, X } from 'lucide-react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, Animated, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useMutation, useQuery } from '@tanstack/react-query';
 
@@ -11,7 +11,7 @@ import { LevelBadge } from '@/components/LevelBadge';
 import { ScoreRing } from '@/components/ScoreRing';
 import { StreakBadge } from '@/components/StreakBadge';
 import Colors from '@/constants/colors';
-import { updateExamDate, updateStudyPlan, fetchUncompletedTeileCount } from '@/lib/profileHelpers';
+import { updateExamDate, updateStudyPlan, fetchUncompletedTeileCount, updatePlayerName } from '@/lib/profileHelpers';
 import { useAuth } from '@/providers/AuthProvider';
 import type { StudyPlanJson } from '@/types/database';
 
@@ -47,6 +47,11 @@ export default function ProfileScreen() {
   const [showDatePicker, setShowDatePicker] = useState<boolean>(false);
   const [showMockDatePicker, setShowMockDatePicker] = useState<boolean>(false);
   const [localPlan, setLocalPlan] = useState<StudyPlanJson>(DEFAULT_PLAN);
+  const [showNameModal, setShowNameModal] = useState<boolean>(false);
+  const [nameInput, setNameInput] = useState<string>('');
+  const [nameError, setNameError] = useState<string>('');
+  const [isSavingName, setIsSavingName] = useState<boolean>(false);
+  const nameModalFade = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (profile?.study_plan_json) {
@@ -143,6 +148,43 @@ export default function ProfileScreen() {
     studyPlanMutation.mutate(updated);
   }, [localPlan, studyPlanMutation]);
 
+  const openNameModal = useCallback(() => {
+    setNameInput('');
+    setNameError('');
+    setShowNameModal(true);
+    Animated.timing(nameModalFade, { toValue: 1, duration: 250, useNativeDriver: true }).start();
+  }, [nameModalFade]);
+
+  const closeNameModal = useCallback(() => {
+    Animated.timing(nameModalFade, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => {
+      setShowNameModal(false);
+    });
+  }, [nameModalFade]);
+
+  const handleSaveName = useCallback(async () => {
+    if (!user) return;
+    const trimmed = nameInput.trim().slice(0, 20);
+    if (trimmed.length < 3) {
+      setNameError('Name must be at least 3 characters');
+      return;
+    }
+    if (!/^[a-zA-Z0-9]+$/.test(trimmed)) {
+      setNameError('Letters and numbers only');
+      return;
+    }
+    setIsSavingName(true);
+    try {
+      await updatePlayerName(user.id, trimmed);
+      await refreshProfile();
+      closeNameModal();
+    } catch (e) {
+      console.log('Set player name error', e);
+      setNameError('Could not save name. Try again.');
+    } finally {
+      setIsSavingName(false);
+    }
+  }, [user, nameInput, refreshProfile, closeNameModal]);
+
   const handleSignOut = async () => {
     try {
       await signOut();
@@ -175,6 +217,14 @@ export default function ProfileScreen() {
 
         <View style={styles.heroCard}>
           <View style={styles.heroLeft}>
+            {profile.player_name ? (
+              <View style={styles.playerNameRow}>
+                <View style={styles.avatarCircle}>
+                  <Text style={styles.avatarInitial}>{profile.player_name.charAt(0).toUpperCase()}</Text>
+                </View>
+                <Text style={styles.playerNameText}>{profile.player_name}</Text>
+              </View>
+            ) : null}
             <Text style={styles.email}>{user?.email ?? 'wordifi@user.com'}</Text>
             <LevelBadge level={profile.target_level ?? 'A1'} />
             <Text style={styles.meta}>Target exam: {profile.exam_type?.toUpperCase() ?? 'TELC'} {profile.target_level ?? 'A1'}{profile.exam_date ? ` · ${profile.exam_date}` : ''}</Text>
@@ -403,10 +453,85 @@ export default function ProfileScreen() {
           )}
         </View>
 
+        <Pressable
+          style={styles.leaderboardCard}
+          onPress={() => router.push('/leaderboard')}
+          testID="open-leaderboard"
+        >
+          <View style={styles.leaderboardLeft}>
+            <View style={styles.leaderboardIconWrap}>
+              <Trophy color="#D4A017" size={20} />
+            </View>
+            <View style={styles.leaderboardTextWrap}>
+              <Text style={styles.leaderboardTitle}>Leaderboard</Text>
+              <Text style={styles.leaderboardSub}>See how you rank against other {profile.target_level ?? 'B1'} learners</Text>
+            </View>
+          </View>
+          <ChevronRight color={Colors.textMuted} size={18} />
+        </Pressable>
+
+        {!profile.player_name ? (
+          <View style={styles.setNameCard}>
+            <User color={Colors.accent} size={20} />
+            <View style={styles.setNameTextWrap}>
+              <Text style={styles.setNameTitle}>Set your learner name</Text>
+              <Text style={styles.setNameBody}>Choose a name to appear on the leaderboard</Text>
+            </View>
+            <Pressable
+              style={styles.setNameCta}
+              onPress={openNameModal}
+              testID="set-player-name-cta"
+            >
+              <Text style={styles.setNameCtaText}>Set Name</Text>
+            </Pressable>
+          </View>
+        ) : null}
+
         <Pressable accessibilityLabel="Sign out" disabled={isSigningOut} onPress={handleSignOut} style={styles.signOutButton} testID="sign-out-button">
           {isSigningOut ? <ActivityIndicator color={Colors.surface} /> : <><LogOut color={Colors.surface} size={18} /><Text style={styles.signOutText}>Sign Out</Text></>}
         </Pressable>
       </ScrollView>
+      <Modal visible={showNameModal} transparent animationType="none" onRequestClose={closeNameModal}>
+        <Animated.View style={[styles.nameModalOverlay, { opacity: nameModalFade }]}>
+          <Pressable style={styles.nameModalBackdrop} onPress={closeNameModal} />
+          <View style={styles.nameModalCard}>
+            <Text style={styles.nameModalHeading}>Choose your learner name</Text>
+            <Text style={styles.nameModalSub}>Max 20 characters, letters and numbers only</Text>
+            <View style={styles.nameModalInputShell}>
+              <TextInput
+                style={styles.nameModalInput}
+                placeholder="e.g. FlinkeFeder"
+                placeholderTextColor={Colors.textMuted}
+                value={nameInput}
+                onChangeText={(t) => { setNameInput(t.slice(0, 20)); setNameError(''); }}
+                maxLength={20}
+                autoCapitalize="none"
+                autoCorrect={false}
+                testID="profile-name-input"
+              />
+              <Text style={styles.nameModalCharCount}>{nameInput.length}/20</Text>
+            </View>
+            {nameError ? <Text style={styles.nameModalError}>{nameError}</Text> : null}
+            <View style={styles.nameModalActions}>
+              <Pressable style={styles.nameModalCancel} onPress={closeNameModal}>
+                <Text style={styles.nameModalCancelText}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.nameModalSave, isSavingName ? styles.nameModalSaveDisabled : null]}
+                onPress={handleSaveName}
+                disabled={isSavingName}
+                testID="profile-save-name"
+              >
+                {isSavingName ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={styles.nameModalSaveText}>Save</Text>
+                )}
+              </Pressable>
+            </View>
+          </View>
+        </Animated.View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -437,6 +562,41 @@ const styles = StyleSheet.create({
   infoText: { color: Colors.text, fontSize: 15, fontWeight: '600' as const },
   signOutButton: { minHeight: 52, borderRadius: 26, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8 },
   signOutText: { color: Colors.surface, fontWeight: '800' as const, fontSize: 16 },
+
+  playerNameRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 2 },
+  avatarCircle: { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.accent, alignItems: 'center', justifyContent: 'center' },
+  avatarInitial: { color: '#FFFFFF', fontSize: 16, fontWeight: '800' as const },
+  playerNameText: { fontSize: 18, fontWeight: '800' as const, color: Colors.primary },
+
+  leaderboardCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: Colors.surface, borderRadius: 20, borderWidth: 1, borderColor: Colors.border, padding: 16 },
+  leaderboardLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
+  leaderboardIconWrap: { width: 42, height: 42, borderRadius: 14, backgroundColor: '#FFF8E1', alignItems: 'center', justifyContent: 'center' },
+  leaderboardTextWrap: { flex: 1, gap: 2 },
+  leaderboardTitle: { fontSize: 16, fontWeight: '700' as const, color: Colors.primary },
+  leaderboardSub: { fontSize: 13, color: Colors.textMuted, lineHeight: 18 },
+
+  setNameCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: Colors.accentSoft, borderRadius: 16, padding: 14, borderWidth: 1, borderColor: Colors.accent },
+  setNameTextWrap: { flex: 1, gap: 2 },
+  setNameTitle: { fontSize: 14, fontWeight: '700' as const, color: Colors.primary },
+  setNameBody: { fontSize: 12, color: Colors.textMuted },
+  setNameCta: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, backgroundColor: Colors.accent },
+  setNameCtaText: { color: '#FFFFFF', fontWeight: '700' as const, fontSize: 13 },
+
+  nameModalOverlay: { flex: 1, backgroundColor: 'rgba(9,23,40,0.7)', justifyContent: 'center', alignItems: 'center', padding: 24 },
+  nameModalBackdrop: { ...StyleSheet.absoluteFillObject },
+  nameModalCard: { width: '100%', maxWidth: 360, backgroundColor: Colors.surface, borderRadius: 24, padding: 24, gap: 12, zIndex: 1 },
+  nameModalHeading: { fontSize: 20, fontWeight: '800' as const, color: Colors.primary, textAlign: 'center' as const },
+  nameModalSub: { fontSize: 13, color: Colors.textMuted, textAlign: 'center' as const, marginTop: -4 },
+  nameModalInputShell: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.background, borderRadius: 14, borderWidth: 1.5, borderColor: Colors.border, paddingHorizontal: 14 },
+  nameModalInput: { flex: 1, fontSize: 16, fontWeight: '600' as const, color: Colors.primary, paddingVertical: 14 },
+  nameModalCharCount: { fontSize: 12, color: Colors.textMuted },
+  nameModalError: { fontSize: 13, color: Colors.danger, fontWeight: '600' as const },
+  nameModalActions: { flexDirection: 'row', gap: 10, marginTop: 4 },
+  nameModalCancel: { flex: 1, minHeight: 48, borderRadius: 14, borderWidth: 1.5, borderColor: Colors.border, alignItems: 'center', justifyContent: 'center' },
+  nameModalCancelText: { color: Colors.textMuted, fontWeight: '700' as const, fontSize: 15 },
+  nameModalSave: { flex: 1, minHeight: 48, borderRadius: 14, backgroundColor: Colors.accent, alignItems: 'center', justifyContent: 'center' },
+  nameModalSaveDisabled: { opacity: 0.5 },
+  nameModalSaveText: { color: '#FFFFFF', fontWeight: '800' as const, fontSize: 15 },
 
   planSection: { gap: 12 },
   planSectionTitle: { fontSize: 22, fontWeight: '800' as const, color: Colors.primary, marginBottom: 2 },
