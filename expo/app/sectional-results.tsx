@@ -1,0 +1,402 @@
+import { Stack, router, useLocalSearchParams } from 'expo-router';
+import { Share } from 'lucide-react-native';
+import React, { useCallback, useMemo, useState } from 'react';
+import { Platform, Pressable, ScrollView, Share as RNShare, StyleSheet, Text, View } from 'react-native';
+
+import { AudioPlayer } from '@/components/AudioPlayer';
+import { QuestionCard } from '@/components/QuestionCard';
+import { ScoreRing } from '@/components/ScoreRing';
+import { StimulusCard } from '@/components/StimulusCard';
+import Colors from '@/constants/colors';
+import type { AppQuestion } from '@/types/database';
+
+function performanceLabel(score: number): string {
+  if (score < 50) return 'Keep going 💪';
+  if (score < 75) return 'Good effort 👍';
+  if (score < 90) return 'Well done ⭐';
+  return 'Excellent 🏆';
+}
+
+function formatDuration(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  if (m === 0) return `${s}s`;
+  return `${m}m ${s}s`;
+}
+
+function retestDateString(): string {
+  const d = new Date();
+  d.setDate(d.getDate() + 7);
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+export default function SectionalResultsScreen() {
+  const params = useLocalSearchParams<{
+    sessionId?: string;
+    scorePct?: string;
+    correctCount?: string;
+    total?: string;
+    level?: string;
+    section?: string;
+    teil?: string;
+    isTimed?: string;
+    timeTaken?: string;
+    questions?: string;
+    answers?: string;
+  }>();
+
+  const [expandedStimulusId, setExpandedStimulusId] = useState<string | null>(null);
+
+  const scorePct = Number(params.scorePct ?? '0');
+  const correctCount = Number(params.correctCount ?? '0');
+  const total = Number(params.total ?? '0');
+  const level = params.level ?? 'A1';
+  const section = params.section ?? 'Hören';
+  const teil = params.teil ?? '1';
+  const isTimed = params.isTimed === '1';
+  const timeTaken = Number(params.timeTaken ?? '0');
+
+  const questions = useMemo<AppQuestion[]>(() => {
+    try {
+      return JSON.parse(params.questions ?? '[]') as AppQuestion[];
+    } catch {
+      return [];
+    }
+  }, [params.questions]);
+
+  const answers = useMemo<Record<string, string>>(() => {
+    try {
+      return JSON.parse(params.answers ?? '{}') as Record<string, string>;
+    } catch {
+      return {};
+    }
+  }, [params.answers]);
+
+  const handleShare = useCallback(async () => {
+    const message = `Wordifi — ${section} · Teil ${teil} · ${level}\nScore: ${correctCount}/${total} (${Math.round(scorePct)}%)\n${performanceLabel(scorePct)}`;
+    try {
+      if (Platform.OS === 'web') {
+        if (navigator.share) {
+          await navigator.share({ text: message });
+        }
+      } else {
+        await RNShare.share({ message });
+      }
+    } catch (err) {
+      console.log('SectionalResults share error', err);
+    }
+  }, [section, teil, level, correctCount, total, scorePct]);
+
+  const retestDate = useMemo(() => retestDateString(), []);
+
+  return (
+    <View style={styles.screen}>
+      <Stack.Screen
+        options={{
+          title: 'Results',
+          headerBackVisible: false,
+          headerRight: () => (
+            <Pressable
+              accessibilityLabel="Share result"
+              onPress={handleShare}
+              style={styles.shareBtn}
+              testID="share-result-button"
+            >
+              <Share color={Colors.primary} size={20} />
+            </Pressable>
+          ),
+        }}
+      />
+
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <View style={styles.heroCard}>
+          <Text style={styles.heroMeta}>
+            {section} · Teil {teil} · {level}
+            {isTimed ? ' · Timed' : ''}
+          </Text>
+          <View style={styles.heroRow}>
+            <View style={styles.heroTextWrap}>
+              <Text style={styles.scoreLine}>
+                {correctCount} / {total}
+              </Text>
+              <Text style={styles.performance}>{performanceLabel(scorePct)}</Text>
+              {isTimed && timeTaken > 0 ? (
+                <Text style={styles.timeLine}>⏱ {formatDuration(timeTaken)}</Text>
+              ) : null}
+              <Text style={styles.xpLine}>+{correctCount} XP</Text>
+            </View>
+            <ScoreRing label="Score" score={scorePct} size={96} />
+          </View>
+        </View>
+
+        <View style={styles.retestNotice}>
+          <Text style={styles.retestText}>
+            You can retest this section in 7 days — {retestDate}
+          </Text>
+        </View>
+
+        <View style={styles.reviewWrap}>
+          {questions.map((question, index) => {
+            const selectedAnswer = (answers[question.id] ?? '').toLowerCase();
+            const isCorrect = selectedAnswer === question.correct_answer.toLowerCase();
+            const selectedOption = question.options.find(
+              (o) => o.key.toLowerCase() === selectedAnswer
+            );
+            const correctOption = question.options.find(
+              (o) => o.key.toLowerCase() === question.correct_answer.toLowerCase()
+            );
+
+            return (
+              <QuestionCard
+                key={question.id}
+                title={question.question_text}
+                subtitle={`Question ${index + 1}`}
+              >
+                <View style={styles.answerRow}>
+                  <Text
+                    style={[
+                      styles.answerBadge,
+                      isCorrect ? styles.correctBadge : styles.incorrectBadge,
+                    ]}
+                  >
+                    {isCorrect ? '✓' : '✗'}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.answerText,
+                      isCorrect ? styles.correctText : styles.incorrectText,
+                    ]}
+                  >
+                    Your answer: {(selectedOption?.text ?? selectedAnswer) || 'No answer'}
+                  </Text>
+                </View>
+                {!isCorrect ? (
+                  <Text style={styles.correctAnswerText}>
+                    Correct answer: {correctOption?.text ?? question.correct_answer}
+                  </Text>
+                ) : null}
+                {section === 'Hören' && question.audio_url ? (
+                  <AudioPlayer audioUrl={question.audio_url} />
+                ) : null}
+                {section === 'Lesen' && question.stimulus_text ? (
+                  <View>
+                    <Pressable
+                      accessibilityLabel="Show passage"
+                      onPress={() =>
+                        setExpandedStimulusId((v) =>
+                          v === question.id ? null : question.id
+                        )
+                      }
+                      style={styles.showPassageButton}
+                      testID={`show-passage-${question.id}`}
+                    >
+                      <Text style={styles.showPassageText}>
+                        {expandedStimulusId === question.id
+                          ? 'Hide passage'
+                          : 'Show passage'}
+                      </Text>
+                    </Pressable>
+                    {expandedStimulusId === question.id ? (
+                      <StimulusCard
+                        text={question.stimulus_text}
+                        type={question.stimulus_type}
+                        collapsible={false}
+                      />
+                    ) : null}
+                  </View>
+                ) : null}
+              </QuestionCard>
+            );
+          })}
+        </View>
+      </ScrollView>
+
+      <View style={styles.footer}>
+        <Pressable
+          accessibilityLabel="Back to tests"
+          onPress={() => router.replace('/(tabs)/tests')}
+          style={styles.primaryButton}
+          testID="back-to-tests-button"
+        >
+          <Text style={styles.primaryButtonText}>Back to Tests</Text>
+        </Pressable>
+        <View style={styles.footerRow}>
+          <Pressable
+            accessibilityLabel="Go home"
+            onPress={() => router.replace('/')}
+            style={styles.secondaryButton}
+            testID="sectional-home-button"
+          >
+            <Text style={styles.secondaryButtonText}>Home</Text>
+          </Pressable>
+          <Pressable
+            accessibilityLabel="Share result"
+            onPress={handleShare}
+            style={styles.secondaryButton}
+            testID="sectional-share-button"
+          >
+            <Text style={styles.secondaryButtonText}>Share Result</Text>
+          </Pressable>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: Colors.background,
+  },
+  shareBtn: {
+    minHeight: 40,
+    minWidth: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  content: {
+    padding: 20,
+    gap: 16,
+    paddingBottom: 180,
+  },
+  heroCard: {
+    borderRadius: 28,
+    backgroundColor: Colors.primary,
+    padding: 20,
+    gap: 16,
+  },
+  heroMeta: {
+    color: 'rgba(255,255,255,0.74)',
+    fontWeight: '700' as const,
+    fontSize: 13,
+  },
+  heroRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 16,
+  },
+  heroTextWrap: {
+    flex: 1,
+    gap: 8,
+  },
+  scoreLine: {
+    color: Colors.surface,
+    fontSize: 34,
+    fontWeight: '800' as const,
+  },
+  performance: {
+    color: Colors.surface,
+    fontSize: 18,
+    fontWeight: '700' as const,
+  },
+  timeLine: {
+    color: 'rgba(255,255,255,0.74)',
+    fontWeight: '700' as const,
+    fontSize: 14,
+  },
+  xpLine: {
+    color: 'rgba(255,255,255,0.74)',
+    fontWeight: '700' as const,
+  },
+  retestNotice: {
+    backgroundColor: Colors.surfaceMuted,
+    borderRadius: 14,
+    padding: 14,
+  },
+  retestText: {
+    color: Colors.textMuted,
+    fontSize: 13,
+    fontWeight: '600' as const,
+    textAlign: 'center',
+  },
+  reviewWrap: {
+    gap: 12,
+  },
+  answerRow: {
+    flexDirection: 'row',
+    gap: 10,
+    alignItems: 'center',
+  },
+  answerBadge: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    textAlign: 'center',
+    lineHeight: 26,
+    overflow: 'hidden',
+    fontWeight: '800' as const,
+  },
+  correctBadge: {
+    backgroundColor: Colors.accentSoft,
+    color: Colors.accent,
+  },
+  incorrectBadge: {
+    backgroundColor: Colors.dangerSoft,
+    color: Colors.danger,
+  },
+  answerText: {
+    flex: 1,
+    fontWeight: '700' as const,
+  },
+  correctText: {
+    color: Colors.accent,
+  },
+  incorrectText: {
+    color: Colors.danger,
+  },
+  correctAnswerText: {
+    color: Colors.accent,
+    fontWeight: '700' as const,
+  },
+  showPassageButton: {
+    minHeight: 44,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.surfaceMuted,
+  },
+  showPassageText: {
+    color: Colors.primary,
+    fontWeight: '700' as const,
+  },
+  footer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    padding: 20,
+    gap: 10,
+    backgroundColor: Colors.background,
+  },
+  primaryButton: {
+    minHeight: 54,
+    borderRadius: 27,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.primary,
+  },
+  primaryButtonText: {
+    color: Colors.surface,
+    fontWeight: '800' as const,
+    fontSize: 16,
+  },
+  footerRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  secondaryButton: {
+    flex: 1,
+    minHeight: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  secondaryButtonText: {
+    color: Colors.primary,
+    fontWeight: '700' as const,
+    textAlign: 'center',
+  },
+});

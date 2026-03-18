@@ -1,0 +1,9 @@
+{
+  "apps": [
+    {
+      "name": "Wordifi",
+      "path": "expo",
+      "framework": "react-native"
+    }
+  ]
+}

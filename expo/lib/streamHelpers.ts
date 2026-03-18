@@ -1,0 +1,347 @@
+import { supabase } from '@/lib/supabaseClient';
+import type { AppQuestion, UserProfile } from '@/types/database';
+
+export type StreamFetchParams = {
+  userId: string;
+  targetLevel: string;
+  limit?: number;
+};
+
+export type SectionAccuracy = {
+  horenAccuracy: number;
+  lesenAccuracy: number;
+  hasHistory: boolean;
+};
+
+type AnswerRow = { is_correct: boolean; question_id: string };
+type QuestionSectionRow = { id: string; section: string };
+type QuestionIdRow = { question_id: string };
+type BadgeRow = { badge_type: string };
+type SessionIdRow = { id: string };
+
+const XP_PER_LEVEL: Record<string, number> = {
+  A1: 5,
+  A2: 10,
+  B1: 15,
+};
+
+export async function fetchSectionAccuracy(userId: string): Promise<SectionAccuracy> {
+  const fourteenDaysAgo = new Date();
+  fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+  const cutoff = fourteenDaysAgo.toISOString();
+
+  try {
+    const { data, error } = await supabase
+      .from('user_answers')
+      .select('is_correct, question_id')
+      .eq('user_id', userId)
+      .gte('created_at', cutoff);
+
+    if (error || !data || data.length === 0) {
+      console.log('fetchSectionAccuracy no history or error', error);
+      return { horenAccuracy: 0.5, lesenAccuracy: 0.5, hasHistory: false };
+    }
+
+    const rows = data as unknown as AnswerRow[];
+    const questionIds = [...new Set(rows.map((r) => r.question_id))];
+    const { data: questions, error: qError } = await supabase
+      .from('app_questions')
+      .select('id, section')
+      .in('id', questionIds);
+
+    if (qError || !questions) {
+      return { horenAccuracy: 0.5, lesenAccuracy: 0.5, hasHistory: false };
+    }
+
+    const qRows = questions as unknown as QuestionSectionRow[];
+    const sectionMap = new Map<string, string>();
+    for (const q of qRows) {
+      sectionMap.set(q.id, q.section);
+    }
+
+    let horenCorrect = 0;
+    let horenTotal = 0;
+    let lesenCorrect = 0;
+    let lesenTotal = 0;
+
+    for (const answer of rows) {
+      const section = sectionMap.get(answer.question_id);
+      if (section === 'Hören') {
+        horenTotal++;
+        if (answer.is_correct) horenCorrect++;
+      } else if (section === 'Lesen') {
+        lesenTotal++;
+        if (answer.is_correct) lesenCorrect++;
+      }
+    }
+
+    const horenAccuracy = horenTotal > 0 ? horenCorrect / horenTotal : 0.5;
+    const lesenAccuracy = lesenTotal > 0 ? lesenCorrect / lesenTotal : 0.5;
+
+    return { horenAccuracy, lesenAccuracy, hasHistory: horenTotal > 0 || lesenTotal > 0 };
+  } catch (err) {
+    console.log('fetchSectionAccuracy error', err);
+    return { horenAccuracy: 0.5, lesenAccuracy: 0.5, hasHistory: false };
+  }
+}
+
+export async function fetchStreamQuestions(
+  params: StreamFetchParams
+): Promise<{ questions: AppQuestion[]; isRecycled: boolean }> {
+  const { userId, targetLevel, limit = 20 } = params;
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  const cutoff = thirtyDaysAgo.toISOString();
+
+  try {
+    const { data: recentAnswers } = await supabase
+      .from('user_answers')
+      .select('question_id')
+      .eq('user_id', userId)
+      .gte('created_at', cutoff);
+
+    const seenIds = ((recentAnswers ?? []) as unknown as QuestionIdRow[]).map((r) => r.question_id);
+
+    let query = supabase
+      .from('app_questions')
+      .select('*')
+      .eq('level', targetLevel)
+      .eq('is_active', true);
+
+    if (seenIds.length > 0) {
+      query = query.not('id', 'in', `(${seenIds.join(',')})`);
+    }
+
+    query = query.limit(limit * 2);
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.log('fetchStreamQuestions error', error);
+      throw error;
+    }
+
+    let questions = (data ?? []) as AppQuestion[];
+
+    if (questions.length === 0 && seenIds.length > 0) {
+      console.log('fetchStreamQuestions all seen, recycling');
+      const { data: recycled, error: recycleError } = await supabase
+        .from('app_questions')
+        .select('*')
+        .eq('level', targetLevel)
+        .eq('is_active', true)
+        .limit(limit * 2);
+
+      if (recycleError) {
+        console.log('fetchStreamQuestions recycle error', recycleError);
+        throw recycleError;
+      }
+
+      questions = (recycled ?? []) as AppQuestion[];
+      const shuffled = shuffleArray(questions).slice(0, limit);
+      return { questions: shuffled, isRecycled: true };
+    }
+
+    const shuffled = shuffleArray(questions).slice(0, limit);
+    return { questions: shuffled, isRecycled: false };
+  } catch (err) {
+    console.log('fetchStreamQuestions unexpected error', err);
+    throw err;
+  }
+}
+
+export async function writeStreamAnswer(params: {
+  userId: string;
+  sessionId: string;
+  questionId: string;
+  selectedAnswer: string;
+  isCorrect: boolean;
+}): Promise<void> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase.from('user_answers') as any).insert({
+    session_id: params.sessionId,
+    user_id: params.userId,
+    question_id: params.questionId,
+    selected_answer: params.selectedAnswer,
+    is_correct: params.isCorrect,
+  });
+  if (error) {
+    console.log('writeStreamAnswer error', error);
+  }
+}
+
+export async function createStreamSession(params: {
+  userId: string;
+  level: string;
+  questionsTotal: number;
+  questionsCorrect: number;
+  timeTakenSeconds: number;
+}): Promise<string> {
+  const scorePct =
+    params.questionsTotal > 0
+      ? Number(((params.questionsCorrect / params.questionsTotal) * 100).toFixed(2))
+      : 0;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase.from('test_sessions') as any)
+    .insert({
+      user_id: params.userId,
+      session_type: 'stream',
+      level: params.level,
+      section: 'mixed',
+      teil: 0,
+      exam_type: 'mixed',
+      score_pct: scorePct,
+      questions_total: params.questionsTotal,
+      questions_correct: params.questionsCorrect,
+      time_taken_seconds: params.timeTakenSeconds,
+      is_timed: false,
+      completed_at: new Date().toISOString(),
+    })
+    .select('id')
+    .single();
+
+  if (error) {
+    console.log('createStreamSession error', error);
+    return 'placeholder-session';
+  }
+
+  return (data as unknown as SessionIdRow).id;
+}
+
+export async function updatePreparednessScore(
+  userId: string,
+  currentScore: number,
+  isCorrect: boolean
+): Promise<number> {
+  const delta = isCorrect ? 2 : -1;
+  const newScore = Math.max(0, Math.min(100, currentScore + delta));
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase.from('user_profiles') as any)
+    .update({ preparedness_score: newScore, updated_at: new Date().toISOString() })
+    .eq('id', userId);
+
+  if (error) {
+    console.log('updatePreparednessScore error', error);
+  }
+
+  return newScore;
+}
+
+export async function updateXpAndStreak(
+  userId: string,
+  profile: UserProfile
+): Promise<{ newXp: number; newStreak: number }> {
+  const today = new Date().toISOString().split('T')[0] ?? '';
+  const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0] ?? '';
+
+  let newStreak = profile.streak_count;
+  if (profile.last_active_date === yesterday) {
+    newStreak = profile.streak_count + 1;
+  } else if (profile.last_active_date !== today) {
+    newStreak = 1;
+  }
+
+  const xpGain = XP_PER_LEVEL[profile.target_level ?? 'A1'] ?? 5;
+  const newXp = profile.xp_total + xpGain;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase.from('user_profiles') as any)
+    .update({
+      xp_total: newXp,
+      streak_count: newStreak,
+      last_active_date: today,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', userId);
+
+  if (error) {
+    console.log('updateXpAndStreak error', error);
+  }
+
+  return { newXp, newStreak };
+}
+
+export async function submitQuestionReport(params: {
+  questionId: string;
+  userId: string;
+  reason: string;
+  detail: string | null;
+}): Promise<boolean> {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabase.from('question_reports') as any).insert({
+      question_id: params.questionId,
+      user_id: params.userId,
+      reason: params.reason,
+      detail: params.detail,
+      status: 'open',
+    });
+    if (error) {
+      console.log('submitQuestionReport error', error);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.log('submitQuestionReport unexpected error', err);
+    return false;
+  }
+}
+
+export type BadgeType = 'bronze' | 'silver' | 'gold' | 'platinum';
+
+const BADGE_THRESHOLDS: { type: BadgeType; xp: number }[] = [
+  { type: 'bronze', xp: 50 },
+  { type: 'silver', xp: 150 },
+  { type: 'gold', xp: 400 },
+  { type: 'platinum', xp: 1000 },
+];
+
+export async function checkAndAwardBadges(
+  userId: string,
+  level: string,
+  xpTotal: number
+): Promise<BadgeType | null> {
+  const eligible = BADGE_THRESHOLDS.filter((b) => xpTotal >= b.xp);
+  if (eligible.length === 0) return null;
+
+  const { data: existing } = await supabase
+    .from('user_badges')
+    .select('badge_type')
+    .eq('user_id', userId)
+    .eq('level', level);
+
+  const existingTypes = new Set(((existing ?? []) as unknown as BadgeRow[]).map((b) => b.badge_type));
+
+  let newBadge: BadgeType | null = null;
+  for (const badge of eligible) {
+    if (!existingTypes.has(badge.type)) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase.from('user_badges') as any).insert({
+        user_id: userId,
+        badge_type: badge.type,
+        level,
+        awarded_at: new Date().toISOString(),
+      });
+      if (!error) {
+        newBadge = badge.type;
+      } else {
+        console.log('checkAndAwardBadges insert error', error);
+      }
+    }
+  }
+
+  return newBadge;
+}
+
+function shuffleArray<T>(array: T[]): T[] {
+  const shuffled = [...array];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const temp = shuffled[i]!;
+    shuffled[i] = shuffled[j]!;
+    shuffled[j] = temp;
+  }
+  return shuffled;
+}
