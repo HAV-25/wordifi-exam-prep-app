@@ -1,19 +1,21 @@
+import { colors } from '@/theme';
+
 const Colors = {
-  background: '#F4F7FB',
-  surface: '#FFFFFF',
+  background: colors.surface,
+  surface: colors.white,
   surfaceMuted: '#E8EEF7',
-  primary: '#10233F',
+  primary: colors.navy,
   primarySoft: '#DDE6F3',
-  primaryDeep: '#091728',
-  accent: '#14B86A',
+  primaryDeep: colors.navy,
+  accent: colors.green,
   accentSoft: '#DDF8EA',
-  danger: '#E24D4D',
+  danger: colors.red,
   dangerSoft: '#FCE3E3',
-  text: '#122033',
-  textMuted: '#65758B',
-  border: '#D9E1EC',
-  warning: '#F4B942',
-  ringTrack: '#D8E1EE',
+  text: colors.text,
+  textMuted: colors.muted,
+  border: colors.border,
+  warning: colors.amber,
+  ringTrack: colors.ringTrack,
   shadow: 'rgba(12, 25, 49, 0.12)',
 };
 

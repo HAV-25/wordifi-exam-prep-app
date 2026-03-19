@@ -23,6 +23,7 @@ import { PreparednessBottomSheet } from '@/components/PreparednessBottomSheet';
 import { ReportModal } from '@/components/ReportModal';
 import { StreamCard } from '@/components/StreamCard';
 import Colors from '@/constants/colors';
+import { colors } from '@/theme';
 import { didCrossBadgeThreshold, formatXp, getBadgeTier } from '@/lib/badgeHelpers';
 import {
   checkAndAwardBadges,
@@ -409,9 +410,9 @@ export default function TestStreamScreen() {
   const isCurrentAnswered = currentQuestion ? Boolean(answeredMap[currentQuestion.id]) : false;
 
   const gaugeColor = useMemo(() => {
-    if (localPreparedness < 40) return '#E24B4A';
-    if (localPreparedness < 70) return '#EF9F27';
-    return '#1D9E75';
+    if (localPreparedness < 40) return colors.red;
+    if (localPreparedness < 70) return colors.amber;
+    return colors.green;
   }, [localPreparedness]);
 
   const badgeTier = useMemo(() => getBadgeTier(localXp), [localXp]);
@@ -783,7 +784,7 @@ const styles = StyleSheet.create({
   badgePillText: {
     fontSize: 10,
     fontWeight: '800' as const,
-    color: '#1a1a1a',
+    color: colors.text,
   },
   toast: {
     position: 'absolute',

@@ -1,15 +1,17 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, StyleSheet, Text, View } from 'react-native';
 
+import { colors } from '@/theme';
+
 type PreparednessBarProps = {
   score: number;
   compact?: boolean;
 };
 
 function getBarColor(score: number): string {
-  if (score < 40) return '#E53935';
-  if (score < 70) return '#FFB300';
-  return '#43A047';
+  if (score < 40) return colors.red;
+  if (score < 70) return colors.amber;
+  return colors.green;
 }
 
 export function PreparednessBar({ score, compact = false }: PreparednessBarProps) {

@@ -16,6 +16,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { OptionButton } from '@/components/OptionButton';
 import { StimulusCard } from '@/components/StimulusCard';
 import Colors from '@/constants/colors';
+import { colors } from '@/theme';
 import {
   completeSectionalSession,
   createSectionalSession,
@@ -166,7 +167,7 @@ export default function SectionalTestScreen() {
 
   const handleAutoSubmit = useCallback(() => {
     console.log('SectionalTest auto-submitting due to timer');
-    handleSubmit();
+    void handleSubmit();
   }, [handleSubmit]);
 
   const handleBack = useCallback(() => {
@@ -184,7 +185,7 @@ export default function SectionalTestScreen() {
     if (!currentQuestion) return;
 
     if (currentIndex === questions.length - 1) {
-      handleSubmit();
+      void handleSubmit();
       return;
     }
     setCurrentIndex((v) => v + 1);
@@ -426,7 +427,7 @@ const styles = StyleSheet.create({
     borderRadius: 99,
   },
   horenPill: {
-    backgroundColor: '#1565C0',
+    backgroundColor: colors.blue,
   },
   lesenPill: {
     backgroundColor: '#6A1B9A',

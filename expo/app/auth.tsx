@@ -5,6 +5,7 @@ import React, { useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import Colors from '@/constants/colors';
+import { colors } from '@/theme';
 import { signInWithEmail, signInWithGoogle, signUpWithEmail } from '@/lib/authHelpers';
 
 function getFriendlyError(errorMessage: string, isSignUp: boolean): string {
@@ -82,14 +83,14 @@ export default function AuthScreen() {
   };
 
   return (
-    <LinearGradient colors={[Colors.primaryDeep, Colors.primary, '#16325D']} style={styles.screen}>
+    <LinearGradient colors={[colors.navy, colors.navy, '#16325D']} style={styles.screen}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex}>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           <View style={styles.hero}>
             <View style={styles.logoWrap}>
               <Sparkles color={Colors.accent} size={26} />
             </View>
-            <Text style={styles.brand}>Wordifi</Text>
+            <Text style={styles.brand}>wordifi</Text>
             <Text style={styles.tagline}>Ace your German exam</Text>
           </View>
 
@@ -188,7 +189,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  brand: { fontSize: 34, fontWeight: '800', color: Colors.surface },
+  brand: { fontSize: 34, fontWeight: '800', color: colors.white },
   tagline: { fontSize: 16, color: 'rgba(255,255,255,0.78)' },
   card: {
     borderRadius: 28,

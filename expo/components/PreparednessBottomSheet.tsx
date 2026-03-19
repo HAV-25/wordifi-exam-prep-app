@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 
 import Colors from '@/constants/colors';
+import { colors } from '@/theme';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 const SHEET_HEIGHT = SCREEN_HEIGHT * 0.52;
@@ -27,9 +28,9 @@ type PreparednessBottomSheetProps = {
 };
 
 function getBarColor(score: number): string {
-  if (score < 40) return '#E24B4A';
-  if (score < 70) return '#EF9F27';
-  return '#1D9E75';
+  if (score < 40) return colors.red;
+  if (score < 70) return colors.amber;
+  return colors.green;
 }
 
 function BarRow({ label, pct, icon }: { label: string; pct: number; icon: string }) {
@@ -193,7 +194,7 @@ export const PreparednessBottomSheet = React.memo(function PreparednessBottomShe
 
         <View style={styles.statsRow}>
           <View style={styles.statCard}>
-            <Flame color="#EF9F27" size={20} />
+            <Flame color={colors.amber} size={20} />
             <Text style={styles.statValue}>{streak}</Text>
             <Text style={styles.statLabel}>Day streak</Text>
           </View>

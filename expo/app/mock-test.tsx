@@ -17,6 +17,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { OptionButton } from '@/components/OptionButton';
 import { StimulusCard } from '@/components/StimulusCard';
 import Colors from '@/constants/colors';
+import { colors } from '@/theme';
 import {
   abandonMockTest,
   completeMockTest,
@@ -577,7 +578,7 @@ const styles = StyleSheet.create({
     borderRadius: 99,
   },
   horenPill: {
-    backgroundColor: '#1565C0',
+    backgroundColor: colors.blue,
   },
   lesenPill: {
     backgroundColor: '#6A1B9A',
@@ -680,7 +681,7 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 20,
-    backgroundColor: '#1565C0',
+    backgroundColor: colors.blue,
     alignItems: 'center',
     justifyContent: 'center',
   },

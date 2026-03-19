@@ -17,6 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/EmptyState';
 import Colors from '@/constants/colors';
+import { colors } from '@/theme';
 import {
   checkRetestAvailability,
   createSessionLink,
@@ -503,7 +504,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 10,
-    backgroundColor: '#1565C0',
+    backgroundColor: colors.blue,
     alignItems: 'center',
     justifyContent: 'center',
   },

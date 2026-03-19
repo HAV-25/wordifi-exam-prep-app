@@ -1,6 +1,6 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { Check, ChevronLeft, ChevronRight, CircleCheck, Headphones, BookOpenText, Lock, Sparkles } from 'lucide-react-native';
+import { Check, ChevronLeft, CircleCheck, Headphones, BookOpenText, Lock, Sparkles } from 'lucide-react-native';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -24,6 +24,10 @@ import { PlayerNameModal } from '@/components/PlayerNameModal';
 import { ScoreRing } from '@/components/ScoreRing';
 import { StimulusCard } from '@/components/StimulusCard';
 import Colors from '@/constants/colors';
+import { colors } from '@/theme';
+import { CTAButton } from '@/components/CTAButton';
+import { GermanConfetti } from '@/components/GermanConfetti';
+import { GermanFlagBadge } from '@/components/GermanFlagBadge';
 import { signInWithEmail, signInWithGoogle, signUpWithEmail } from '@/lib/authHelpers';
 import { upsertOnboardingProfile, updatePlayerName } from '@/lib/profileHelpers';
 import { supabase } from '@/lib/supabaseClient';
@@ -226,12 +230,16 @@ export default function OnboardingScreen() {
 
   const renderStep1 = () => (
     <View style={styles.splashContainer}>
-      <LinearGradient colors={['#091728', '#10233F', '#0D1F38']} style={StyleSheet.absoluteFillObject} />
+      <LinearGradient colors={[colors.navy, '#10233F', '#0D1F38']} style={StyleSheet.absoluteFillObject} />
+      <GermanConfetti />
       <Animated.View style={[styles.splashContent, { opacity: splashOpacity, transform: [{ scale: splashScale }] }]}>
         <View style={styles.splashLogoWrap}>
-          <Sparkles color={Colors.accent} size={36} />
+          <Sparkles color={colors.green} size={36} />
         </View>
-        <Text style={styles.splashBrand}>Wordifi</Text>
+        <View style={styles.splashBrandRow}>
+          <Text style={styles.splashBrand}>wordifi</Text>
+          <GermanFlagBadge width={22} height={14} />
+        </View>
         <Text style={styles.splashTagline}>Your exam, conquered.</Text>
       </Animated.View>
     </View>
@@ -276,15 +284,11 @@ export default function OnboardingScreen() {
           </View>
         </ScrollView>
         <View style={styles.footer}>
-          <Pressable
-            accessibilityLabel="Continue"
+          <CTAButton
+            label="Continue"
             onPress={() => setStep(3)}
-            style={styles.primaryButton}
             testID="onboarding-step2-continue"
-          >
-            <Text style={styles.primaryButtonText}>Continue</Text>
-            <ChevronRight color="#fff" size={18} />
-          </Pressable>
+          />
         </View>
       </SafeAreaView>
     </View>
@@ -345,16 +349,12 @@ export default function OnboardingScreen() {
           ))}
         </ScrollView>
         <View style={styles.footer}>
-          <Pressable
-            accessibilityLabel="Continue"
-            disabled={!state.selectedLevel}
+          <CTAButton
+            label="Continue"
             onPress={() => setStep(4)}
-            style={[styles.primaryButton, !state.selectedLevel ? styles.buttonDisabled : null]}
+            disabled={!state.selectedLevel}
             testID="onboarding-step3-continue"
-          >
-            <Text style={styles.primaryButtonText}>Continue</Text>
-            <ChevronRight color="#fff" size={18} />
-          </Pressable>
+          />
         </View>
       </SafeAreaView>
     </View>
@@ -428,15 +428,11 @@ export default function OnboardingScreen() {
           </Pressable>
         </ScrollView>
         <View style={styles.footer}>
-          <Pressable
-            accessibilityLabel="Continue"
+          <CTAButton
+            label="Continue"
             onPress={() => setStep(5)}
-            style={styles.primaryButton}
             testID="onboarding-step4-continue"
-          >
-            <Text style={styles.primaryButtonText}>Continue</Text>
-            <ChevronRight color="#fff" size={18} />
-          </Pressable>
+          />
         </View>
       </SafeAreaView>
     </View>
@@ -444,7 +440,8 @@ export default function OnboardingScreen() {
 
   const renderStep5 = () => (
     <View style={styles.stepContainer}>
-      <LinearGradient colors={['#091728', '#10233F']} style={StyleSheet.absoluteFillObject} />
+      <LinearGradient colors={[colors.navy, '#10233F']} style={StyleSheet.absoluteFillObject} />
+      <GermanConfetti />
       <SafeAreaView style={styles.safeInner}>
         <View style={styles.step5Content}>
           <View style={styles.step5Hero}>
@@ -573,17 +570,11 @@ export default function OnboardingScreen() {
 
           {hasAnswer ? (
             <View style={styles.footer}>
-              <Pressable
-                accessibilityLabel="Next question"
+              <CTAButton
+                label={sampleIndex === sampleTotalQuestions - 1 ? 'See results' : 'Next question'}
                 onPress={advanceSample}
-                style={styles.primaryButton}
                 testID="sample-next"
-              >
-                <Text style={styles.primaryButtonText}>
-                  {sampleIndex === sampleTotalQuestions - 1 ? 'See Results' : 'Next Question'}
-                </Text>
-                <ChevronRight color="#fff" size={18} />
-              </Pressable>
+              />
             </View>
           ) : null}
         </SafeAreaView>
@@ -667,14 +658,11 @@ export default function OnboardingScreen() {
           </ScrollView>
 
           <View style={styles.footer}>
-            <Pressable
-              accessibilityLabel="Save results and continue"
+            <CTAButton
+              label="Save your results and keep going"
               onPress={() => setStep(8)}
-              style={styles.primaryButton}
               testID="save-results-continue"
-            >
-              <Text style={styles.primaryButtonText}>Save your results and keep going</Text>
-            </Pressable>
+            />
             <Text style={styles.footerNote}>Your score will be lost if you don't save</Text>
           </View>
         </SafeAreaView>
@@ -742,21 +730,12 @@ export default function OnboardingScreen() {
                 />
               </View>
 
-              <Pressable
-                accessibilityLabel={authMode === 'signUp' ? 'Create account' : 'Sign in'}
-                disabled={!canEmailAuth || isAuthLoading}
+              <CTAButton
+                label="Continue with email"
                 onPress={() => handleAuth('email')}
-                style={[styles.primaryButton, (!canEmailAuth || isAuthLoading) ? styles.buttonDisabled : null]}
+                disabled={!canEmailAuth || isAuthLoading}
                 testID="onboarding-email-auth"
-              >
-                {isAuthLoading ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={styles.primaryButtonText}>
-                    Continue with Email
-                  </Text>
-                )}
-              </Pressable>
+              />
 
               <View style={styles.dividerRow}>
                 <View style={styles.divider} />
@@ -818,14 +797,11 @@ export default function OnboardingScreen() {
         </ScrollView>
 
         <View style={styles.footer}>
-          <Pressable
-            accessibilityLabel="Start free"
+          <CTAButton
+            label="Start free"
             onPress={() => router.replace('/')}
-            style={styles.primaryButton}
             testID="start-free-button"
-          >
-            <Text style={styles.primaryButtonText}>Start Free</Text>
-          </Pressable>
+          />
           <Pressable
             accessibilityLabel="Go premium"
             onPress={() => {
@@ -899,10 +875,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 8,
   },
+  splashBrandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   splashBrand: {
     fontSize: 42,
     fontWeight: '800' as const,
-    color: '#fff',
+    color: colors.white,
     letterSpacing: -0.5,
   },
   splashTagline: {

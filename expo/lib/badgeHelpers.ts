@@ -1,4 +1,5 @@
 import type { BadgeType } from '@/lib/streamHelpers';
+import { BADGE_THRESHOLDS } from '@/theme';
 
 export type BadgeTier = {
   type: BadgeType;
@@ -8,10 +9,10 @@ export type BadgeTier = {
 };
 
 const BADGE_TIERS: BadgeTier[] = [
-  { type: 'platinum', label: 'Platinum', color: '#E5E4E2', minXp: 1000 },
-  { type: 'gold', label: 'Gold', color: '#FFD700', minXp: 500 },
-  { type: 'silver', label: 'Silver', color: '#C0C0C0', minXp: 200 },
-  { type: 'bronze', label: 'Bronze', color: '#CD7F32', minXp: 0 },
+  { type: 'platinum', label: BADGE_THRESHOLDS[3].label, color: BADGE_THRESHOLDS[3].color, minXp: BADGE_THRESHOLDS[3].minXP },
+  { type: 'gold', label: BADGE_THRESHOLDS[2].label, color: BADGE_THRESHOLDS[2].color, minXp: BADGE_THRESHOLDS[2].minXP },
+  { type: 'silver', label: BADGE_THRESHOLDS[1].label, color: BADGE_THRESHOLDS[1].color, minXp: BADGE_THRESHOLDS[1].minXP },
+  { type: 'bronze', label: BADGE_THRESHOLDS[0].label, color: BADGE_THRESHOLDS[0].color, minXp: BADGE_THRESHOLDS[0].minXP },
 ];
 
 export function getBadgeTier(xpTotal: number): BadgeTier {

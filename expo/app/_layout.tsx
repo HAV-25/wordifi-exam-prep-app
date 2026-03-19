@@ -6,7 +6,7 @@ import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { ErrorBoundary } from '@/components/ErrorBoundary';
-import Colors from '@/constants/colors';
+import { colors } from '@/theme';
 import { AuthProvider, useAuth } from '@/providers/AuthProvider';
 
 void SplashScreen.preventAutoHideAsync();
@@ -26,7 +26,7 @@ function RouteGate() {
   if (isLoading) {
     return (
       <View style={styles.loadingWrap}>
-        <ActivityIndicator color={Colors.primary} size="large" />
+        <ActivityIndicator color={colors.navy} size="large" />
       </View>
     );
   }
@@ -54,7 +54,7 @@ function RootLayoutNav() {
   return (
     <>
       <RouteGate />
-      <Stack screenOptions={{ headerBackTitle: 'Back', headerTintColor: Colors.primary }}>
+      <Stack screenOptions={{ headerBackTitle: 'Back', headerTintColor: colors.navy }}>
         <Stack.Screen name="auth" options={{ headerShown: false }} />
         <Stack.Screen name="onboarding" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
@@ -93,7 +93,7 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.background,
+    backgroundColor: colors.surface,
     zIndex: 2,
   },
 });

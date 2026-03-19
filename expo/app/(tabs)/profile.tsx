@@ -11,6 +11,7 @@ import { LevelBadge } from '@/components/LevelBadge';
 import { ScoreRing } from '@/components/ScoreRing';
 import { StreakBadge } from '@/components/StreakBadge';
 import Colors from '@/constants/colors';
+import { colors } from '@/theme';
 import { formatXp, getBadgeTier, getNextBadgeTier } from '@/lib/badgeHelpers';
 import { updateExamDate, updateStudyPlan, fetchUncompletedTeileCount, updatePlayerName } from '@/lib/profileHelpers';
 import { useAuth } from '@/providers/AuthProvider';
@@ -586,7 +587,7 @@ const styles = StyleSheet.create({
 
   playerNameRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 2 },
   avatarCircle: { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.accent, alignItems: 'center', justifyContent: 'center' },
-  avatarInitial: { color: '#FFFFFF', fontSize: 16, fontWeight: '800' as const },
+  avatarInitial: { color: colors.white, fontSize: 16, fontWeight: '800' as const },
   playerNameText: { fontSize: 18, fontWeight: '800' as const, color: Colors.primary },
 
   leaderboardCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: Colors.surface, borderRadius: 20, borderWidth: 1, borderColor: Colors.border, padding: 16 },
@@ -601,7 +602,7 @@ const styles = StyleSheet.create({
   setNameTitle: { fontSize: 14, fontWeight: '700' as const, color: Colors.primary },
   setNameBody: { fontSize: 12, color: Colors.textMuted },
   setNameCta: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, backgroundColor: Colors.accent },
-  setNameCtaText: { color: '#FFFFFF', fontWeight: '700' as const, fontSize: 13 },
+  setNameCtaText: { color: colors.white, fontWeight: '700' as const, fontSize: 13 },
 
   nameModalOverlay: { flex: 1, backgroundColor: 'rgba(9,23,40,0.7)', justifyContent: 'center', alignItems: 'center', padding: 24 },
   nameModalBackdrop: { ...StyleSheet.absoluteFillObject },
@@ -617,7 +618,7 @@ const styles = StyleSheet.create({
   nameModalCancelText: { color: Colors.textMuted, fontWeight: '700' as const, fontSize: 15 },
   nameModalSave: { flex: 1, minHeight: 48, borderRadius: 14, backgroundColor: Colors.accent, alignItems: 'center', justifyContent: 'center' },
   nameModalSaveDisabled: { opacity: 0.5 },
-  nameModalSaveText: { color: '#FFFFFF', fontWeight: '800' as const, fontSize: 15 },
+  nameModalSaveText: { color: colors.white, fontWeight: '800' as const, fontSize: 15 },
 
   planSection: { gap: 12 },
   planSectionTitle: { fontSize: 22, fontWeight: '800' as const, color: Colors.primary, marginBottom: 2 },
@@ -670,5 +671,5 @@ const styles = StyleSheet.create({
   promptBody: { fontSize: 14, color: '#78350F', lineHeight: 21 },
   promptBold: { fontWeight: '800' as const },
   promptCta: { alignSelf: 'flex-start', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, backgroundColor: '#D97706', marginTop: 2 },
-  promptCtaText: { color: '#FFFFFF', fontWeight: '700' as const, fontSize: 14 },
+  promptCtaText: { color: colors.white, fontWeight: '700' as const, fontSize: 14 },
 });

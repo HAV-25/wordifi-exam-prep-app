@@ -18,6 +18,7 @@ import { AudioPlayer } from '@/components/AudioPlayer';
 import { ScoreRing } from '@/components/ScoreRing';
 import { StimulusCard } from '@/components/StimulusCard';
 import Colors from '@/constants/colors';
+import { colors } from '@/theme';
 import { submitQuestionReport } from '@/lib/mockHelpers';
 import { updatePreparednessScore } from '@/lib/streamHelpers';
 import { useAuth } from '@/providers/AuthProvider';
@@ -48,9 +49,9 @@ function formatDuration(seconds: number): string {
 }
 
 function scoreColor(pct: number): string {
-  if (pct < 60) return '#E53935';
-  if (pct < 75) return '#FFB300';
-  if (pct < 90) return '#43A047';
+  if (pct < 60) return colors.red;
+  if (pct < 75) return colors.amber;
+  if (pct < 90) return colors.green;
   return '#FFD700';
 }
 
@@ -635,7 +636,7 @@ const styles = StyleSheet.create({
     fontWeight: '700' as const,
   },
   xpFloat: {
-    color: '#43A047',
+    color: colors.green,
     fontSize: 16,
     fontWeight: '800' as const,
   },
@@ -662,7 +663,7 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: '#1565C0',
+    backgroundColor: colors.blue,
   },
   sectionDotLesen: {
     width: 10,
@@ -850,7 +851,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   horenTag: {
-    backgroundColor: '#1565C0',
+    backgroundColor: colors.blue,
   },
   lesenTag: {
     backgroundColor: '#6A1B9A',

@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ActivityIndicator, Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import Colors from '@/constants/colors';
+import { colors } from '@/theme';
 
 type AudioPlayerProps = {
   audioUrl: string;
@@ -271,7 +272,7 @@ export function AudioPlayer({ audioUrl, onFirstPlay }: AudioPlayerProps) {
 const styles = StyleSheet.create({
   card: {
     borderRadius: 16,
-    backgroundColor: Colors.primaryDeep,
+    backgroundColor: colors.navy,
     padding: 14,
     gap: 10,
   },

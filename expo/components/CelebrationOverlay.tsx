@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { Animated, StyleSheet, Text, View } from 'react-native';
 
 import Colors from '@/constants/colors';
+import { colors } from '@/theme';
 import type { BadgeType } from '@/lib/streamHelpers';
 
 type CelebrationOverlayProps = {
@@ -57,7 +58,7 @@ export function CelebrationOverlay({ badgeType, level, onDismiss }: CelebrationO
 const styles = StyleSheet.create({
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(9, 23, 40, 0.85)',
+    backgroundColor: colors.overlayDark,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 100,

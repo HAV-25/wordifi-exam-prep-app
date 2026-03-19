@@ -14,13 +14,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 
 import Colors from '@/constants/colors';
+import { colors } from '@/theme';
 import { fetchLeaderboard } from '@/lib/profileHelpers';
 import { useAuth } from '@/providers/AuthProvider';
 
 function getScoreColor(score: number): string {
-  if (score >= 70) return '#1D9E75';
-  if (score >= 40) return '#EF9F27';
-  return '#E24B4A';
+  if (score >= 70) return colors.green;
+  if (score >= 40) return colors.amber;
+  return colors.red;
 }
 
 function getScoreBg(score: number): string {
@@ -115,7 +116,7 @@ export default function LeaderboardScreen() {
                 </View>
                 {currentUserRank.streak_count > 0 ? (
                   <View style={styles.streakPill}>
-                    <Flame color="#EF9F27" size={13} />
+                    <Flame color={colors.amber} size={13} />
                     <Text style={styles.streakText}>{currentUserRank.streak_count}</Text>
                   </View>
                 ) : null}
@@ -182,7 +183,7 @@ export default function LeaderboardScreen() {
                         </View>
                         {entry.streak_count > 0 ? (
                           <View style={styles.streakSmall}>
-                            <Flame color="#EF9F27" size={11} />
+                            <Flame color={colors.amber} size={11} />
                             <Text style={styles.streakSmallText}>{entry.streak_count}</Text>
                           </View>
                         ) : null}
@@ -263,7 +264,7 @@ const styles = StyleSheet.create({
   myRankNumber: {
     fontSize: 28,
     fontWeight: '900' as const,
-    color: '#FFFFFF',
+    color: colors.white,
     letterSpacing: -0.5,
   },
   myRankRight: {
@@ -369,7 +370,7 @@ const styles = StyleSheet.create({
   streakText: {
     fontSize: 13,
     fontWeight: '700' as const,
-    color: '#FFFFFF',
+    color: colors.white,
   },
   streakSmall: {
     flexDirection: 'row',
@@ -379,7 +380,7 @@ const styles = StyleSheet.create({
   streakSmallText: {
     fontSize: 12,
     fontWeight: '700' as const,
-    color: '#EF9F27',
+    color: colors.amber,
   },
   noNameWrap: {
     flex: 1,
@@ -415,7 +416,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   noNameCtaText: {
-    color: '#FFFFFF',
+    color: colors.white,
     fontWeight: '700' as const,
     fontSize: 15,
   },
