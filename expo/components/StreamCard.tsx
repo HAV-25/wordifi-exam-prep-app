@@ -13,6 +13,8 @@ import {
 
 import { AudioPlayer } from '@/components/AudioPlayer';
 import Colors from '@/constants/colors';
+// DESIGN SYSTEM — import tokens
+import { colors, shadows, fontSize } from '@/theme';
 import type { AppQuestion } from '@/types/database';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
@@ -130,9 +132,9 @@ export const StreamCard = React.memo(function StreamCard({
       const isCorrectOption = normalizedOption === question.correct_answer.toLowerCase();
       const isSelectedOption = normalizedOption === selectedAnswer.toLowerCase();
 
-      if (isSelectedOption && isCorrectOption) return <Check color="#fff" size={14} />;
-      if (isSelectedOption && !isCorrectOption) return <X color="#fff" size={14} />;
-      if (isCorrectOption) return <Check color="#fff" size={14} />;
+      if (isSelectedOption && isCorrectOption) return <Check color={colors.white} size={14} />;
+      if (isSelectedOption && !isCorrectOption) return <X color={colors.white} size={14} />;
+      if (isCorrectOption) return <Check color={colors.white} size={14} />;
       return null;
     },
     [isAnswered, selectedAnswer, question.correct_answer]
@@ -172,9 +174,9 @@ export const StreamCard = React.memo(function StreamCard({
         {needsAudioGate ? (
           <View style={styles.audioGate}>
             <View style={styles.audioGateIcon}>
-              <Play color="#fff" size={12} />
+              <Play color={colors.white} size={12} />
             </View>
-            <Text style={styles.audioGateText}>Press Play above to unlock answers</Text>
+            <Text style={styles.audioGateText}>Press play above to unlock answers</Text>
           </View>
         ) : null}
 
@@ -182,16 +184,17 @@ export const StreamCard = React.memo(function StreamCard({
           <View style={styles.stimulusWrap}>
             <View style={styles.stimulusHeader}>
               <BookOpenText color={Colors.textMuted} size={14} />
+              {/* FIX: sentence case — removed textTransform uppercase */}
               <Text style={styles.stimulusLabel}>
                 {question.stimulus_type === 'building_directory'
-                  ? 'Building Directory'
+                  ? 'Building directory'
                   : 'Read the following:'}
               </Text>
             </View>
             <ScrollView
               style={styles.stimulusScroll}
               nestedScrollEnabled
-              showsVerticalScrollIndicator={false}
+              showsVerticalScrollIndicator
             >
               <Text style={styles.stimulusText}>{question.stimulus_text}</Text>
             </ScrollView>
@@ -262,6 +265,7 @@ export const StreamCard = React.memo(function StreamCard({
         </Animated.View>
       </ScrollView>
 
+      {/* FIX: white background, shadow instead of border */}
       <Animated.View style={[styles.explanationPanel, { height: panelHeight }]}>
         {isAnswered ? (
           <ScrollView
@@ -339,9 +343,18 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: Colors.surfaceMuted,
   },
+  audioGateIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: Colors.accent,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  // FIX: sentence case — no textTransform uppercase
   audioGateText: {
     color: Colors.textMuted,
-    fontSize: 13,
+    fontSize: fontSize.bodySm,
     fontWeight: '600' as const,
   },
   stimulusWrap: {
@@ -360,11 +373,11 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 6,
   },
+  // FIX: removed textTransform uppercase — sentence case rule
   stimulusLabel: {
-    fontSize: 12,
+    fontSize: fontSize.label,
     fontWeight: '700' as const,
     color: Colors.textMuted,
-    textTransform: 'uppercase',
     letterSpacing: 0.3,
   },
   stimulusScroll: {
@@ -372,9 +385,9 @@ const styles = StyleSheet.create({
     paddingBottom: 14,
   },
   stimulusText: {
-    fontSize: 14,
+    fontSize: fontSize.bodyMd,
     lineHeight: 22,
-    color: Colors.text,
+    color: colors.text,
   },
   stimulusFade: {
     position: 'absolute',
@@ -384,11 +397,12 @@ const styles = StyleSheet.create({
     height: 24,
     backgroundColor: 'rgba(255,255,255,0.8)',
   },
+  // FIX: color → colors.text (was Colors.primary)
   questionText: {
-    fontSize: 18,
+    fontSize: fontSize.displaySm,
     lineHeight: 28,
     fontWeight: '500' as const,
-    color: Colors.primary,
+    color: colors.text,
   },
   optionsWrap: {
     gap: 0,
@@ -405,14 +419,15 @@ const styles = StyleSheet.create({
   optionDefault: {
     backgroundColor: 'transparent',
   },
+  // FIX: rgba green/red tints (not Material green/red)
   optionCorrect: {
-    backgroundColor: '#E8F5E9',
+    backgroundColor: 'rgba(20, 184, 106, 0.12)',
   },
   optionWrong: {
-    backgroundColor: '#FFEBEE',
+    backgroundColor: 'rgba(226, 77, 77, 0.12)',
   },
   optionCorrectHighlight: {
-    backgroundColor: '#E8F5E9',
+    backgroundColor: 'rgba(20, 184, 106, 0.12)',
   },
   optionFaded: {
     backgroundColor: 'transparent',
@@ -435,26 +450,27 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surfaceMuted,
   },
   optionKey: {
-    fontSize: 13,
+    fontSize: fontSize.bodySm,
     fontWeight: '800' as const,
     color: Colors.textMuted,
   },
   optionLabel: {
     flex: 1,
-    fontSize: 15,
+    fontSize: fontSize.bodyLg,
     lineHeight: 22,
     fontWeight: '500' as const,
-    color: Colors.text,
+    color: colors.text,
   },
   optionTextDefault: {
-    color: Colors.text,
+    color: colors.text,
   },
+  // FIX: theme green/red (not Material #2E7D32 / #C62828)
   optionTextCorrect: {
-    color: '#2E7D32',
+    color: colors.green,
     fontWeight: '600' as const,
   },
   optionTextWrong: {
-    color: '#C62828',
+    color: colors.red,
     fontWeight: '600' as const,
   },
   optionTextFaded: {
@@ -476,17 +492,17 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   binaryText: {
-    fontSize: 15,
+    fontSize: fontSize.bodyLg,
     fontWeight: '600' as const,
-    color: Colors.text,
+    color: colors.text,
   },
+  // FIX: white bg + shadow instead of surface bg + border
   explanationPanel: {
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.white,
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     overflow: 'hidden',
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
+    ...shadows.panel,
   },
   explanationScroll: {
     flex: 1,
@@ -501,14 +517,15 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   resultLabel: {
-    fontSize: 16,
+    fontSize: fontSize.bodyLg,
     fontWeight: '700' as const,
   },
+  // FIX: theme green/red (not Material colours)
   resultCorrect: {
-    color: '#2E7D32',
+    color: colors.green,
   },
   resultWrong: {
-    color: '#C62828',
+    color: colors.red,
   },
   langToggle: {
     flexDirection: 'row',
@@ -520,7 +537,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   langOption: {
-    fontSize: 12,
+    fontSize: fontSize.label,
     fontWeight: '600' as const,
     color: Colors.textMuted,
   },
@@ -529,13 +546,13 @@ const styles = StyleSheet.create({
     fontWeight: '800' as const,
   },
   langSep: {
-    fontSize: 12,
+    fontSize: fontSize.label,
     color: Colors.border,
   },
   explanationText: {
-    fontSize: 14,
+    fontSize: fontSize.bodyMd,
     lineHeight: 22,
-    color: Colors.text,
+    color: colors.text,
   },
   grammarCard: {
     backgroundColor: Colors.surfaceMuted,
@@ -543,17 +560,17 @@ const styles = StyleSheet.create({
     padding: 14,
     gap: 4,
   },
+  // FIX: sentence case label — removed uppercase (grammar rule is not a chip)
   grammarLabel: {
-    fontSize: 11,
+    fontSize: fontSize.micro,
     fontWeight: '700' as const,
     color: Colors.textMuted,
-    textTransform: 'uppercase',
     letterSpacing: 0.3,
   },
   grammarText: {
-    fontSize: 13,
+    fontSize: fontSize.bodySm,
     lineHeight: 20,
-    color: Colors.text,
+    color: colors.text,
   },
   reportLink: {
     flexDirection: 'row',
@@ -563,16 +580,8 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   reportText: {
-    fontSize: 12,
+    fontSize: fontSize.label,
     color: Colors.textMuted,
     fontWeight: '500' as const,
-  },
-  audioGateIcon: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: Colors.accent,
-    alignItems: 'center' as const,
-    justifyContent: 'center' as const,
   },
 });
