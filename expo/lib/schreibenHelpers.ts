@@ -21,45 +21,70 @@ export const assessSchreiben = async (
 
   console.log('schreibenHelpers assessSchreiben invoking edge function...');
 
-  const { data, error } = await supabase.functions.invoke('assess-schreiben', {
-    body: {
-      question_id: question.id,
-      session_id: sessionId,
-      user_text: userText,
-      word_count: wordCount,
-      level: question.level,
-      task_type: taskType,
-      required_points: requiredPoints,
-      options: taskType === 'form_fill' ? question.options : undefined,
-    },
-  });
+  const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL ?? 'https://wwfiauhsbssjowaxmqyn.supabase.co';
+  const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
 
-  console.log('schreibenHelpers assessSchreiben raw response', {
-    dataType: typeof data,
-    dataKeys: data ? Object.keys(data) : null,
-    hasAssessment: data?.assessment !== undefined,
-    hasOverallScore: data?.overall_score !== undefined,
-    error: error ? String(error) : null,
-  });
+  const { data: sessionData } = await supabase.auth.getSession();
+  const accessToken = sessionData?.session?.access_token ?? '';
 
-  if (error) {
-    console.log('schreibenHelpers assessSchreiben error object', JSON.stringify(error));
-    throw new Error(typeof error === 'string' ? error : (error as { message?: string })?.message ?? 'Edge function error');
+  console.log('schreibenHelpers assessSchreiben hasAccessToken:', !!accessToken);
+
+  const requestBody = {
+    question_id: question.id,
+    session_id: sessionId,
+    user_text: userText,
+    word_count: wordCount,
+    level: question.level,
+    task_type: taskType,
+    required_points: requiredPoints,
+    options: taskType === 'form_fill' ? question.options : undefined,
+  };
+
+  console.log('schreibenHelpers assessSchreiben request body', JSON.stringify(requestBody).slice(0, 300));
+
+  let response: Response;
+  try {
+    response = await fetch(`${SUPABASE_URL}/functions/v1/assess-schreiben`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`,
+        'apikey': SUPABASE_ANON_KEY,
+      },
+      body: JSON.stringify(requestBody),
+    });
+  } catch (fetchErr) {
+    console.log('schreibenHelpers assessSchreiben fetch network error', String(fetchErr));
+    throw new Error('Network error calling assess-schreiben');
   }
 
-  if (!data) {
-    console.log('schreibenHelpers assessSchreiben: data is null/undefined');
-    throw new Error('No data returned from assessment');
+  console.log('schreibenHelpers assessSchreiben response status', response.status);
+
+  const responseText = await response.text();
+  console.log('schreibenHelpers assessSchreiben response body', responseText.slice(0, 500));
+
+  if (!response.ok) {
+    throw new Error(`Edge function returned ${response.status}: ${responseText.slice(0, 200)}`);
   }
 
-  const assessment: AssessmentResult | undefined = data.assessment ?? (data.overall_score !== undefined ? data as unknown as AssessmentResult : undefined);
+  let data: Record<string, unknown>;
+  try {
+    data = JSON.parse(responseText);
+  } catch {
+    console.log('schreibenHelpers assessSchreiben: failed to parse JSON');
+    throw new Error('Invalid JSON from edge function');
+  }
+
+  console.log('schreibenHelpers assessSchreiben parsed keys:', Object.keys(data));
+
+  const assessment: AssessmentResult | undefined = (data.assessment as AssessmentResult | undefined) ?? (data.overall_score !== undefined ? (data as unknown as AssessmentResult) : undefined);
 
   if (!assessment) {
-    console.log('schreibenHelpers assessSchreiben: could not find assessment in response. Full data:', JSON.stringify(data).slice(0, 500));
+    console.log('schreibenHelpers assessSchreiben: could not find assessment. Full data:', JSON.stringify(data).slice(0, 500));
     throw new Error('Assessment not found in response');
   }
 
-  console.log('schreibenHelpers assessSchreiben result', assessment.overall_score);
+  console.log('schreibenHelpers assessSchreiben result score:', assessment.overall_score);
   return assessment;
 };
 
