@@ -22,7 +22,7 @@ export const assessSchreiben = async (
   console.log('schreibenHelpers assessSchreiben invoking edge function...');
 
   const SUPABASE_URL = 'https://wwfiauhsbssjowaxmqyn.supabase.co';
-  const SUPABASE_ANON_KEY = 'sb_publishable_7Ei27k750MIfF3Vm7pz8eA_FcSPSR9v';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind3ZmlhdWhzYnNzam93YXhtcXluIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE0MTQxMzUsImV4cCI6MjA4Njk5MDEzNX0.lSPPEQCtdigdXpwB2X5hUTrC2dThil6qleQtqcUEKAE';
 
   let { data: sessionData } = await supabase.auth.getSession();
   let accessToken = sessionData?.session?.access_token ?? '';
