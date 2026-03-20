@@ -21,8 +21,8 @@ export const assessSchreiben = async (
 
   console.log('schreibenHelpers assessSchreiben invoking edge function...');
 
-  const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL ?? 'https://wwfiauhsbssjowaxmqyn.supabase.co';
-  const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
+  const SUPABASE_URL = 'https://wwfiauhsbssjowaxmqyn.supabase.co';
+  const SUPABASE_ANON_KEY = 'sb_publishable_7Ei27k750MIfF3Vm7pz8eA_FcSPSR9v';
 
   let { data: sessionData } = await supabase.auth.getSession();
   let accessToken = sessionData?.session?.access_token ?? '';
