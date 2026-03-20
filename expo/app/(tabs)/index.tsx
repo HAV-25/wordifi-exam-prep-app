@@ -19,9 +19,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { CelebrationOverlay } from '@/components/CelebrationOverlay';
+import { PaywallModal } from '@/components/PaywallModal';
 import { PreparednessBottomSheet } from '@/components/PreparednessBottomSheet';
 import { ReportModal } from '@/components/ReportModal';
 import { StreamCard } from '@/components/StreamCard';
+import { TrialBanner } from '@/components/TrialBanner';
 import Colors from '@/constants/colors';
 import { colors } from '@/theme';
 import { didCrossBadgeThreshold, formatXp, getBadgeTier } from '@/lib/badgeHelpers';
@@ -35,6 +37,7 @@ import {
   writeStreamAnswer,
   type BadgeType,
 } from '@/lib/streamHelpers';
+import { useAccess } from '@/providers/AccessProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import type { AppQuestion } from '@/types/database';
 
@@ -51,10 +54,12 @@ type AnswerRecord = {
 
 export default function TestStreamScreen() {
   const { profile, user, refreshProfile } = useAuth();
+  const { access, isStreamLimited, decrementStreamRemaining, incrementDailyStreamCount } = useAccess();
   const queryClient = useQueryClient();
   const router = useRouter();
   const userId = user?.id ?? '';
   const targetLevel = profile?.target_level ?? 'A1';
+  const [showPaywall, setShowPaywall] = useState<boolean>(false);
 
   const [currentIndex, setCurrentIndex] = useState<number>(0);
   const [answeredMap, setAnsweredMap] = useState<Record<string, string>>({});
@@ -212,6 +217,9 @@ export default function TestStreamScreen() {
       setAnsweredMap((prev) => ({ ...prev, [questionId]: selectedKey }));
       answeredCountRef.current += 1;
 
+      decrementStreamRemaining();
+      incrementDailyStreamCount().catch(() => {});
+
       const newTotal = totalAnswered + 1;
       setTotalAnswered(newTotal);
       AsyncStorage.setItem(SWIPE_HINT_KEY, String(newTotal)).catch(() => {});
@@ -285,7 +293,7 @@ export default function TestStreamScreen() {
       userId, localXp, localStreak, profile, totalAnswered,
       ensureSession, writeBlockSession, targetLevel, questions.length,
       currentIndex, fetchMoreQuestions, refreshProfile, checkMilestones, animateGaugePulse,
-      showStreakToastBanner,
+      showStreakToastBanner, decrementStreamRemaining, incrementDailyStreamCount,
     ]
   );
 
@@ -296,6 +304,11 @@ export default function TestStreamScreen() {
   const advanceToNext = useCallback(() => {
     if (isAnimatingRef.current) return;
     if (currentIndex >= questions.length - 1) return;
+
+    if (isStreamLimited) {
+      setShowPaywall(true);
+      return;
+    }
 
     isAnimatingRef.current = true;
     setPreviousIndex(null);
@@ -311,7 +324,7 @@ export default function TestStreamScreen() {
       translateY.setValue(0);
       isAnimatingRef.current = false;
     });
-  }, [currentIndex, questions.length, translateY]);
+  }, [currentIndex, questions.length, translateY, isStreamLimited]);
 
   const goToPrevious = useCallback(() => {
     if (isAnimatingRef.current) return;
@@ -472,6 +485,12 @@ export default function TestStreamScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      {access.trial_hours_remaining !== null ? (
+        <TrialBanner
+          hoursRemaining={access.trial_hours_remaining}
+          onUpgrade={() => setShowPaywall(true)}
+        />
+      ) : null}
       <View style={styles.statusBar}>
         <View style={styles.statusLeft}>
           {currentQuestion ? (
@@ -586,6 +605,15 @@ export default function TestStreamScreen() {
         questionId={reportQuestionId ?? ''}
         userId={userId}
         onClose={() => setReportQuestionId(null)}
+      />
+
+      <PaywallModal
+        visible={showPaywall}
+        variant="stream_limit"
+        onUpgrade={() => {
+          setShowPaywall(false);
+        }}
+        onDismiss={() => setShowPaywall(false)}
       />
     </SafeAreaView>
   );

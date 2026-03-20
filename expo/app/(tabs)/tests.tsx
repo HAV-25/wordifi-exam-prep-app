@@ -16,6 +16,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/EmptyState';
+import { PaywallModal } from '@/components/PaywallModal';
 import Colors from '@/constants/colors';
 import { colors } from '@/theme';
 import {
@@ -26,6 +27,7 @@ import {
   type RetestInfo,
   type TeilInfo,
 } from '@/lib/sectionalHelpers';
+import { useAccess } from '@/providers/AccessProvider';
 import { useAuth } from '@/providers/AuthProvider';
 
 type SetupState = {
@@ -52,8 +54,11 @@ function formatRetestDate(dateStr: string): string {
 
 export default function TestsScreen() {
   const { profile, user } = useAuth();
+  const { access } = useAccess();
   const userId = user?.id ?? '';
   const targetLevel = profile?.target_level ?? 'A1';
+  const [showPaywall, setShowPaywall] = useState<boolean>(false);
+  const sectionalEnabled = access.sectional_tests_enabled;
 
   const [setup, setSetup] = useState<SetupState>({
     visible: false,
@@ -87,6 +92,10 @@ export default function TestsScreen() {
 
   const openSetup = useCallback(
     async (teilInfo: TeilInfo) => {
+      if (!sectionalEnabled) {
+        setShowPaywall(true);
+        return;
+      }
       setSetup({
         visible: true,
         teilInfo,
@@ -104,7 +113,7 @@ export default function TestsScreen() {
         setSetup((prev) => ({ ...prev, isLoadingRetest: false }));
       }
     },
-    [userId, targetLevel]
+    [userId, targetLevel, sectionalEnabled]
   );
 
   const closeSetup = useCallback(() => {
@@ -213,7 +222,7 @@ export default function TestsScreen() {
           key={`${info.section}-${info.teil}-${info.question_type}`}
           accessibilityLabel={`${info.section} Teil ${info.teil}`}
           onPress={() => openSetup(info)}
-          style={styles.teilCard}
+          style={[styles.teilCard, !sectionalEnabled && styles.teilCardDisabled]}
           testID={`teil-card-${info.section}-${info.teil}`}
         >
           <View style={styles.teilCardLeft}>
@@ -236,7 +245,7 @@ export default function TestsScreen() {
         </Pressable>
       );
     },
-    [openSetup]
+    [openSetup, sectionalEnabled]
   );
 
   const renderSectionGroup = useCallback(
@@ -424,6 +433,12 @@ export default function TestsScreen() {
           </Pressable>
         </Pressable>
       </Modal>
+      <PaywallModal
+        visible={showPaywall}
+        variant="sectional"
+        onUpgrade={() => setShowPaywall(false)}
+        onDismiss={() => setShowPaywall(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -551,6 +566,9 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
     padding: 14,
     gap: 12,
+  },
+  teilCardDisabled: {
+    opacity: 0.45,
   },
   teilCardLeft: {
     flexDirection: 'row',

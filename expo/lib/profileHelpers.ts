@@ -25,17 +25,19 @@ export async function ensureUserProfile(user: User): Promise<UserProfile> {
     return data as UserProfile;
   }
 
+  const trialExpiresAt = new Date(Date.now() + 72 * 60 * 60 * 1000).toISOString();
+
   const { data: inserted, error: insertError } = await supabase
     .from('user_profiles')
     .insert({
       id: user.id,
-      subscription_tier: 'free',
-      trial_active: false,
+      subscription_tier: 'free_trial',
+      trial_active: true,
       preparedness_score: 0,
       streak_count: 0,
       xp_total: 0,
       credit_balance: 0,
-    })
+    } as never)
     .select('*')
     .single();
 
@@ -43,6 +45,15 @@ export async function ensureUserProfile(user: User): Promise<UserProfile> {
     console.log('ensureUserProfile insert error', insertError);
     throw insertError ?? new Error('Profile creation failed');
   }
+
+  console.log('ensureUserProfile new user created with free_trial tier, trial expires at', trialExpiresAt);
+
+  await supabase
+    .from('user_profiles')
+    .update({
+      trial_expires_at: trialExpiresAt,
+    } as never)
+    .eq('id', user.id);
 
   return inserted as UserProfile;
 }
@@ -59,7 +70,6 @@ export async function upsertOnboardingProfile(
         target_level: payload.targetLevel,
         exam_type: payload.examType,
         exam_date: payload.examDate,
-        subscription_tier: 'free',
         updated_at: new Date().toISOString(),
       },
       { onConflict: 'id' }

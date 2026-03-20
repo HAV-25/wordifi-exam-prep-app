@@ -7,6 +7,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { colors } from '@/theme';
+import { AccessProvider } from '@/providers/AccessProvider';
 import { AuthProvider, useAuth } from '@/providers/AuthProvider';
 
 void SplashScreen.preventAutoHideAsync();
@@ -75,11 +76,13 @@ export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <GestureHandlerRootView style={styles.gestureRoot}>
-          <ErrorBoundary>
-            <RootLayoutNav />
-          </ErrorBoundary>
-        </GestureHandlerRootView>
+        <AccessProvider>
+          <GestureHandlerRootView style={styles.gestureRoot}>
+            <ErrorBoundary>
+              <RootLayoutNav />
+            </ErrorBoundary>
+          </GestureHandlerRootView>
+        </AccessProvider>
       </AuthProvider>
     </QueryClientProvider>
   );

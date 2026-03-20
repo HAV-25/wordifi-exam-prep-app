@@ -15,6 +15,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/EmptyState';
+import { PaywallModal } from '@/components/PaywallModal';
 import Colors from '@/constants/colors';
 import {
   checkMockRetestAvailability,
@@ -23,6 +24,7 @@ import {
   getMockTiming,
   type MockTestInfo,
 } from '@/lib/mockHelpers';
+import { useAccess } from '@/providers/AccessProvider';
 import { useAuth } from '@/providers/AuthProvider';
 
 type SetupState = {
@@ -42,9 +44,12 @@ function formatRetestDate(dateStr: string): string {
 
 export default function MockScreen() {
   const { profile, user } = useAuth();
+  const { access } = useAccess();
   const userId = user?.id ?? '';
   const targetLevel = profile?.target_level ?? 'A1';
   const examType = profile?.exam_type ?? 'TELC';
+  const [showPaywall, setShowPaywall] = useState<boolean>(false);
+  const mockEnabled = access.mock_tests_enabled;
 
   const [setup, setSetup] = useState<SetupState>({
     visible: false,
@@ -67,6 +72,10 @@ export default function MockScreen() {
 
   const openSetup = useCallback(async () => {
     if (!info) return;
+    if (!mockEnabled) {
+      setShowPaywall(true);
+      return;
+    }
     setSetup({
       visible: true,
       info,
@@ -88,7 +97,7 @@ export default function MockScreen() {
     } catch {
       setSetup((prev) => ({ ...prev, isLoadingRetest: false }));
     }
-  }, [info, userId, targetLevel]);
+  }, [info, userId, targetLevel, mockEnabled]);
 
   const closeSetup = useCallback(() => {
     setSetup((prev) => ({ ...prev, visible: false }));
@@ -155,7 +164,7 @@ export default function MockScreen() {
                 key={level}
                 accessibilityLabel={`${level} mock test`}
                 onPress={isTarget ? openSetup : undefined}
-                style={[styles.mockCard, !isTarget ? styles.mockCardLocked : null]}
+                style={[styles.mockCard, !isTarget ? styles.mockCardLocked : null, isTarget && !mockEnabled ? styles.mockCardGated : null]}
                 testID={`mock-card-${level}`}
                 disabled={!isTarget}
               >
@@ -348,6 +357,13 @@ export default function MockScreen() {
           </Pressable>
         </Pressable>
       </Modal>
+
+      <PaywallModal
+        visible={showPaywall}
+        variant="mock"
+        onUpgrade={() => setShowPaywall(false)}
+        onDismiss={() => setShowPaywall(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -415,6 +431,9 @@ const styles = StyleSheet.create({
   },
   mockCardLocked: {
     opacity: 0.5,
+  },
+  mockCardGated: {
+    opacity: 0.6,
   },
   mockCardHeader: {
     flexDirection: 'row',
