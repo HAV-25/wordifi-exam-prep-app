@@ -24,8 +24,27 @@ export const assessSchreiben = async (
   const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL ?? 'https://wwfiauhsbssjowaxmqyn.supabase.co';
   const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
 
-  const { data: sessionData } = await supabase.auth.getSession();
-  const accessToken = sessionData?.session?.access_token ?? '';
+  let { data: sessionData } = await supabase.auth.getSession();
+  let accessToken = sessionData?.session?.access_token ?? '';
+
+  if (!accessToken) {
+    console.log('schreibenHelpers assessSchreiben: no access token, attempting refresh...');
+    const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
+    if (refreshError || !refreshed.session) {
+      console.log('schreibenHelpers assessSchreiben: session refresh failed', refreshError);
+      throw new Error('Session expired — please sign in again');
+    }
+    accessToken = refreshed.session.access_token;
+    console.log('schreibenHelpers assessSchreiben: session refreshed successfully');
+  } else {
+    const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
+    if (!refreshError && refreshed.session) {
+      accessToken = refreshed.session.access_token;
+      console.log('schreibenHelpers assessSchreiben: proactively refreshed session token');
+    } else {
+      console.log('schreibenHelpers assessSchreiben: proactive refresh failed, using existing token');
+    }
+  }
 
   console.log('schreibenHelpers assessSchreiben hasAccessToken:', !!accessToken);
 
