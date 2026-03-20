@@ -289,6 +289,9 @@ export default function OnboardingScreen() {
             onPress={() => setStep(3)}
             testID="onboarding-step2-continue"
           />
+          <Pressable onPress={() => router.push('/auth')} style={styles.signInLink} testID="onboarding-signin-link">
+            <Text style={styles.signInLinkText}>Already a user? <Text style={styles.signInLinkBold}>Sign in</Text></Text>
+          </Pressable>
         </View>
       </SafeAreaView>
     </View>
@@ -1631,5 +1634,18 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600' as const,
     color: Colors.primary,
+  },
+  signInLink: {
+    marginTop: 16,
+    alignItems: 'center' as const,
+    paddingVertical: 8,
+  },
+  signInLinkText: {
+    fontSize: 14,
+    color: colors.muted,
+  },
+  signInLinkBold: {
+    fontWeight: '600' as const,
+    color: colors.blue,
   },
 });
