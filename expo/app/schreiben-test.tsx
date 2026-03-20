@@ -2,6 +2,7 @@ import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { PenLine } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Animated,
   Pressable,
@@ -16,7 +17,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { SchreibenQuestion } from '@/components/SchreibenQuestion';
 import { SchreibenResult } from '@/components/SchreibenResult';
 import { colors, fontSize, radius, shadows, spacing } from '@/theme';
-import { assessSchreiben } from '@/lib/schreibenHelpers';
+import { assessSchreiben, fetchExistingSubmission } from '@/lib/schreibenHelpers';
 import { updatePreparednessScore } from '@/lib/streamHelpers';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/providers/AuthProvider';
@@ -29,6 +30,7 @@ type QuestionState = {
   isLoading: boolean;
   assessment: AssessmentResult | null;
   error: string | null;
+  isLoadingCached: boolean;
 };
 
 export default function SchreibenTestScreen() {
@@ -116,12 +118,79 @@ export default function SchreibenTestScreen() {
     }).start();
   }, [currentIndex, questions.length, progressAnim]);
 
+  const checkCachedAssessment = useCallback(async (index: number) => {
+    const question = questions[index];
+    if (!question || !userId) return;
+
+    const existing = questionStates[index];
+    if (existing?.assessment || existing?.isLoading || existing?.isLoadingCached) return;
+
+    setQuestionStates((prev) => ({
+      ...prev,
+      [index]: {
+        isSubmitted: false,
+        isLoading: false,
+        assessment: null,
+        error: null,
+        isLoadingCached: true,
+      },
+    }));
+
+    try {
+      const cached = await fetchExistingSubmission(userId, question.id);
+      if (cached) {
+        console.log('SchreibenTest found cached assessment for question', index);
+        setQuestionStates((prev) => ({
+          ...prev,
+          [index]: {
+            isSubmitted: true,
+            isLoading: false,
+            assessment: cached,
+            error: null,
+            isLoadingCached: false,
+          },
+        }));
+        setTotalScore((prev) => prev + cached.overall_score);
+        setTotalMaxScore((prev) => prev + cached.max_score);
+      } else {
+        setQuestionStates((prev) => ({
+          ...prev,
+          [index]: {
+            isSubmitted: false,
+            isLoading: false,
+            assessment: null,
+            error: null,
+            isLoadingCached: false,
+          },
+        }));
+      }
+    } catch (err) {
+      console.log('SchreibenTest checkCachedAssessment error', err);
+      setQuestionStates((prev) => ({
+        ...prev,
+        [index]: {
+          isSubmitted: false,
+          isLoading: false,
+          assessment: null,
+          error: null,
+          isLoadingCached: false,
+        },
+      }));
+    }
+  }, [questions, userId, questionStates]);
+
+  useEffect(() => {
+    if (questions.length === 0 || !userId) return;
+    void checkCachedAssessment(currentIndex);
+  }, [currentIndex, questions.length, userId, checkCachedAssessment]);
+
   const currentQuestion = questions[currentIndex] ?? null;
   const currentState = questionStates[currentIndex] ?? {
     isSubmitted: false,
     isLoading: false,
     assessment: null,
     error: null,
+    isLoadingCached: false,
   };
 
   const handleSubmit = useCallback(async (userText: string, wordCount: number) => {
@@ -129,7 +198,7 @@ export default function SchreibenTestScreen() {
 
     setQuestionStates((prev) => ({
       ...prev,
-      [currentIndex]: { isSubmitted: true, isLoading: true, assessment: null, error: null },
+      [currentIndex]: { isSubmitted: true, isLoading: true, assessment: null, error: null, isLoadingCached: false },
     }));
 
     const timeoutId = setTimeout(() => {
@@ -156,7 +225,7 @@ export default function SchreibenTestScreen() {
 
       setQuestionStates((prev) => ({
         ...prev,
-        [currentIndex]: { isSubmitted: true, isLoading: false, assessment: result, error: null },
+        [currentIndex]: { isSubmitted: true, isLoading: false, assessment: result, error: null, isLoadingCached: false },
       }));
 
       setTotalScore((prev) => prev + result.overall_score);
@@ -187,6 +256,7 @@ export default function SchreibenTestScreen() {
           isLoading: false,
           assessment: null,
           error: 'Bewertung nicht verfügbar. Bitte versuche es später.',
+          isLoadingCached: false,
         },
       }));
     }
@@ -195,7 +265,7 @@ export default function SchreibenTestScreen() {
   const handleRetry = useCallback(() => {
     setQuestionStates((prev) => ({
       ...prev,
-      [currentIndex]: { isSubmitted: false, isLoading: false, assessment: null, error: null },
+      [currentIndex]: { isSubmitted: false, isLoading: false, assessment: null, error: null, isLoadingCached: false },
     }));
   }, [currentIndex]);
 
@@ -345,6 +415,8 @@ export default function SchreibenTestScreen() {
     );
   }
 
+  const isLoadingCached = currentState.isLoadingCached;
+
   return (
     <View style={styles.screen}>
       <Stack.Screen
@@ -381,7 +453,12 @@ export default function SchreibenTestScreen() {
         </View>
       </View>
 
-      {currentQuestion ? (
+      {isLoadingCached ? (
+        <View style={styles.loadingWrap}>
+          <ActivityIndicator color={colors.blue} size="large" />
+          <Text style={styles.loadingText}>Wird geladen...</Text>
+        </View>
+      ) : currentQuestion ? (
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           {currentState.assessment ? (
             <SchreibenResult
@@ -542,6 +619,17 @@ const styles = StyleSheet.create({
     fontSize: fontSize.bodyMd,
     color: colors.navy,
     fontWeight: '700' as const,
+  },
+  loadingWrap: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.md,
+  },
+  loadingText: {
+    fontSize: fontSize.bodyMd,
+    color: colors.muted,
+    fontWeight: '600' as const,
   },
   summaryContent: {
     padding: spacing.xl,

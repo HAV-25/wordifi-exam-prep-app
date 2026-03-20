@@ -138,11 +138,23 @@ export async function fetchSchreibenTeile(level: string): Promise<Array<{ teil: 
   return result;
 }
 
+function shuffleArray<T>(array: T[]): T[] {
+  const shuffled = [...array];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const temp = shuffled[i]!;
+    shuffled[i] = shuffled[j]!;
+    shuffled[j] = temp;
+  }
+  return shuffled;
+}
+
 export async function fetchSchreibenQuestions(
   level: string,
-  teil: number
+  teil: number,
+  limit: number = 10
 ): Promise<AppQuestion[]> {
-  console.log('schreibenHelpers fetchSchreibenQuestions', { level, teil });
+  console.log('schreibenHelpers fetchSchreibenQuestions', { level, teil, limit });
 
   const { data, error } = await supabase
     .from('app_questions')
@@ -150,13 +162,49 @@ export async function fetchSchreibenQuestions(
     .eq('level', level)
     .eq('section', 'Schreiben')
     .eq('teil', teil)
-    .eq('is_active', true)
-    .order('question_number', { ascending: true });
+    .eq('is_active', true);
 
   if (error) {
     console.log('fetchSchreibenQuestions error', error);
     throw error;
   }
 
-  return (data ?? []) as AppQuestion[];
+  const all = (data ?? []) as AppQuestion[];
+  const shuffled = shuffleArray(all);
+  return shuffled.slice(0, limit);
+}
+
+export async function fetchExistingSubmission(
+  userId: string,
+  questionId: string
+): Promise<AssessmentResult | null> {
+  console.log('schreibenHelpers fetchExistingSubmission', { userId, questionId });
+
+  const { data, error } = await supabase
+    .from('schreiben_submissions')
+    .select('assessment_json, score, passed')
+    .eq('user_id', userId)
+    .eq('question_id', questionId)
+    .maybeSingle();
+
+  if (error) {
+    console.log('fetchExistingSubmission error', error);
+    return null;
+  }
+
+  if (!data) return null;
+
+  const row = data as Record<string, unknown>;
+  if (row.assessment_json) {
+    try {
+      const parsed = typeof row.assessment_json === 'string'
+        ? JSON.parse(row.assessment_json)
+        : row.assessment_json;
+      return parsed as AssessmentResult;
+    } catch {
+      console.log('fetchExistingSubmission: failed to parse assessment_json');
+    }
+  }
+
+  return null;
 }

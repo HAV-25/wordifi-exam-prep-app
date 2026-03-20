@@ -19,6 +19,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { CelebrationOverlay } from '@/components/CelebrationOverlay';
+import { HomeDashboard } from '@/components/HomeDashboard';
 import { PaywallModal } from '@/components/PaywallModal';
 import { PreparednessBottomSheet } from '@/components/PreparednessBottomSheet';
 import { ReportModal } from '@/components/ReportModal';
@@ -60,6 +61,7 @@ export default function TestStreamScreen() {
   const userId = user?.id ?? '';
   const targetLevel = profile?.target_level ?? 'A1';
   const [showPaywall, setShowPaywall] = useState<boolean>(false);
+  const [showDashboard, setShowDashboard] = useState<boolean>(true);
 
   const [currentIndex, setCurrentIndex] = useState<number>(0);
   const [answeredMap, setAnsweredMap] = useState<Record<string, string>>({});
@@ -438,6 +440,30 @@ export default function TestStreamScreen() {
   const isFirstLaunch = useMemo(() => {
     return Object.keys(answeredMap).length === 0 && totalAnswered === 0 && questions.length > 0;
   }, [answeredMap, totalAnswered, questions.length]);
+
+  const handleStartPractice = useCallback(() => {
+    setShowDashboard(false);
+  }, []);
+
+  if (showDashboard) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        {access.trial_hours_remaining !== null ? (
+          <TrialBanner
+            hoursRemaining={access.trial_hours_remaining}
+            onUpgrade={() => setShowPaywall(true)}
+          />
+        ) : null}
+        <HomeDashboard onStartPractice={handleStartPractice} />
+        <PaywallModal
+          visible={showPaywall}
+          variant="stream_limit"
+          onUpgrade={() => setShowPaywall(false)}
+          onDismiss={() => setShowPaywall(false)}
+        />
+      </SafeAreaView>
+    );
+  }
 
   if (questionsQuery.isLoading) {
     return (
