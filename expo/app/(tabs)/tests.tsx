@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
-import { BookOpen, ChevronDown, ChevronRight, Clock, Headphones, Lock, Play } from 'lucide-react-native';
+import { BookOpen, ChevronDown, ChevronRight, Clock, Headphones, Lock, PenLine, Play } from 'lucide-react-native';
 import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -19,6 +19,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { PaywallModal } from '@/components/PaywallModal';
 import Colors from '@/constants/colors';
 import { colors } from '@/theme';
+import { fetchSchreibenQuestions, fetchSchreibenTeile } from '@/lib/schreibenHelpers';
 import {
   checkRetestAvailability,
   createSessionLink,
@@ -29,6 +30,7 @@ import {
 } from '@/lib/sectionalHelpers';
 import { useAccess } from '@/providers/AccessProvider';
 import { useAuth } from '@/providers/AuthProvider';
+import { SCHREIBEN_TASK_TYPE, SCHREIBEN_TASK_LABELS } from '@/types/schreiben';
 
 type SetupState = {
   visible: boolean;
@@ -73,7 +75,9 @@ export default function TestsScreen() {
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     'Hören': true,
     'Lesen': true,
+    'Schreiben': true,
   });
+  const [schreibenStarting, setSchreibenStarting] = useState<number | null>(null);
 
   const teileQuery = useQuery({
     queryKey: ['sectional-teile', targetLevel],
@@ -85,6 +89,44 @@ export default function TestsScreen() {
 
   const horenTeile = useMemo(() => teile.filter((t) => t.section === 'Hören'), [teile]);
   const lesenTeile = useMemo(() => teile.filter((t) => t.section === 'Lesen'), [teile]);
+
+  const schreibenQuery = useQuery({
+    queryKey: ['schreiben-teile', targetLevel],
+    enabled: Boolean(targetLevel),
+    queryFn: () => fetchSchreibenTeile(targetLevel),
+  });
+
+  const schreibenTeile = useMemo(() => schreibenQuery.data ?? [], [schreibenQuery.data]);
+
+  const schreibenEnabled = access.schreiben_enabled;
+  const schreibenVisible = access.schreiben_visible;
+
+  const handleStartSchreiben = useCallback(async (teil: number) => {
+    if (!schreibenEnabled) {
+      setShowPaywall(true);
+      return;
+    }
+    setSchreibenStarting(teil);
+    try {
+      const questions = await fetchSchreibenQuestions(targetLevel, teil);
+      if (questions.length === 0) {
+        setSchreibenStarting(null);
+        return;
+      }
+      setSchreibenStarting(null);
+      router.push({
+        pathname: '/schreiben-test',
+        params: {
+          level: targetLevel,
+          teil: String(teil),
+          questions: JSON.stringify(questions),
+        },
+      });
+    } catch (err) {
+      console.log('TestsScreen handleStartSchreiben error', err);
+      setSchreibenStarting(null);
+    }
+  }, [targetLevel, schreibenEnabled]);
 
   const toggleSection = useCallback((section: string) => {
     setExpandedSections((prev) => ({ ...prev, [section]: !prev[section] }));
@@ -322,6 +364,84 @@ export default function TestsScreen() {
             lesenTeile,
             <View style={styles.sectionIconLesen}><BookOpen color="#fff" size={16} /></View>
           )}
+
+          {schreibenVisible ? (
+            <View style={styles.sectionGroup}>
+              <Pressable
+                accessibilityLabel="Toggle Schreiben"
+                onPress={() => toggleSection('Schreiben')}
+                style={styles.sectionHeader}
+                testID="toggle-Schreiben"
+              >
+                <View style={styles.sectionHeaderLeft}>
+                  <View style={styles.sectionIconSchreiben}><PenLine color="#fff" size={16} /></View>
+                  <Text style={styles.sectionTitle}>Schreiben</Text>
+                  <View style={styles.sectionBadge}>
+                    <Text style={styles.sectionBadgeText}>{schreibenTeile.length} Teil{schreibenTeile.length !== 1 ? 'e' : ''}</Text>
+                  </View>
+                </View>
+                {expandedSections['Schreiben'] ? (
+                  <ChevronDown color={Colors.textMuted} size={20} />
+                ) : (
+                  <ChevronRight color={Colors.textMuted} size={20} />
+                )}
+              </Pressable>
+              {expandedSections['Schreiben'] ? (
+                <View style={styles.teilList}>
+                  {schreibenTeile.length === 0 ? (
+                    <Text style={styles.noContent}>No Schreiben content available for {targetLevel} yet.</Text>
+                  ) : (
+                    schreibenTeile.map((info) => {
+                      const taskType = SCHREIBEN_TASK_TYPE[targetLevel]?.[info.teil] ?? 'form_fill';
+                      const taskLabel = SCHREIBEN_TASK_LABELS[taskType] ?? taskType;
+                      const estimatedMin = Math.max(1, info.q_count * 5);
+                      const isStarting = schreibenStarting === info.teil;
+                      return (
+                        <Pressable
+                          key={`schreiben-${info.teil}`}
+                          accessibilityLabel={`Schreiben Teil ${info.teil}`}
+                          onPress={() => handleStartSchreiben(info.teil)}
+                          style={[styles.teilCard, !schreibenEnabled && styles.teilCardDisabled]}
+                          testID={`teil-card-Schreiben-${info.teil}`}
+                        >
+                          <View style={styles.teilCardLeft}>
+                            <View style={styles.teilNumberWrap}>
+                              <Text style={styles.teilNumber}>{info.teil}</Text>
+                            </View>
+                            <View style={styles.teilCardMeta}>
+                              <Text style={styles.teilTitle}>Teil {info.teil}</Text>
+                              <Text style={styles.teilType}>{taskLabel}</Text>
+                            </View>
+                          </View>
+                          <View style={styles.teilCardRight}>
+                            {!schreibenEnabled ? (
+                              <View style={styles.lockedRow}>
+                                <Lock color={colors.muted} size={12} />
+                                <Text style={styles.lockedLabel}>Upgrade erforderlich</Text>
+                              </View>
+                            ) : (
+                              <>
+                                <Text style={styles.teilCount}>{info.q_count} questions</Text>
+                                <View style={styles.teilDuration}>
+                                  <Clock color={Colors.textMuted} size={12} />
+                                  <Text style={styles.teilDurationText}>~{estimatedMin} min</Text>
+                                </View>
+                              </>
+                            )}
+                          </View>
+                          {isStarting ? (
+                            <ActivityIndicator color={colors.blue} size="small" />
+                          ) : (
+                            <ChevronRight color={Colors.textMuted} size={18} />
+                          )}
+                        </Pressable>
+                      );
+                    })
+                  )}
+                </View>
+              ) : null}
+            </View>
+          ) : null}
         </ScrollView>
       )}
 
@@ -784,5 +904,23 @@ const styles = StyleSheet.create({
     color: Colors.primary,
     fontSize: 15,
     fontWeight: '700' as const,
+  },
+  sectionIconSchreiben: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: '#D84315',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  lockedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  lockedLabel: {
+    fontSize: 11,
+    fontWeight: '600' as const,
+    color: Colors.textMuted,
   },
 });
