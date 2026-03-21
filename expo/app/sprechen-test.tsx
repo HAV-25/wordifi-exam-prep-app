@@ -1,7 +1,7 @@
 import { Audio } from 'expo-av';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { CheckCircle, Mic } from 'lucide-react-native';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -18,6 +18,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { SprechenQuestion } from '@/components/SprechenQuestion';
 import { colors, fontSize, radius, shadows, spacing } from '@/theme';
 import {
+  fetchSprechenQuestions,
   fetchSprechenResponse,
   saveSelfRating,
   saveSprechenResponse,
@@ -41,7 +42,6 @@ export default function SprechenTestScreen() {
   const params = useLocalSearchParams<{
     level?: string;
     teil?: string;
-    questions?: string;
   }>();
 
   const { user, profile, refreshProfile } = useAuth();
@@ -50,13 +50,37 @@ export default function SprechenTestScreen() {
   const level = params.level ?? profile?.target_level ?? 'A1';
   const teil = Number(params.teil ?? '1');
 
-  const questions = useMemo<AppQuestion[]>(() => {
-    try {
-      return JSON.parse(params.questions ?? '[]') as AppQuestion[];
-    } catch {
-      return [];
-    }
-  }, [params.questions]);
+  const [questions, setQuestions] = useState<AppQuestion[]>([]);
+  const [isLoadingQuestions, setIsLoadingQuestions] = useState<boolean>(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadQuestions = async () => {
+      setIsLoadingQuestions(true);
+      try {
+        console.log('SprechenTest fetching questions for', level, 'teil', teil);
+        const fetched = await fetchSprechenQuestions(level, teil);
+        if (!cancelled) {
+          console.log('SprechenTest fetched', fetched.length, 'questions');
+          if (fetched.length > 0) {
+            const q0 = fetched[0] as Record<string, unknown>;
+            console.log('SprechenTest q0 audio_url=', q0.audio_url);
+            console.log('SprechenTest q0 model_answer_audio_url=', q0.model_answer_audio_url);
+            console.log('SprechenTest q0 partner_prompts=', JSON.stringify(q0.partner_prompts));
+            console.log('SprechenTest q0 keys=', Object.keys(q0).filter(k => k.includes('audio') || k.includes('url') || k.includes('model') || k.includes('partner') || k.includes('rubric') || k.includes('recording')));
+          }
+          setQuestions(fetched);
+        }
+      } catch (err) {
+        console.log('SprechenTest fetchQuestions error', err);
+        if (!cancelled) setQuestions([]);
+      } finally {
+        if (!cancelled) setIsLoadingQuestions(false);
+      }
+    };
+    void loadQuestions();
+    return () => { cancelled = true; };
+  }, [level, teil]);
 
   const structureType = questions[0]?.source_structure_type ?? '';
   const taskLabel = SPRECHEN_STRUCTURE_LABELS[structureType] ?? 'Sprechen';
@@ -403,6 +427,18 @@ export default function SprechenTestScreen() {
             onPress={() => router.back()}
             testID="sprechen-permission-back"
           />
+        </View>
+      </View>
+    );
+  }
+
+  if (isLoadingQuestions) {
+    return (
+      <View style={styles.screen}>
+        <Stack.Screen options={{ title: 'Sprechen', headerShown: true }} />
+        <View style={styles.loadingWrap}>
+          <ActivityIndicator color={colors.blue} size="large" />
+          <Text style={styles.loadingText}>Fragen werden geladen...</Text>
         </View>
       </View>
     );

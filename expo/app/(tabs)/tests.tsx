@@ -21,7 +21,6 @@ import Colors from '@/constants/colors';
 import { colors } from '@/theme';
 import { fetchSchreibenQuestions, fetchSchreibenTeile } from '@/lib/schreibenHelpers';
 import {
-  fetchSprechenQuestions,
   fetchSprechenTeile,
   SPRECHEN_STRUCTURE_LABELS,
 } from '@/lib/sprechenHelpers';
@@ -85,7 +84,7 @@ export default function TestsScreen() {
     'Sprechen': true,
   });
   const [schreibenStarting, setSchreibenStarting] = useState<number | null>(null);
-  const [sprechenStarting, setSprechenStarting] = useState<number | null>(null);
+  const [sprechenStarting] = useState<number | null>(null);
 
   const teileQuery = useQuery({
     queryKey: ['sectional-teile', targetLevel],
@@ -120,31 +119,18 @@ export default function TestsScreen() {
 
   const sprechenTeile = useMemo(() => sprechenQuery.data ?? [], [sprechenQuery.data]);
 
-  const handleStartSprechen = useCallback(async (teil: number) => {
+  const handleStartSprechen = useCallback((teil: number) => {
     if (!sprechenEnabled) {
       setShowPaywall(true);
       return;
     }
-    setSprechenStarting(teil);
-    try {
-      const questions = await fetchSprechenQuestions(targetLevel, teil);
-      if (questions.length === 0) {
-        setSprechenStarting(null);
-        return;
-      }
-      setSprechenStarting(null);
-      router.push({
-        pathname: '/sprechen-test',
-        params: {
-          level: targetLevel,
-          teil: String(teil),
-          questions: JSON.stringify(questions),
-        },
-      });
-    } catch (err) {
-      console.log('TestsScreen handleStartSprechen error', err);
-      setSprechenStarting(null);
-    }
+    router.push({
+      pathname: '/sprechen-test',
+      params: {
+        level: targetLevel,
+        teil: String(teil),
+      },
+    });
   }, [targetLevel, sprechenEnabled]);
 
   const handleStartSchreiben = useCallback(async (teil: number) => {
