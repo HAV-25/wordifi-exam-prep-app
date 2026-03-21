@@ -70,18 +70,24 @@ export default function SprechenTestScreen() {
   const sessionStartTimeRef = useRef<number>(Date.now());
 
   useEffect(() => {
-    const requestMic = async () => {
-      console.log('SprechenTest requesting mic permission');
+    const setup = async () => {
+      console.log('SprechenTest requesting mic permission & setting audio mode');
       try {
+        await Audio.setAudioModeAsync({
+          allowsRecordingIOS: false,
+          playsInSilentModeIOS: true,
+          staysActiveInBackground: false,
+        });
+        console.log('SprechenTest audio mode set (playback)');
         const { status } = await Audio.requestPermissionsAsync();
         console.log('SprechenTest mic permission status', status);
         setHasMicPermission(status === 'granted');
       } catch (err) {
-        console.log('SprechenTest mic permission error', err);
+        console.log('SprechenTest setup error', err);
         setHasMicPermission(false);
       }
     };
-    void requestMic();
+    void setup();
   }, []);
 
   useEffect(() => {

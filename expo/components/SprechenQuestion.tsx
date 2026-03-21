@@ -22,6 +22,7 @@ type PartnerPrompt = {
   turn: number;
   audio_script: string;
   label: string;
+  audio_url?: string;
 };
 
 type RubricCard = {
@@ -64,7 +65,7 @@ export function SprechenQuestion({
   const rubricCard = (question as Record<string, unknown>).rubric_card as RubricCard | null ?? null;
   const modelAnswerAudioUrl = (question as Record<string, unknown>).model_answer_audio_url as string | null ?? null;
   const modelAnswerScript = (question as Record<string, unknown>).model_answer_script as string | null ?? null;
-  const moderatorAudioUrl = (question as Record<string, unknown>).moderator_audio_url as string | null ?? null;
+  const moderatorAudioUrl = (question as Record<string, unknown>).audio_url as string | null ?? null;
 
   const [uiState, setUiState] = useState<UIState>(existingResponse ? 'result' : 'instruction');
   const [prepCountdown, setPrepCountdown] = useState<number>(isPresentation ? 15 : 0);
@@ -83,6 +84,12 @@ export function SprechenQuestion({
   const [hasRated, setHasRated] = useState<boolean>(existingResponse?.self_rating != null);
   const [showModelScript, setShowModelScript] = useState<boolean>(false);
   const [tooShortWarning, setTooShortWarning] = useState<boolean>(false);
+  const [hasAutoPlayedModerator, setHasAutoPlayedModerator] = useState<boolean>(false);
+  const [isPartnerAudioPlaying, setIsPartnerAudioPlaying] = useState<boolean>(false);
+  const [partnerAudioFinished, setPartnerAudioFinished] = useState<boolean>(false);
+
+  const moderatorSoundRef = useRef<Audio.Sound | null>(null);
+  const partnerSoundRef = useRef<Audio.Sound | null>(null);
 
   const pulseAnim = useRef(new Animated.Value(0.6)).current;
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -104,6 +111,9 @@ export function SprechenQuestion({
       setHasRated(false);
       setShowModelScript(false);
       setTooShortWarning(false);
+      setHasAutoPlayedModerator(false);
+      setIsPartnerAudioPlaying(false);
+      setPartnerAudioFinished(false);
     }
   }, [question.id, existingResponse, isPresentation]);
 
@@ -162,8 +172,43 @@ export function SprechenQuestion({
       if (playbackSoundRef.current) {
         void playbackSoundRef.current.unloadAsync().catch(() => {});
       }
+      if (moderatorSoundRef.current) {
+        void moderatorSoundRef.current.unloadAsync().catch(() => {});
+      }
+      if (partnerSoundRef.current) {
+        void partnerSoundRef.current.unloadAsync().catch(() => {});
+      }
     };
   }, []);
+
+  useEffect(() => {
+    if (uiState !== 'instruction' || !moderatorAudioUrl || hasAutoPlayedModerator || existingResponse) return;
+    setHasAutoPlayedModerator(true);
+    const autoPlay = async () => {
+      try {
+        console.log('SprechenQuestion auto-playing moderator audio', moderatorAudioUrl);
+        if (moderatorSoundRef.current) {
+          await moderatorSoundRef.current.unloadAsync().catch(() => {});
+          moderatorSoundRef.current = null;
+        }
+        const { sound } = await Audio.Sound.createAsync(
+          { uri: moderatorAudioUrl },
+          { shouldPlay: true }
+        );
+        moderatorSoundRef.current = sound;
+        sound.setOnPlaybackStatusUpdate((status) => {
+          if (!status.isLoaded) return;
+          if (status.didJustFinish) {
+            sound.unloadAsync().catch(() => {});
+            moderatorSoundRef.current = null;
+          }
+        });
+      } catch (err) {
+        console.log('SprechenQuestion auto-play moderator error', err);
+      }
+    };
+    void autoPlay();
+  }, [uiState, moderatorAudioUrl, hasAutoPlayedModerator, existingResponse]);
 
   const options = useMemo(() => {
     if (!question.options) return [];
@@ -250,30 +295,128 @@ export function SprechenQuestion({
     stopRecordingRef.current = stopRecording;
   }, [stopRecording]);
 
+  const playModeratorAudio = useCallback(async () => {
+    if (!moderatorAudioUrl) return;
+    try {
+      console.log('SprechenQuestion replay moderator audio');
+      if (moderatorSoundRef.current) {
+        await moderatorSoundRef.current.unloadAsync().catch(() => {});
+        moderatorSoundRef.current = null;
+      }
+      const { sound } = await Audio.Sound.createAsync(
+        { uri: moderatorAudioUrl },
+        { shouldPlay: true }
+      );
+      moderatorSoundRef.current = sound;
+      sound.setOnPlaybackStatusUpdate((status) => {
+        if (!status.isLoaded) return;
+        if (status.didJustFinish) {
+          sound.unloadAsync().catch(() => {});
+          moderatorSoundRef.current = null;
+        }
+      });
+    } catch (err) {
+      console.log('SprechenQuestion replay moderator error', err);
+    }
+  }, [moderatorAudioUrl]);
+
+  const playPartnerAudio = useCallback(async (audioUrl: string, onFinish: () => void) => {
+    try {
+      console.log('SprechenQuestion playing partner audio', audioUrl);
+      if (partnerSoundRef.current) {
+        await partnerSoundRef.current.unloadAsync().catch(() => {});
+        partnerSoundRef.current = null;
+      }
+      setIsPartnerAudioPlaying(true);
+      setPartnerAudioFinished(false);
+      const { sound } = await Audio.Sound.createAsync(
+        { uri: audioUrl },
+        { shouldPlay: true }
+      );
+      partnerSoundRef.current = sound;
+      sound.setOnPlaybackStatusUpdate((status) => {
+        if (!status.isLoaded) return;
+        if (status.didJustFinish) {
+          setIsPartnerAudioPlaying(false);
+          setPartnerAudioFinished(true);
+          sound.unloadAsync().catch(() => {});
+          partnerSoundRef.current = null;
+          onFinish();
+        }
+      });
+    } catch (err) {
+      console.log('SprechenQuestion partner audio error', err);
+      setIsPartnerAudioPlaying(false);
+      setPartnerAudioFinished(true);
+      onFinish();
+    }
+  }, []);
+
+  const replayPartnerAudio = useCallback(async () => {
+    if (!partnerPrompts || dialogueTurn < 1) return;
+    const currentPrompt = partnerPrompts[dialogueTurn - 1];
+    if (!currentPrompt?.audio_url) return;
+    try {
+      if (partnerSoundRef.current) {
+        await partnerSoundRef.current.unloadAsync().catch(() => {});
+        partnerSoundRef.current = null;
+      }
+      const { sound } = await Audio.Sound.createAsync(
+        { uri: currentPrompt.audio_url },
+        { shouldPlay: true }
+      );
+      partnerSoundRef.current = sound;
+      sound.setOnPlaybackStatusUpdate((status) => {
+        if (!status.isLoaded) return;
+        if (status.didJustFinish) {
+          sound.unloadAsync().catch(() => {});
+          partnerSoundRef.current = null;
+        }
+      });
+    } catch (err) {
+      console.log('SprechenQuestion replay partner audio error', err);
+    }
+  }, [partnerPrompts, dialogueTurn]);
+
   const handleDialogueStart = useCallback(async () => {
     if (isDialogue && partnerPrompts && partnerPrompts.length > 0) {
       setIsPartnerTurn(true);
       setDialogueTurn(1);
       setUiState('recording');
-      setTimeout(() => {
-        setIsPartnerTurn(false);
-      }, 3000);
+      const firstPrompt = partnerPrompts[0];
+      if (firstPrompt?.audio_url) {
+        await playPartnerAudio(firstPrompt.audio_url, () => {
+          setIsPartnerTurn(false);
+        });
+      } else {
+        setTimeout(() => {
+          setIsPartnerTurn(false);
+        }, 3000);
+      }
     } else {
       await startRecording();
     }
-  }, [isDialogue, partnerPrompts, startRecording]);
+  }, [isDialogue, partnerPrompts, startRecording, playPartnerAudio]);
 
   const handleDialogueUserDone = useCallback(async () => {
     await stopRecording();
     const totalTurns = partnerPrompts?.length ?? 0;
     if (dialogueTurn < totalTurns) {
+      const nextTurnIdx = dialogueTurn;
       setDialogueTurn((prev) => prev + 1);
       setIsPartnerTurn(true);
-      setTimeout(() => {
-        setIsPartnerTurn(false);
-      }, 3000);
+      const nextPrompt = partnerPrompts?.[nextTurnIdx];
+      if (nextPrompt?.audio_url) {
+        await playPartnerAudio(nextPrompt.audio_url, () => {
+          setIsPartnerTurn(false);
+        });
+      } else {
+        setTimeout(() => {
+          setIsPartnerTurn(false);
+        }, 3000);
+      }
     }
-  }, [stopRecording, dialogueTurn, partnerPrompts]);
+  }, [stopRecording, dialogueTurn, partnerPrompts, playPartnerAudio]);
 
   const playRecording = useCallback(async () => {
     if (!recordingUri) return;
@@ -421,9 +564,9 @@ export function SprechenQuestion({
   const renderModeratorReplay = () => {
     if (!moderatorAudioUrl || uiState !== 'instruction') return null;
     return (
-      <Pressable style={styles.replayInstructionBtn}>
-        <Volume2 color={colors.blue} size={16} />
-        <Text style={styles.replayInstructionText}>Aufgabe nochmal hören</Text>
+      <Pressable style={styles.replayPill} onPress={playModeratorAudio}>
+        <Volume2 color={colors.muted} size={14} />
+        <Text style={styles.replayPillText}>Aufgabe nochmal hören</Text>
       </Pressable>
     );
   };
@@ -465,7 +608,14 @@ export function SprechenQuestion({
               <Text style={styles.partnerLabel}>
                 Runde {dialogueTurn} von {partnerPrompts?.length ?? 0}
               </Text>
-              <Text style={styles.partnerSpeaking}>Partner spricht...</Text>
+              {isPartnerAudioPlaying ? (
+                <View style={styles.partnerSpeakingRow}>
+                  <Volume2 color={colors.blue} size={14} />
+                  <Text style={styles.partnerSpeakingActive}>Partner spricht...</Text>
+                </View>
+              ) : (
+                <Text style={styles.partnerSpeaking}>{partnerAudioFinished ? 'Fertig' : 'Partner spricht...'}</Text>
+              )}
             </View>
             {partnerPrompts && partnerPrompts[dialogueTurn - 1] ? (
               <View style={styles.speechBubble}>
@@ -474,12 +624,31 @@ export function SprechenQuestion({
                 </Text>
               </View>
             ) : null}
-            <Text style={styles.partnerWait}>Jetzt sind Sie dran</Text>
-            <CTAButton
-              label="Antwort aufnehmen"
-              onPress={startRecording}
-              testID="sprechen-record-reply"
-            />
+            {!isPartnerAudioPlaying && partnerAudioFinished ? (
+              <>
+                {partnerPrompts?.[dialogueTurn - 1]?.audio_url ? (
+                  <Pressable style={styles.replayPill} onPress={replayPartnerAudio}>
+                    <Volume2 color={colors.muted} size={14} />
+                    <Text style={styles.replayPillText}>Nochmal hören</Text>
+                  </Pressable>
+                ) : null}
+                <Text style={styles.partnerWait}>Jetzt sind Sie dran ▶</Text>
+                <CTAButton
+                  label="Antwort aufnehmen"
+                  onPress={startRecording}
+                  testID="sprechen-record-reply"
+                />
+              </>
+            ) : !isPartnerAudioPlaying ? (
+              <>
+                <Text style={styles.partnerWait}>Jetzt sind Sie dran</Text>
+                <CTAButton
+                  label="Antwort aufnehmen"
+                  onPress={startRecording}
+                  testID="sprechen-record-reply"
+                />
+              </>
+            ) : null}
           </View>
         ) : (
           <View style={styles.recordingControls}>
@@ -581,33 +750,35 @@ export function SprechenQuestion({
         </View>
       ) : null}
 
-      {modelAnswerAudioUrl ? (
-        <View style={[styles.modelCard, shadows.card]}>
-          <Text style={styles.modelHeader}>Musterantwort anhören</Text>
+      <View style={[styles.modelCard, shadows.card]}>
+        <Text style={styles.modelHeader}>Musterantwort anhören</Text>
+        {modelAnswerAudioUrl ? (
           <AudioPlayer audioUrl={modelAnswerAudioUrl} />
-          {modelAnswerScript ? (
-            <>
-              <Pressable
-                onPress={() => setShowModelScript((v) => !v)}
-                style={styles.modelScriptToggle}
-                testID="sprechen-toggle-model-script"
-              >
-                <Text style={styles.modelScriptToggleText}>
-                  {showModelScript ? 'Musterantwort ausblenden' : 'Musterantwort lesen'}
-                </Text>
-                <ChevronRight
-                  color={colors.blue}
-                  size={16}
-                  style={showModelScript ? styles.chevronDown : undefined}
-                />
-              </Pressable>
-              {showModelScript ? (
-                <Text style={styles.modelScriptText}>{modelAnswerScript}</Text>
-              ) : null}
-            </>
-          ) : null}
-        </View>
-      ) : null}
+        ) : (
+          <Text style={styles.modelPlaceholder}>Musterantwort wird bald verfügbar.</Text>
+        )}
+        {modelAnswerScript ? (
+          <>
+            <Pressable
+              onPress={() => setShowModelScript((v) => !v)}
+              style={styles.modelScriptToggle}
+              testID="sprechen-toggle-model-script"
+            >
+              <Text style={styles.modelScriptToggleText}>
+                {showModelScript ? 'Musterantwort ausblenden' : 'Musterantwort lesen'}
+              </Text>
+              <ChevronRight
+                color={colors.blue}
+                size={16}
+                style={showModelScript ? styles.chevronDown : undefined}
+              />
+            </Pressable>
+            {showModelScript ? (
+              <Text style={styles.modelScriptText}>{modelAnswerScript}</Text>
+            ) : null}
+          </>
+        ) : null}
+      </View>
 
       {rubricCard ? (
         <View style={[styles.rubricCard, shadows.card]}>
@@ -797,16 +968,37 @@ const styles = StyleSheet.create({
     fontSize: fontSize.bodyMd,
     fontWeight: '600' as const,
   },
-  replayInstructionBtn: {
+  replayPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    alignSelf: 'center',
     gap: spacing.sm,
-    paddingVertical: spacing.sm,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    backgroundColor: colors.surface,
+    borderWidth: 0.5,
+    borderColor: colors.border,
   },
-  replayInstructionText: {
-    color: colors.blue,
+  replayPillText: {
+    color: colors.muted,
+    fontSize: fontSize.label,
+    fontWeight: '600' as const,
+  },
+  modelPlaceholder: {
+    color: colors.muted,
     fontSize: fontSize.bodyMd,
+    fontWeight: '500' as const,
+    fontStyle: 'italic' as const,
+  },
+  partnerSpeakingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  partnerSpeakingActive: {
+    color: colors.blue,
+    fontSize: fontSize.label,
     fontWeight: '600' as const,
   },
   warningText: {
