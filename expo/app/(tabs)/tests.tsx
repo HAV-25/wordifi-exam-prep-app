@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
-import { BookOpen, ChevronDown, ChevronRight, Clock, Headphones, Lock, PenLine, Play } from 'lucide-react-native';
+import { BookOpen, ChevronDown, ChevronRight, Clock, Headphones, Lock, Mic, PenLine, Play } from 'lucide-react-native';
 import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -21,6 +21,11 @@ import Colors from '@/constants/colors';
 import { colors } from '@/theme';
 import { fetchSchreibenQuestions, fetchSchreibenTeile } from '@/lib/schreibenHelpers';
 import {
+  fetchSprechenQuestions,
+  fetchSprechenTeile,
+  SPRECHEN_STRUCTURE_LABELS,
+} from '@/lib/sprechenHelpers';
+import {
   checkRetestAvailability,
   createSessionLink,
   fetchAvailableTeile,
@@ -31,6 +36,7 @@ import {
 import { useAccess } from '@/providers/AccessProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import { SCHREIBEN_TASK_TYPE, SCHREIBEN_TASK_LABELS } from '@/types/schreiben';
+import type { SprechenTeilInfo } from '@/lib/sprechenHelpers';
 
 type SetupState = {
   visible: boolean;
@@ -76,8 +82,10 @@ export default function TestsScreen() {
     'Hören': true,
     'Lesen': true,
     'Schreiben': true,
+    'Sprechen': true,
   });
   const [schreibenStarting, setSchreibenStarting] = useState<number | null>(null);
+  const [sprechenStarting, setSprechenStarting] = useState<number | null>(null);
 
   const teileQuery = useQuery({
     queryKey: ['sectional-teile', targetLevel],
@@ -100,6 +108,44 @@ export default function TestsScreen() {
 
   const schreibenEnabled = access.schreiben_enabled;
   const schreibenVisible = access.schreiben_visible;
+
+  const sprechenEnabled = access.sprechen_enabled;
+  const sprechenVisible = access.sprechen_visible;
+
+  const sprechenQuery = useQuery({
+    queryKey: ['sprechen-teile', targetLevel],
+    enabled: Boolean(targetLevel),
+    queryFn: () => fetchSprechenTeile(targetLevel),
+  });
+
+  const sprechenTeile = useMemo(() => sprechenQuery.data ?? [], [sprechenQuery.data]);
+
+  const handleStartSprechen = useCallback(async (teil: number) => {
+    if (!sprechenEnabled) {
+      setShowPaywall(true);
+      return;
+    }
+    setSprechenStarting(teil);
+    try {
+      const questions = await fetchSprechenQuestions(targetLevel, teil);
+      if (questions.length === 0) {
+        setSprechenStarting(null);
+        return;
+      }
+      setSprechenStarting(null);
+      router.push({
+        pathname: '/sprechen-test',
+        params: {
+          level: targetLevel,
+          teil: String(teil),
+          questions: JSON.stringify(questions),
+        },
+      });
+    } catch (err) {
+      console.log('TestsScreen handleStartSprechen error', err);
+      setSprechenStarting(null);
+    }
+  }, [targetLevel, sprechenEnabled]);
 
   const handleStartSchreiben = useCallback(async (teil: number) => {
     if (!schreibenEnabled) {
@@ -415,6 +461,83 @@ export default function TestsScreen() {
                           </View>
                           <View style={styles.teilCardRight}>
                             {!schreibenEnabled ? (
+                              <View style={styles.lockedRow}>
+                                <Lock color={colors.muted} size={12} />
+                                <Text style={styles.lockedLabel}>Upgrade erforderlich</Text>
+                              </View>
+                            ) : (
+                              <>
+                                <Text style={styles.teilCount}>{info.q_count} questions</Text>
+                                <View style={styles.teilDuration}>
+                                  <Clock color={Colors.textMuted} size={12} />
+                                  <Text style={styles.teilDurationText}>~{estimatedMin} min</Text>
+                                </View>
+                              </>
+                            )}
+                          </View>
+                          {isStarting ? (
+                            <ActivityIndicator color={colors.blue} size="small" />
+                          ) : (
+                            <ChevronRight color={Colors.textMuted} size={18} />
+                          )}
+                        </Pressable>
+                      );
+                    })
+                  )}
+                </View>
+              ) : null}
+            </View>
+          ) : null}
+
+          {sprechenVisible ? (
+            <View style={styles.sectionGroup}>
+              <Pressable
+                accessibilityLabel="Toggle Sprechen"
+                onPress={() => toggleSection('Sprechen')}
+                style={styles.sectionHeader}
+                testID="toggle-Sprechen"
+              >
+                <View style={styles.sectionHeaderLeft}>
+                  <View style={styles.sectionIconSprechen}><Mic color="#fff" size={16} /></View>
+                  <Text style={styles.sectionTitle}>Sprechen</Text>
+                  <View style={styles.sectionBadge}>
+                    <Text style={styles.sectionBadgeText}>{sprechenTeile.length} Teil{sprechenTeile.length !== 1 ? 'e' : ''}</Text>
+                  </View>
+                </View>
+                {expandedSections['Sprechen'] ? (
+                  <ChevronDown color={Colors.textMuted} size={20} />
+                ) : (
+                  <ChevronRight color={Colors.textMuted} size={20} />
+                )}
+              </Pressable>
+              {expandedSections['Sprechen'] ? (
+                <View style={styles.teilList}>
+                  {sprechenTeile.length === 0 ? (
+                    <Text style={styles.noContent}>No Sprechen content available for {targetLevel} yet.</Text>
+                  ) : (
+                    sprechenTeile.map((info: SprechenTeilInfo) => {
+                      const structLabel = SPRECHEN_STRUCTURE_LABELS[info.source_structure_type] ?? 'Sprechen';
+                      const estimatedMin = Math.max(1, Math.ceil((info.q_count * 60) / 60));
+                      const isStarting = sprechenStarting === info.teil;
+                      return (
+                        <Pressable
+                          key={`sprechen-${info.teil}`}
+                          accessibilityLabel={`Sprechen Teil ${info.teil}`}
+                          onPress={() => handleStartSprechen(info.teil)}
+                          style={[styles.teilCard, !sprechenEnabled && styles.teilCardDisabled]}
+                          testID={`teil-card-Sprechen-${info.teil}`}
+                        >
+                          <View style={styles.teilCardLeft}>
+                            <View style={styles.teilNumberWrap}>
+                              <Text style={styles.teilNumber}>{info.teil}</Text>
+                            </View>
+                            <View style={styles.teilCardMeta}>
+                              <Text style={styles.teilTitle}>Teil {info.teil}</Text>
+                              <Text style={styles.teilType}>{structLabel}</Text>
+                            </View>
+                          </View>
+                          <View style={styles.teilCardRight}>
+                            {!sprechenEnabled ? (
                               <View style={styles.lockedRow}>
                                 <Lock color={colors.muted} size={12} />
                                 <Text style={styles.lockedLabel}>Upgrade erforderlich</Text>
@@ -910,6 +1033,14 @@ const styles = StyleSheet.create({
     height: 32,
     borderRadius: 10,
     backgroundColor: '#D84315',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sectionIconSprechen: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: '#00897B',
     alignItems: 'center',
     justifyContent: 'center',
   },
