@@ -66,6 +66,20 @@ export function SprechenQuestion({
   const modelAnswerAudioUrl = (question as Record<string, unknown>).model_answer_audio_url as string | null ?? null;
   const modelAnswerScript = (question as Record<string, unknown>).model_answer_script as string | null ?? null;
   const moderatorAudioUrl = (question as Record<string, unknown>).audio_url as string | null ?? null;
+  const questionRaw = question as Record<string, unknown>;
+  const moderatorAudioUrlAlt = (questionRaw.moderator_audio_url as string | null) ?? null;
+  const effectiveModeratorUrl = moderatorAudioUrl || moderatorAudioUrlAlt;
+
+  console.log('SprechenQuestion DEBUG question.id=', question.id);
+  console.log('SprechenQuestion DEBUG audio_url=', question.audio_url);
+  console.log('SprechenQuestion DEBUG moderatorAudioUrl=', moderatorAudioUrl);
+  console.log('SprechenQuestion DEBUG moderator_audio_url (alt field)=', moderatorAudioUrlAlt);
+  console.log('SprechenQuestion DEBUG effectiveModeratorUrl=', effectiveModeratorUrl);
+  console.log('SprechenQuestion DEBUG model_answer_audio_url=', modelAnswerAudioUrl);
+  console.log('SprechenQuestion DEBUG partner_prompts=', JSON.stringify(partnerPrompts));
+  console.log('SprechenQuestion DEBUG source_structure_type=', structureType);
+  console.log('SprechenQuestion DEBUG all keys with audio/url=', Object.keys(questionRaw).filter(k => k.includes('audio') || k.includes('url')));
+  console.log('SprechenQuestion DEBUG full question keys=', Object.keys(questionRaw));
 
   const [uiState, setUiState] = useState<UIState>(existingResponse ? 'result' : 'instruction');
   const [prepCountdown, setPrepCountdown] = useState<number>(isPresentation ? 15 : 0);
@@ -84,7 +98,7 @@ export function SprechenQuestion({
   const [hasRated, setHasRated] = useState<boolean>(existingResponse?.self_rating != null);
   const [showModelScript, setShowModelScript] = useState<boolean>(false);
   const [tooShortWarning, setTooShortWarning] = useState<boolean>(false);
-  const [hasAutoPlayedModerator, setHasAutoPlayedModerator] = useState<boolean>(false);
+
   const [isPartnerAudioPlaying, setIsPartnerAudioPlaying] = useState<boolean>(false);
   const [partnerAudioFinished, setPartnerAudioFinished] = useState<boolean>(false);
 
@@ -111,7 +125,6 @@ export function SprechenQuestion({
       setHasRated(false);
       setShowModelScript(false);
       setTooShortWarning(false);
-      setHasAutoPlayedModerator(false);
       setIsPartnerAudioPlaying(false);
       setPartnerAudioFinished(false);
     }
@@ -181,34 +194,6 @@ export function SprechenQuestion({
     };
   }, []);
 
-  useEffect(() => {
-    if (uiState !== 'instruction' || !moderatorAudioUrl || hasAutoPlayedModerator || existingResponse) return;
-    setHasAutoPlayedModerator(true);
-    const autoPlay = async () => {
-      try {
-        console.log('SprechenQuestion auto-playing moderator audio', moderatorAudioUrl);
-        if (moderatorSoundRef.current) {
-          await moderatorSoundRef.current.unloadAsync().catch(() => {});
-          moderatorSoundRef.current = null;
-        }
-        const { sound } = await Audio.Sound.createAsync(
-          { uri: moderatorAudioUrl },
-          { shouldPlay: true }
-        );
-        moderatorSoundRef.current = sound;
-        sound.setOnPlaybackStatusUpdate((status) => {
-          if (!status.isLoaded) return;
-          if (status.didJustFinish) {
-            sound.unloadAsync().catch(() => {});
-            moderatorSoundRef.current = null;
-          }
-        });
-      } catch (err) {
-        console.log('SprechenQuestion auto-play moderator error', err);
-      }
-    };
-    void autoPlay();
-  }, [uiState, moderatorAudioUrl, hasAutoPlayedModerator, existingResponse]);
 
   const options = useMemo(() => {
     if (!question.options) return [];
@@ -295,30 +280,7 @@ export function SprechenQuestion({
     stopRecordingRef.current = stopRecording;
   }, [stopRecording]);
 
-  const playModeratorAudio = useCallback(async () => {
-    if (!moderatorAudioUrl) return;
-    try {
-      console.log('SprechenQuestion replay moderator audio');
-      if (moderatorSoundRef.current) {
-        await moderatorSoundRef.current.unloadAsync().catch(() => {});
-        moderatorSoundRef.current = null;
-      }
-      const { sound } = await Audio.Sound.createAsync(
-        { uri: moderatorAudioUrl },
-        { shouldPlay: true }
-      );
-      moderatorSoundRef.current = sound;
-      sound.setOnPlaybackStatusUpdate((status) => {
-        if (!status.isLoaded) return;
-        if (status.didJustFinish) {
-          sound.unloadAsync().catch(() => {});
-          moderatorSoundRef.current = null;
-        }
-      });
-    } catch (err) {
-      console.log('SprechenQuestion replay moderator error', err);
-    }
-  }, [moderatorAudioUrl]);
+
 
   const playPartnerAudio = useCallback(async (audioUrl: string, onFinish: () => void) => {
     try {
@@ -561,13 +523,17 @@ export function SprechenQuestion({
     );
   };
 
-  const renderModeratorReplay = () => {
-    if (!moderatorAudioUrl || uiState !== 'instruction') return null;
+  const renderModeratorAudio = () => {
+    if (!effectiveModeratorUrl || uiState !== 'instruction') return null;
+    console.log('SprechenQuestion renderModeratorAudio URL=', effectiveModeratorUrl);
     return (
-      <Pressable style={styles.replayPill} onPress={playModeratorAudio}>
-        <Volume2 color={colors.muted} size={14} />
-        <Text style={styles.replayPillText}>Aufgabe nochmal hören</Text>
-      </Pressable>
+      <View style={styles.moderatorAudioWrap}>
+        <View style={styles.moderatorAudioLabel}>
+          <Volume2 color={colors.muted} size={14} />
+          <Text style={styles.replayPillText}>Aufgabe anhören</Text>
+        </View>
+        <AudioPlayer audioUrl={effectiveModeratorUrl} />
+      </View>
     );
   };
 
@@ -578,7 +544,7 @@ export function SprechenQuestion({
         {renderRequiredPoints()}
         {renderDialogueInfo()}
         {renderPrepTimer()}
-        {renderModeratorReplay()}
+        {renderModeratorAudio()}
 
         {tooShortWarning ? (
           <Text style={styles.warningText}>Bitte sprechen Sie mehr.</Text>
@@ -984,6 +950,15 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontSize: fontSize.label,
     fontWeight: '600' as const,
+  },
+  moderatorAudioWrap: {
+    gap: spacing.sm,
+  },
+  moderatorAudioLabel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.xs,
   },
   modelPlaceholder: {
     color: colors.muted,
