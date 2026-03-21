@@ -133,65 +133,56 @@ export default function SprechenTestScreen() {
     }).start();
   }, [currentIndex, questions.length, progressAnim]);
 
-  const checkCachedResponse = useCallback(async (index: number) => {
-    const question = questions[index];
-    if (!question || !userId) return;
+  const checkedIndicesRef = useRef<Set<number>>(new Set());
 
-    const existing = questionStates[index];
-    if (existing?.existingResponse || existing?.isLoadingCached) return;
+  useEffect(() => {
+    if (questions.length === 0 || !userId) return;
+    if (checkedIndicesRef.current.has(currentIndex)) return;
+
+    const question = questions[currentIndex];
+    if (!question) return;
+
+    checkedIndicesRef.current.add(currentIndex);
 
     setQuestionStates((prev) => ({
       ...prev,
-      [index]: {
-        existingResponse: null,
+      [currentIndex]: {
+        existingResponse: prev[currentIndex]?.existingResponse ?? null,
         isUploading: false,
         uploadError: null,
         isLoadingCached: true,
       },
     }));
 
-    try {
-      const cached = await fetchSprechenResponse(userId, question.id);
-      if (cached) {
-        console.log('SprechenTest found cached response for question', index);
+    const idx = currentIndex;
+    fetchSprechenResponse(userId, question.id)
+      .then((cached) => {
+        if (cached) {
+          console.log('SprechenTest found cached response for question', idx);
+        }
         setQuestionStates((prev) => ({
           ...prev,
-          [index]: {
-            existingResponse: cached,
+          [idx]: {
+            existingResponse: cached ?? null,
             isUploading: false,
             uploadError: null,
             isLoadingCached: false,
           },
         }));
-      } else {
+      })
+      .catch((err) => {
+        console.log('SprechenTest checkCachedResponse error', err);
         setQuestionStates((prev) => ({
           ...prev,
-          [index]: {
+          [idx]: {
             existingResponse: null,
             isUploading: false,
             uploadError: null,
             isLoadingCached: false,
           },
         }));
-      }
-    } catch (err) {
-      console.log('SprechenTest checkCachedResponse error', err);
-      setQuestionStates((prev) => ({
-        ...prev,
-        [index]: {
-          existingResponse: null,
-          isUploading: false,
-          uploadError: null,
-          isLoadingCached: false,
-        },
-      }));
-    }
-  }, [questions, userId, questionStates]);
-
-  useEffect(() => {
-    if (questions.length === 0 || !userId) return;
-    void checkCachedResponse(currentIndex);
-  }, [currentIndex, questions.length, userId, checkCachedResponse]);
+      });
+  }, [currentIndex, questions, userId]);
 
   const currentQuestion = questions[currentIndex] ?? null;
   const currentState = questionStates[currentIndex] ?? {
