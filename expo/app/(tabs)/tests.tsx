@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
-import { BookOpen, ChevronDown, ChevronRight, Clock, Headphones, Lock, Mic, PenLine, Play } from 'lucide-react-native';
+import { BookOpen, ChevronDown, ChevronRight, Clock, Eye, Headphones, Lock, Mic, PenLine, Play } from 'lucide-react-native';
 import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -28,7 +28,9 @@ import {
   checkRetestAvailability,
   createSessionLink,
   fetchAvailableTeile,
+  fetchPreviousSessionResult,
   fetchSectionalQuestions,
+  type PreviousSessionResult,
   type RetestInfo,
   type TeilInfo,
 } from '@/lib/sectionalHelpers';
@@ -45,6 +47,7 @@ type SetupState = {
   isLoadingRetest: boolean;
   isStarting: boolean;
   isSendingLink: boolean;
+  isLoadingReview: boolean;
 };
 
 const QUESTION_TYPE_LABELS: Record<string, string> = {
@@ -75,6 +78,7 @@ export default function TestsScreen() {
     isLoadingRetest: false,
     isStarting: false,
     isSendingLink: false,
+    isLoadingReview: false,
   });
 
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
@@ -178,6 +182,7 @@ export default function TestsScreen() {
         isLoadingRetest: true,
         isStarting: false,
         isSendingLink: false,
+        isLoadingReview: false,
       });
 
       try {
@@ -285,6 +290,49 @@ export default function TestsScreen() {
       setSetup((prev) => ({ ...prev, isSendingLink: false }));
     }
   }, [setup.teilInfo, setup.isTimed, setup.isSendingLink, userId, targetLevel, user?.email, profile?.exam_type]);
+
+  const handleReviewPrevious = useCallback(async () => {
+    if (!setup.teilInfo || setup.isLoadingReview) return;
+
+    setSetup((prev) => ({ ...prev, isLoadingReview: true }));
+
+    try {
+      const result: PreviousSessionResult | null = await fetchPreviousSessionResult(
+        userId,
+        targetLevel,
+        setup.teilInfo.section,
+        setup.teilInfo.teil
+      );
+
+      if (!result) {
+        console.log('TestsScreen handleReviewPrevious no previous result found');
+        setSetup((prev) => ({ ...prev, isLoadingReview: false }));
+        return;
+      }
+
+      setSetup((prev) => ({ ...prev, visible: false, isLoadingReview: false }));
+
+      router.push({
+        pathname: '/sectional-results',
+        params: {
+          sessionId: result.sessionId,
+          scorePct: String(result.scorePct),
+          correctCount: String(result.correctCount),
+          total: String(result.total),
+          level: targetLevel,
+          section: setup.teilInfo!.section,
+          teil: String(setup.teilInfo!.teil),
+          isTimed: result.isTimed ? '1' : '0',
+          timeTaken: String(result.timeTaken),
+          questions: JSON.stringify(result.questions),
+          answers: JSON.stringify(result.answers),
+        },
+      });
+    } catch (err) {
+      console.log('TestsScreen handleReviewPrevious error', err);
+      setSetup((prev) => ({ ...prev, isLoadingReview: false }));
+    }
+  }, [setup.teilInfo, setup.isLoadingReview, userId, targetLevel]);
 
   const isLocked = setup.retestInfo?.is_locked ?? false;
 
@@ -643,19 +691,38 @@ export default function TestsScreen() {
                     )}
                   </Pressable>
 
-                  <Pressable
-                    accessibilityLabel="Continue on desktop"
-                    disabled={setup.isSendingLink}
-                    onPress={handleSendLink}
-                    style={styles.desktopButton}
-                    testID="desktop-link-button"
-                  >
-                    {setup.isSendingLink ? (
-                      <ActivityIndicator color={Colors.primary} />
-                    ) : (
-                      <Text style={styles.desktopButtonText}>📧 Continue on Desktop</Text>
-                    )}
-                  </Pressable>
+                  {isLocked ? (
+                    <Pressable
+                      accessibilityLabel="Review previous answers"
+                      disabled={setup.isLoadingReview}
+                      onPress={handleReviewPrevious}
+                      style={styles.reviewButton}
+                      testID="review-previous-button"
+                    >
+                      {setup.isLoadingReview ? (
+                        <ActivityIndicator color={Colors.accent} />
+                      ) : (
+                        <>
+                          <Eye color={Colors.accent} size={16} />
+                          <Text style={styles.reviewButtonText}>Review Previous Answers</Text>
+                        </>
+                      )}
+                    </Pressable>
+                  ) : (
+                    <Pressable
+                      accessibilityLabel="Continue on desktop"
+                      disabled={setup.isSendingLink}
+                      onPress={handleSendLink}
+                      style={styles.desktopButton}
+                      testID="desktop-link-button"
+                    >
+                      {setup.isSendingLink ? (
+                        <ActivityIndicator color={Colors.primary} />
+                      ) : (
+                        <Text style={styles.desktopButtonText}>📧 Continue on Desktop</Text>
+                      )}
+                    </Pressable>
+                  )
                 </View>
               </>
             ) : null}
@@ -1011,6 +1078,20 @@ const styles = StyleSheet.create({
   },
   desktopButtonText: {
     color: Colors.primary,
+    fontSize: 15,
+    fontWeight: '700' as const,
+  },
+  reviewButton: {
+    minHeight: 48,
+    borderRadius: 24,
+    backgroundColor: Colors.accentSoft,
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    gap: 8,
+  },
+  reviewButtonText: {
+    color: Colors.accent,
     fontSize: 15,
     fontWeight: '700' as const,
   },

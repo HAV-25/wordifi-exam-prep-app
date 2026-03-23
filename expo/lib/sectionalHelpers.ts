@@ -313,3 +313,95 @@ function getRetestDate(): string {
   d.setDate(d.getDate() + 7);
   return d.toISOString().split('T')[0] ?? '';
 }
+
+export type PreviousSessionResult = {
+  sessionId: string;
+  scorePct: number;
+  correctCount: number;
+  total: number;
+  isTimed: boolean;
+  timeTaken: number;
+  questions: AppQuestion[];
+  answers: Record<string, string>;
+};
+
+export async function fetchPreviousSessionResult(
+  userId: string,
+  level: string,
+  section: string,
+  teil: number
+): Promise<PreviousSessionResult | null> {
+  console.log('sectionalHelpers fetchPreviousSessionResult', { userId, level, section, teil });
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: sessionData, error: sessionError } = await (supabase.from('test_sessions') as any)
+    .select('id, score_pct, questions_total, questions_correct, is_timed, time_taken_seconds')
+    .eq('user_id', userId)
+    .eq('level', level)
+    .eq('section', section)
+    .eq('teil', teil)
+    .eq('session_type', 'sectional')
+    .not('completed_at', 'is', null)
+    .order('completed_at', { ascending: false })
+    .limit(1);
+
+  if (sessionError || !sessionData || sessionData.length === 0) {
+    console.log('fetchPreviousSessionResult no session found', sessionError);
+    return null;
+  }
+
+  const session = sessionData[0] as {
+    id: string;
+    score_pct: number;
+    questions_total: number;
+    questions_correct: number;
+    is_timed: boolean;
+    time_taken_seconds: number;
+  };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: answerData, error: answerError } = await (supabase.from('user_answers') as any)
+    .select('question_id, selected_answer')
+    .eq('session_id', session.id)
+    .eq('user_id', userId);
+
+  if (answerError) {
+    console.log('fetchPreviousSessionResult answers error', answerError);
+    return null;
+  }
+
+  const answerRows = (answerData ?? []) as { question_id: string; selected_answer: string }[];
+  const questionIds = answerRows.map((a) => a.question_id);
+
+  if (questionIds.length === 0) {
+    console.log('fetchPreviousSessionResult no answers found');
+    return null;
+  }
+
+  const { data: questionData, error: questionError } = await supabase
+    .from('app_questions')
+    .select('*')
+    .in('id', questionIds)
+    .order('question_number', { ascending: true });
+
+  if (questionError || !questionData) {
+    console.log('fetchPreviousSessionResult questions error', questionError);
+    return null;
+  }
+
+  const answersMap: Record<string, string> = {};
+  for (const row of answerRows) {
+    answersMap[row.question_id] = row.selected_answer;
+  }
+
+  return {
+    sessionId: session.id,
+    scorePct: session.score_pct,
+    correctCount: session.questions_correct,
+    total: session.questions_total,
+    isTimed: session.is_timed,
+    timeTaken: session.time_taken_seconds,
+    questions: questionData as AppQuestion[],
+    answers: answersMap,
+  };
+}
