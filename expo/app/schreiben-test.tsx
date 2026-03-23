@@ -118,23 +118,29 @@ export default function SchreibenTestScreen() {
     }).start();
   }, [currentIndex, questions.length, progressAnim]);
 
+  const checkedIndicesRef = useRef<Set<number>>(new Set());
+
   const checkCachedAssessment = useCallback(async (index: number) => {
     const question = questions[index];
     if (!question || !userId) return;
 
-    const existing = questionStates[index];
-    if (existing?.assessment || existing?.isLoading || existing?.isLoadingCached) return;
+    if (checkedIndicesRef.current.has(index)) return;
+    checkedIndicesRef.current.add(index);
 
-    setQuestionStates((prev) => ({
-      ...prev,
-      [index]: {
-        isSubmitted: false,
-        isLoading: false,
-        assessment: null,
-        error: null,
-        isLoadingCached: true,
-      },
-    }));
+    setQuestionStates((prev) => {
+      const existing = prev[index];
+      if (existing?.assessment || existing?.isLoading || existing?.isLoadingCached) return prev;
+      return {
+        ...prev,
+        [index]: {
+          isSubmitted: false,
+          isLoading: false,
+          assessment: null,
+          error: null,
+          isLoadingCached: true,
+        },
+      };
+    });
 
     try {
       const cached = await fetchExistingSubmission(userId, question.id);
@@ -166,6 +172,7 @@ export default function SchreibenTestScreen() {
       }
     } catch (err) {
       console.log('SchreibenTest checkCachedAssessment error', err);
+      checkedIndicesRef.current.delete(index);
       setQuestionStates((prev) => ({
         ...prev,
         [index]: {
@@ -177,7 +184,7 @@ export default function SchreibenTestScreen() {
         },
       }));
     }
-  }, [questions, userId, questionStates]);
+  }, [questions, userId]);
 
   useEffect(() => {
     if (questions.length === 0 || !userId) return;

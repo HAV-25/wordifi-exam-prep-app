@@ -4,6 +4,21 @@ export type PointResult = {
   comment: string;
 };
 
+export type CorrectionItem = {
+  type: 'error' | 'suggestion' | 'excellent';
+  original: string;
+  corrected: string;
+  explanation: string;
+  context?: string;
+};
+
+export type ScoreBreakdownItem = {
+  label: string;
+  score: number;
+  max_score: number;
+  color?: string;
+};
+
 export type AssessmentResult = {
   overall_score: number;
   max_score: number;
@@ -18,6 +33,8 @@ export type AssessmentResult = {
   encouragement: string;
   assessment_type: 'local' | 'ai';
   scoring_breakdown?: string;
+  score_details?: ScoreBreakdownItem[];
+  corrections?: CorrectionItem[];
 };
 
 export type FormFillOption = {
