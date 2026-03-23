@@ -722,7 +722,7 @@ export default function TestsScreen() {
                         <Text style={styles.desktopButtonText}>📧 Continue on Desktop</Text>
                       )}
                     </Pressable>
-                  )
+                  )}
                 </View>
               </>
             ) : null}
