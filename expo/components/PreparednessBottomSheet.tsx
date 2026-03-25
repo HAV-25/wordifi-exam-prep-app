@@ -23,6 +23,7 @@ type PreparednessBottomSheetProps = {
   overallScore: number;
   horenPct: number;
   lesenPct: number;
+  schreibenPct?: number;
   streak: number;
   lastActiveDate: string | null;
 };
@@ -108,6 +109,12 @@ const barStyles = StyleSheet.create({
   },
 });
 
+function getReadinessColor(pct: number): string {
+  if (pct >= 70) return colors.green;
+  if (pct >= 40) return colors.amber;
+  return colors.red;
+}
+
 export const PreparednessBottomSheet = React.memo(function PreparednessBottomSheet({
   visible,
   onClose,
@@ -115,6 +122,7 @@ export const PreparednessBottomSheet = React.memo(function PreparednessBottomShe
   overallScore,
   horenPct,
   lesenPct,
+  schreibenPct = 0,
   streak,
   lastActiveDate,
 }: PreparednessBottomSheetProps) {
@@ -188,8 +196,15 @@ export const PreparednessBottomSheet = React.memo(function PreparednessBottomShe
         <View style={styles.barsWrap}>
           <BarRow label="Hören" pct={horenPct} icon="🎧" />
           <BarRow label="Lesen" pct={lesenPct} icon="📖" />
+          <BarRow label="Schreiben" pct={schreibenPct} icon="✍️" />
           <View style={styles.divider} />
           <BarRow label="Overall" pct={overallScore} icon="📊" />
+        </View>
+
+        <View style={styles.readinessRow}>
+          <Text style={[styles.readinessText, { color: getReadinessColor(Math.round((horenPct * 0.35) + (lesenPct * 0.35) + (schreibenPct * 0.30))) }]}>
+            Estimated exam readiness: {Math.round((horenPct * 0.35) + (lesenPct * 0.35) + (schreibenPct * 0.30))}%
+          </Text>
         </View>
 
         <View style={styles.statsRow}>
@@ -253,6 +268,16 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: Colors.border,
     marginVertical: 2,
+  },
+  readinessRow: {
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+    paddingTop: 12,
+  },
+  readinessText: {
+    fontSize: 15,
+    fontWeight: '700' as const,
+    textAlign: 'center' as const,
   },
   statsRow: {
     flexDirection: 'row',

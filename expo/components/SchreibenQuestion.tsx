@@ -1,7 +1,7 @@
 import { Mail, MessageSquare, PenLine } from 'lucide-react-native';
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
+  Animated,
   ScrollView,
   StyleSheet,
   Text,
@@ -493,11 +493,25 @@ function RequiredPointsList({ points }: { points: string[] }) {
 }
 
 function LoadingIndicator() {
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 0.5, duration: 600, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 600, useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [pulseAnim]);
+
   return (
-    <View style={styles.loadingWrap}>
-      <ActivityIndicator color={colors.blue} size="small" />
-      <Text style={styles.loadingText}>Wird bewertet...</Text>
-    </View>
+    <Animated.View style={[styles.loadingWrap, { opacity: pulseAnim }]}>
+      <Text style={styles.loadingEmoji}>✍️</Text>
+      <Text style={styles.loadingTitle}>Wir prüfen deine Antwort…</Text>
+      <Text style={styles.loadingSub}>Das dauert nur einen Moment</Text>
+    </Animated.View>
   );
 }
 
@@ -751,14 +765,23 @@ const styles = StyleSheet.create({
     marginHorizontal: 0,
   },
   loadingWrap: {
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    paddingVertical: 40,
     gap: spacing.sm,
-    paddingVertical: spacing.lg,
   },
-  loadingText: {
+  loadingEmoji: {
+    fontSize: 32,
+  },
+  loadingTitle: {
     fontSize: fontSize.bodyMd,
+    color: colors.navy,
+    fontWeight: '600' as const,
+    textAlign: 'center' as const,
+  },
+  loadingSub: {
+    fontSize: 13,
     color: colors.muted,
+    textAlign: 'center' as const,
   },
 });

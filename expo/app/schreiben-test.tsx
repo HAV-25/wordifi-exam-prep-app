@@ -2,7 +2,6 @@ import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { PenLine } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   Animated,
   Pressable,
@@ -462,8 +461,7 @@ export default function SchreibenTestScreen() {
 
       {isLoadingCached ? (
         <View style={styles.loadingWrap}>
-          <ActivityIndicator color={colors.blue} size="large" />
-          <Text style={styles.loadingText}>Wird geladen...</Text>
+          <PulsingCachedLoader />
         </View>
       ) : currentQuestion ? (
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -507,6 +505,33 @@ export default function SchreibenTestScreen() {
         </View>
       ) : null}
     </View>
+  );
+}
+
+function PulsingCachedLoader() {
+  const pulseAnim = React.useRef(new Animated.Value(1)).current;
+
+  React.useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 0.5, duration: 600, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 600, useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [pulseAnim]);
+
+  return (
+    <Animated.View style={{ opacity: pulseAnim, alignItems: 'center', gap: 8 }}>
+      <Text style={{ fontSize: 32 }}>✍️</Text>
+      <Text style={{ fontSize: fontSize.bodyMd, color: colors.navy, fontWeight: '600' as const, textAlign: 'center' as const }}>
+        Deine Antwort wird geladen…
+      </Text>
+      <Text style={{ fontSize: 13, color: colors.muted, textAlign: 'center' as const }}>
+        Das dauert nur einen Moment
+      </Text>
+    </Animated.View>
   );
 }
 

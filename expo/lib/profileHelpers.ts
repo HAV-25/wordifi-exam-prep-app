@@ -182,6 +182,74 @@ export async function fetchLeaderboard(targetLevel: string): Promise<Leaderboard
   return (data ?? []) as LeaderboardEntry[];
 }
 
+export type RecentIncorrectAnswer = {
+  question_id: string;
+  question_text: string;
+  correct_answer: string;
+  explanation_en: string | null;
+  section: string;
+  level: string;
+  created_at: string | null;
+};
+
+export async function fetchRecentIncorrect(userId: string): Promise<RecentIncorrectAnswer[]> {
+  try {
+    const { data: answers, error: ansError } = await supabase
+      .from('user_answers')
+      .select('question_id, created_at')
+      .eq('user_id', userId)
+      .eq('is_correct', false)
+      .order('created_at', { ascending: false })
+      .limit(20);
+
+    if (ansError || !answers || answers.length === 0) {
+      console.log('fetchRecentIncorrect answers error or empty', ansError);
+      return [];
+    }
+
+    const rows = answers as Array<{ question_id: string; created_at: string | null }>;
+    const questionIds = [...new Set(rows.map((r) => r.question_id))];
+
+    const { data: questions, error: qError } = await supabase
+      .from('app_questions')
+      .select('id, question_text, correct_answer, explanation_en, section, level')
+      .in('id', questionIds);
+
+    if (qError || !questions) {
+      console.log('fetchRecentIncorrect questions error', qError);
+      return [];
+    }
+
+    const qMap = new Map<string, { question_text: string; correct_answer: string; explanation_en: string | null; section: string; level: string }>();
+    for (const q of questions as Array<{ id: string; question_text: string; correct_answer: string; explanation_en: string | null; section: string; level: string }>) {
+      qMap.set(q.id, q);
+    }
+
+    const result: RecentIncorrectAnswer[] = [];
+    const seen = new Set<string>();
+    for (const row of rows) {
+      if (seen.has(row.question_id)) continue;
+      seen.add(row.question_id);
+      const q = qMap.get(row.question_id);
+      if (!q) continue;
+      result.push({
+        question_id: row.question_id,
+        question_text: q.question_text,
+        correct_answer: q.correct_answer,
+        explanation_en: q.explanation_en,
+        section: q.section,
+        level: q.level,
+        created_at: row.created_at,
+      });
+    }
+
+    return result;
+  } catch (err) {
+    console.log('fetchRecentIncorrect unexpected error', err);
+    return [];
+  }
+}
+
 export async function fetchUncompletedTeileCount(userId: string, level: string): Promise<number> {
   const { data, error } = await supabase
     .from('app_questions')

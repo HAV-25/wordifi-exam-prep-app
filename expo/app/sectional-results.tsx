@@ -462,4 +462,23 @@ const styles = StyleSheet.create({
     fontWeight: '700' as const,
     textAlign: 'center',
   },
+  explanationToggle: {
+    paddingTop: 6,
+  },
+  explanationToggleText: {
+    fontSize: 13,
+    color: colors.blue,
+    fontWeight: '600' as const,
+  },
+  explanationBox: {
+    backgroundColor: '#F0F4FF',
+    borderRadius: 10,
+    padding: 12,
+    marginTop: 8,
+  },
+  explanationBoxText: {
+    fontSize: 13,
+    lineHeight: 20,
+    color: Colors.text,
+  },
 });

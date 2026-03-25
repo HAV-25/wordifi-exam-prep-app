@@ -136,6 +136,15 @@ export const StreamCard = React.memo(function StreamCard({
     ]).start();
   }, [wrongShakeAnim]);
 
+  const optionPressAnims = useRef<Record<string, Animated.Value>>({}).current;
+
+  const getOptionPressAnim = useCallback((key: string): Animated.Value => {
+    if (!optionPressAnims[key]) {
+      optionPressAnims[key] = new Animated.Value(1);
+    }
+    return optionPressAnims[key];
+  }, [optionPressAnims]);
+
   const handleSelect = useCallback(
     (key: string) => {
       if (isAnswered || needsAudioGate || reviewMode) return;
@@ -146,6 +155,12 @@ export const StreamCard = React.memo(function StreamCard({
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
       }
 
+      const pressAnim = getOptionPressAnim(key);
+      Animated.sequence([
+        Animated.timing(pressAnim, { toValue: 0.96, duration: 60, useNativeDriver: true }),
+        Animated.spring(pressAnim, { toValue: 1, friction: 5, useNativeDriver: true }),
+      ]).start();
+
       setTimeout(() => {
         onAnswer(question.id, normalizedKey, isCorrect);
         if (isCorrect) {
@@ -155,7 +170,7 @@ export const StreamCard = React.memo(function StreamCard({
         }
       }, 120);
     },
-    [isAnswered, needsAudioGate, reviewMode, question.id, question.correct_answer, onAnswer, animateCorrect, animateWrong]
+    [isAnswered, needsAudioGate, reviewMode, question.id, question.correct_answer, onAnswer, animateCorrect, animateWrong, getOptionPressAnim]
   );
 
   const _flashOptions = useCallback(() => {
@@ -306,23 +321,16 @@ export const StreamCard = React.memo(function StreamCard({
               {question.options.map((option) => {
                 const optStyle = getOptionStyle(option.key);
                 const textStyle = getOptionTextStyle(option.key);
-                const icon = renderIcon(option.key);
                 const animStyle = getOptionAnimatedStyle(option.key);
+                const pressAnim = getOptionPressAnim(option.key);
                 return (
-                  <Animated.View key={option.key} style={[{ flex: 1 }, animStyle]}>
+                  <Animated.View key={option.key} style={[{ flex: 1 }, animStyle, { transform: [...(animStyle.transform ?? []), { scale: pressAnim }] }]}>
                     <Pressable
                       style={[styles.binaryOption, optStyle]}
                       onPress={() => handleSelect(option.key)}
                       disabled={isAnswered || needsAudioGate}
                       testID={`stream-option-${option.key}`}
                     >
-                      <View style={[styles.optionLeading, isAnswered ? optStyle : null]}>
-                        {icon ?? (
-                          <Text style={[styles.optionKey, isAnswered ? textStyle : null]}>
-                            {option.key.toUpperCase()}
-                          </Text>
-                        )}
-                      </View>
                       <Text style={[styles.binaryText, textStyle]}>{option.text}</Text>
                     </Pressable>
                   </Animated.View>
@@ -337,9 +345,11 @@ export const StreamCard = React.memo(function StreamCard({
               const isLast = idx === question.options.length - 1;
               const animStyle = getOptionAnimatedStyle(option.key);
 
+              const pressAnim = getOptionPressAnim(option.key);
+
               return (
                 <React.Fragment key={option.key}>
-                  <Animated.View style={animStyle}>
+                  <Animated.View style={[animStyle, { transform: [...(animStyle.transform ?? []), { scale: pressAnim }] }]}>
                     <Pressable
                       style={[styles.option, optStyle, needsAudioGate && styles.optionLocked]}
                       onPress={() => handleSelect(option.key)}

@@ -140,6 +140,11 @@ export default function TestStreamScreen() {
   const [comboToast, setComboToast] = useState<string | null>(null);
   const [midSessionShown, setMidSessionShown] = useState<boolean>(false);
   const [firstCorrectToday, setFirstCorrectToday] = useState<boolean>(false);
+  const [xpBurstVisible, setXpBurstVisible] = useState<boolean>(false);
+  const [xpBurstValue, setXpBurstValue] = useState<number>(0);
+  const xpBurstOpacity = useRef(new Animated.Value(0)).current;
+  const xpBurstTranslateY = useRef(new Animated.Value(0)).current;
+  const xpBurstScale = useRef(new Animated.Value(0.8)).current;
 
   const blockAnswersRef = useRef<AnswerRecord[]>([]);
   const blockStartTimeRef = useRef<number>(Date.now());
@@ -153,6 +158,33 @@ export default function TestStreamScreen() {
   const swipeHintPulse = useRef(new Animated.Value(1)).current;
   const gaugeScaleAnim = useRef(new Animated.Value(1)).current;
   const comboToastAnim = useRef(new Animated.Value(0)).current;
+
+  const XP_PER_LEVEL: Record<string, number> = useMemo(() => ({
+    A1: 5,
+    A2: 10,
+    B1: 15,
+  }), []);
+
+  const triggerXpBurst = useCallback((level: string) => {
+    const xpVal = XP_PER_LEVEL[level] ?? 5;
+    setXpBurstValue(xpVal);
+    setXpBurstVisible(true);
+    xpBurstOpacity.setValue(0);
+    xpBurstTranslateY.setValue(0);
+    xpBurstScale.setValue(0.8);
+
+    Animated.parallel([
+      Animated.timing(xpBurstOpacity, { toValue: 1, duration: 150, useNativeDriver: true }),
+      Animated.timing(xpBurstScale, { toValue: 1, duration: 150, useNativeDriver: true }),
+    ]).start(() => {
+      Animated.parallel([
+        Animated.timing(xpBurstTranslateY, { toValue: -30, duration: 450, useNativeDriver: true }),
+        Animated.timing(xpBurstOpacity, { toValue: 0, duration: 450, delay: 150, useNativeDriver: true }),
+      ]).start(() => {
+        setXpBurstVisible(false);
+      });
+    });
+  }, [XP_PER_LEVEL, xpBurstOpacity, xpBurstTranslateY, xpBurstScale]);
 
   useEffect(() => {
     if (profile) {
@@ -307,6 +339,7 @@ export default function TestStreamScreen() {
       }
 
       if (isCorrect) {
+        triggerXpBurst(targetLevel);
         const newStrk = correctStreak + 1;
         setCorrectStreak(newStrk);
 
@@ -393,7 +426,7 @@ export default function TestStreamScreen() {
       correctStreak, firstCorrectToday, midSessionShown,
       ensureSession, writeBlockSession, targetLevel, questions.length,
       currentIndex, fetchMoreQuestions, refreshProfile, checkMilestones, animateGaugePulse,
-      showStreakToastBanner, showComboToastBanner, decrementStreamRemaining, incrementDailyStreamCount,
+      showStreakToastBanner, showComboToastBanner, decrementStreamRemaining, incrementDailyStreamCount, triggerXpBurst,
     ]
   );
 
@@ -704,6 +737,15 @@ export default function TestStreamScreen() {
         </Animated.View>
       ) : null}
 
+      {xpBurstVisible ? (
+        <Animated.View
+          pointerEvents="none"
+          style={[styles.xpBurst, { opacity: xpBurstOpacity, transform: [{ translateY: xpBurstTranslateY }, { scale: xpBurstScale }] }]}
+        >
+          <Text style={styles.xpBurstText}>+{xpBurstValue} XP</Text>
+        </Animated.View>
+      ) : null}
+
       {celebrationBadge ? (
         <CelebrationOverlay
           badgeType={celebrationBadge}
@@ -969,5 +1011,16 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 15,
     fontWeight: '700' as const,
+  },
+  xpBurst: {
+    position: 'absolute',
+    top: '45%' as unknown as number,
+    alignSelf: 'center',
+    zIndex: 250,
+  },
+  xpBurstText: {
+    color: colors.green,
+    fontSize: 18,
+    fontWeight: '800' as const,
   },
 });

@@ -26,6 +26,7 @@ function scoreColor(score: number): string {
 export default function ResultsScreen() {
   const params = useLocalSearchParams<{ scorePct?: string; correctCount?: string; total?: string; level?: string; section?: string; teil?: string; questions?: string; answers?: string }>();
   const [expandedStimulusId, setExpandedStimulusId] = useState<string | null>(null);
+  const [expandedExplanationIds, setExpandedExplanationIds] = useState<Set<string>>(new Set());
   const scorePct = Number(params.scorePct ?? '0');
   const correctCount = Number(params.correctCount ?? '0');
   const _total = Number(params.total ?? '0');
@@ -113,6 +114,31 @@ export default function ResultsScreen() {
                     {expandedStimulusId === question.id ? <StimulusCard text={question.stimulus_text} type={question.stimulus_type} collapsible={false} /> : null}
                   </View>
                 ) : null}
+                {(question.explanation_en || question.explanation_de) ? (
+                  <View>
+                    <Pressable
+                      onPress={() => setExpandedExplanationIds((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(question.id)) next.delete(question.id);
+                        else next.add(question.id);
+                        return next;
+                      })}
+                      style={styles.explanationToggle}
+                      testID={`explanation-toggle-${question.id}`}
+                    >
+                      <Text style={styles.explanationToggleText}>
+                        {expandedExplanationIds.has(question.id) ? 'Hide explanation ↑' : 'See explanation ↓'}
+                      </Text>
+                    </Pressable>
+                    {expandedExplanationIds.has(question.id) ? (
+                      <View style={styles.explanationBox}>
+                        <Text style={styles.explanationBoxText}>
+                          {question.explanation_en ?? question.explanation_de}
+                        </Text>
+                      </View>
+                    ) : null}
+                  </View>
+                ) : null}
               </QuestionCard>
             );
           })}
@@ -174,4 +200,8 @@ const styles = StyleSheet.create({
   footerRow: { flexDirection: 'row', gap: 10 },
   secondaryButton: { flex: 1, minHeight: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border },
   secondaryButtonText: { color: Colors.primary, fontWeight: '700' as const, textAlign: 'center' },
+  explanationToggle: { paddingTop: 6 },
+  explanationToggleText: { fontSize: 13, color: colors.blue, fontWeight: '600' as const },
+  explanationBox: { backgroundColor: '#F0F4FF', borderRadius: 10, padding: 12, marginTop: 8 },
+  explanationBoxText: { fontSize: 13, lineHeight: 20, color: Colors.text },
 });
