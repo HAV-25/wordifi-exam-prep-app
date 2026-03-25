@@ -1,10 +1,30 @@
 import { Audio, type AVPlaybackStatus } from 'expo-av';
-import { AlertCircle, Pause, Play, RotateCcw } from 'lucide-react-native';
+import { AlertCircle, Pause, Play, RotateCcw, Gauge } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Animated,
+  LayoutChangeEvent,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import * as Haptics from 'expo-haptics';
 
 import Colors from '@/constants/colors';
 import { colors } from '@/theme';
+
+const WAVEFORM_BAR_COUNT = 32;
+const MAX_REPLAYS = 3;
+
+const WAVEFORM_SEED = Array.from({ length: WAVEFORM_BAR_COUNT }, (_, i) => {
+  const x = i / WAVEFORM_BAR_COUNT;
+  const base = 0.25 + 0.55 * Math.sin(x * Math.PI);
+  const noise = 0.15 * Math.sin(x * 17.3 + 2.7) + 0.1 * Math.cos(x * 31.1 + 1.2);
+  return Math.max(0.15, Math.min(1, base + noise));
+});
 
 type AudioPlayerProps = {
   audioUrl: string;
@@ -21,24 +41,49 @@ export function AudioPlayer({ audioUrl, onFirstPlay }: AudioPlayerProps) {
   const [positionMillis, setPositionMillis] = useState<number>(0);
   const [durationMillis, setDurationMillis] = useState<number>(1);
   const [reloadKey, setReloadKey] = useState<number>(0);
-  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const [playbackSpeed, setPlaybackSpeed] = useState<number>(1);
+  const [replayCount, setReplayCount] = useState<number>(0);
+  const [waveformWidth, setWaveformWidth] = useState<number>(0);
   const hasPlayedRef = useRef<boolean>(false);
   const audioModeSetRef = useRef<boolean>(false);
 
+  const barAnims = useRef<Animated.Value[]>(
+    WAVEFORM_SEED.map(() => new Animated.Value(0.4))
+  ).current;
+
+  const playButtonScale = useRef(new Animated.Value(1)).current;
+
   useEffect(() => {
     if (isPlaying) {
-      const loop = Animated.loop(
-        Animated.sequence([
-          Animated.timing(pulseAnim, { toValue: 0.6, duration: 600, useNativeDriver: true }),
-          Animated.timing(pulseAnim, { toValue: 1, duration: 600, useNativeDriver: true }),
-        ])
-      );
-      loop.start();
-      return () => loop.stop();
+      const animations = barAnims.map((anim, i) => {
+        const baseHeight = WAVEFORM_SEED[i] ?? 0.5;
+        return Animated.loop(
+          Animated.sequence([
+            Animated.timing(anim, {
+              toValue: baseHeight,
+              duration: 300 + (i % 5) * 80,
+              useNativeDriver: true,
+            }),
+            Animated.timing(anim, {
+              toValue: baseHeight * 0.35,
+              duration: 250 + (i % 7) * 60,
+              useNativeDriver: true,
+            }),
+          ])
+        );
+      });
+      animations.forEach((a) => a.start());
+      return () => animations.forEach((a) => a.stop());
     } else {
-      pulseAnim.setValue(1);
+      barAnims.forEach((anim, i) => {
+        Animated.timing(anim, {
+          toValue: (WAVEFORM_SEED[i] ?? 0.5) * 0.4,
+          duration: 300,
+          useNativeDriver: true,
+        }).start();
+      });
     }
-  }, [isPlaying, pulseAnim]);
+  }, [isPlaying, barAnims]);
 
   useEffect(() => {
     let isMounted = true;
@@ -50,6 +95,8 @@ export function AudioPlayer({ audioUrl, onFirstPlay }: AudioPlayerProps) {
       setIsFinished(false);
       setPositionMillis(0);
       setDurationMillis(1);
+      setReplayCount(0);
+      setPlaybackSpeed(1);
 
       if (soundRef.current) {
         try {
@@ -147,8 +194,23 @@ export function AudioPlayer({ audioUrl, onFirstPlay }: AudioPlayerProps) {
     return `${fmt(pos)} / ${fmt(dur)}`;
   }, [positionMillis, durationMillis]);
 
+  const triggerHaptic = useCallback(() => {
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    }
+  }, []);
+
+  const animatePlayButton = useCallback(() => {
+    Animated.sequence([
+      Animated.timing(playButtonScale, { toValue: 0.88, duration: 80, useNativeDriver: true }),
+      Animated.spring(playButtonScale, { toValue: 1, friction: 4, useNativeDriver: true }),
+    ]).start();
+  }, [playButtonScale]);
+
   const handlePlayPause = useCallback(async () => {
     if (!soundRef.current || !isLoaded) return;
+    triggerHaptic();
+    animatePlayButton();
     try {
       const status = await soundRef.current.getStatusAsync();
       if (!status.isLoaded) {
@@ -172,15 +234,18 @@ export function AudioPlayer({ audioUrl, onFirstPlay }: AudioPlayerProps) {
       console.log('AudioPlayer playPause error', e);
       setError('Audio nicht verfügbar');
     }
-  }, [isLoaded, isFinished, onFirstPlay]);
+  }, [isLoaded, isFinished, onFirstPlay, triggerHaptic, animatePlayButton]);
 
   const handleReplay = useCallback(async () => {
     if (!soundRef.current || !isLoaded) return;
+    triggerHaptic();
+    animatePlayButton();
     try {
       const status = await soundRef.current.getStatusAsync();
       if (!status.isLoaded) return;
       await soundRef.current.setPositionAsync(0);
       setIsFinished(false);
+      setReplayCount((prev) => prev + 1);
       await soundRef.current.playAsync();
       if (!hasPlayedRef.current && onFirstPlay) {
         hasPlayedRef.current = true;
@@ -189,12 +254,56 @@ export function AudioPlayer({ audioUrl, onFirstPlay }: AudioPlayerProps) {
     } catch (e) {
       console.log('AudioPlayer replay error', e);
     }
-  }, [isLoaded, onFirstPlay]);
+  }, [isLoaded, onFirstPlay, triggerHaptic, animatePlayButton]);
 
   const handleRetry = useCallback(() => {
     console.log('AudioPlayer: retrying load');
     setReloadKey((v) => v + 1);
   }, []);
+
+  const handleSpeedToggle = useCallback(async () => {
+    if (!soundRef.current || !isLoaded) return;
+    triggerHaptic();
+    const newSpeed = playbackSpeed === 1 ? 0.75 : 1;
+    setPlaybackSpeed(newSpeed);
+    try {
+      await soundRef.current.setRateAsync(newSpeed, true);
+      console.log('AudioPlayer: speed set to', newSpeed);
+    } catch (e) {
+      console.log('AudioPlayer setRate error', e);
+    }
+  }, [isLoaded, playbackSpeed, triggerHaptic]);
+
+  const handleWaveformPress = useCallback(
+    async (locationX: number) => {
+      if (!soundRef.current || !isLoaded || !waveformWidth || waveformWidth <= 0) return;
+      triggerHaptic();
+      const ratio = Math.max(0, Math.min(1, locationX / waveformWidth));
+      const seekTo = Math.floor(ratio * durationMillis);
+      console.log('AudioPlayer: scrub to', seekTo, 'ms (', Math.round(ratio * 100), '%)');
+      try {
+        await soundRef.current.setPositionAsync(seekTo);
+        if (isFinished) {
+          setIsFinished(false);
+          await soundRef.current.playAsync();
+        }
+      } catch (e) {
+        console.log('AudioPlayer scrub error', e);
+      }
+    },
+    [isLoaded, waveformWidth, durationMillis, isFinished, triggerHaptic]
+  );
+
+  const onWaveformLayout = useCallback((e: LayoutChangeEvent) => {
+    setWaveformWidth(e.nativeEvent.layout.width);
+  }, []);
+
+  const replayLabel = useMemo(() => {
+    const used = Math.min(replayCount, MAX_REPLAYS);
+    return `${used}/${MAX_REPLAYS}`;
+  }, [replayCount]);
+
+  const replayLimitReached = replayCount >= MAX_REPLAYS;
 
   if (error) {
     return (
@@ -217,10 +326,10 @@ export function AudioPlayer({ audioUrl, onFirstPlay }: AudioPlayerProps) {
   }
 
   const getPlayIcon = () => {
-    if (isBuffering) return <ActivityIndicator color={Colors.surface} size="small" />;
-    if (isFinished) return <RotateCcw color={Colors.surface} size={20} />;
-    if (isPlaying) return <Pause color={Colors.surface} size={20} />;
-    return <Play color={Colors.surface} size={20} />;
+    if (isBuffering) return <ActivityIndicator color={colors.white} size="small" />;
+    if (isFinished) return <RotateCcw color={colors.white} size={20} />;
+    if (isPlaying) return <Pause color={colors.white} size={20} />;
+    return <Play color={colors.white} size={20} />;
   };
 
   const getPlayLabel = () => {
@@ -230,30 +339,103 @@ export function AudioPlayer({ audioUrl, onFirstPlay }: AudioPlayerProps) {
     return 'Play audio';
   };
 
+  const activeBarIndex = Math.floor(progress * WAVEFORM_BAR_COUNT);
+
   return (
     <View style={styles.card} testID="audio-player">
-      <View style={styles.controls}>
-        <Pressable
-          accessibilityLabel={getPlayLabel()}
-          onPress={isFinished ? handleReplay : handlePlayPause}
-          style={({ pressed }) => [styles.playButton, pressed && styles.playPressed]}
-          testID="play-audio-button"
-          disabled={isBuffering}
-        >
-          {getPlayIcon()}
-        </Pressable>
-        <View style={styles.infoColumn}>
-          <View style={styles.barTrack}>
-            <Animated.View
-              style={[
-                styles.barFill,
-                { width: `${progress * 100}%` },
-                isPlaying && { opacity: pulseAnim },
-              ]}
-            />
+      <View style={styles.topRow}>
+        <Animated.View style={{ transform: [{ scale: playButtonScale }] }}>
+          <Pressable
+            accessibilityLabel={getPlayLabel()}
+            onPress={isFinished ? handleReplay : handlePlayPause}
+            style={({ pressed }) => [styles.playButton, pressed && styles.playPressed]}
+            testID="play-audio-button"
+            disabled={isBuffering}
+          >
+            {getPlayIcon()}
+          </Pressable>
+        </Animated.View>
+
+        <View style={styles.centerColumn}>
+          <Pressable
+            style={styles.waveformTouchArea}
+            onPress={(e) => {
+              const x = e.nativeEvent.locationX;
+              void handleWaveformPress(x);
+            }}
+            onLayout={onWaveformLayout}
+            testID="waveform-scrub"
+            accessibilityLabel="Scrub audio position"
+          >
+            <View style={styles.waveformContainer}>
+              {WAVEFORM_SEED.map((height, i) => {
+                const isPast = i < activeBarIndex;
+                const isCurrent = i === activeBarIndex;
+                const barColor = isPast || isCurrent
+                  ? colors.teal
+                  : 'rgba(255,255,255,0.22)';
+
+                return (
+                  <Animated.View
+                    key={i}
+                    style={[
+                      styles.waveformBar,
+                      {
+                        backgroundColor: barColor,
+                        height: `${height * 100}%`,
+                        transform: [{ scaleY: barAnims[i] ?? new Animated.Value(0.4) }],
+                      },
+                      isCurrent && isPlaying && styles.waveformBarActive,
+                    ]}
+                  />
+                );
+              })}
+            </View>
+          </Pressable>
+
+          <View style={styles.timeRow}>
+            <Text style={styles.timeText}>{formattedTime}</Text>
+            {playbackSpeed !== 1 ? (
+              <Text style={styles.speedIndicator}>{playbackSpeed}x</Text>
+            ) : null}
           </View>
-          <Text style={styles.timeText}>{formattedTime}</Text>
         </View>
+      </View>
+
+      <View style={styles.bottomRow}>
+        <Pressable
+          onPress={handleSpeedToggle}
+          style={({ pressed }) => [styles.speedButton, pressed && styles.speedPressed]}
+          testID="speed-toggle-button"
+          accessibilityLabel={`Playback speed ${playbackSpeed}x`}
+          disabled={!isLoaded}
+        >
+          <Gauge color={playbackSpeed === 0.75 ? colors.teal : 'rgba(255,255,255,0.5)'} size={14} />
+          <Text
+            style={[
+              styles.speedText,
+              playbackSpeed === 0.75 && styles.speedTextActive,
+            ]}
+          >
+            {playbackSpeed === 1 ? '1x' : '0.75x'}
+          </Text>
+        </Pressable>
+
+        <View style={styles.replayBadge}>
+          <RotateCcw
+            color={replayLimitReached ? colors.amber : 'rgba(255,255,255,0.5)'}
+            size={12}
+          />
+          <Text
+            style={[
+              styles.replayText,
+              replayLimitReached && styles.replayTextLimit,
+            ]}
+          >
+            Replay: {replayLabel}
+          </Text>
+        </View>
+
         {isLoaded && (
           <Pressable
             accessibilityLabel="Replay audio"
@@ -261,7 +443,7 @@ export function AudioPlayer({ audioUrl, onFirstPlay }: AudioPlayerProps) {
             style={({ pressed }) => [styles.replayButton, pressed && styles.replayPressed]}
             testID="replay-audio-button"
           >
-            <RotateCcw color={Colors.primary} size={16} />
+            <RotateCcw color={colors.teal} size={14} />
           </Pressable>
         )}
       </View>
@@ -273,55 +455,124 @@ const styles = StyleSheet.create({
   card: {
     borderRadius: 16,
     backgroundColor: colors.navy,
-    padding: 14,
-    gap: 10,
-  },
-  controls: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    padding: 16,
     gap: 12,
   },
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
   playButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.accent,
+    backgroundColor: colors.blue,
   },
   playPressed: {
-    opacity: 0.8,
+    opacity: 0.85,
   },
-  infoColumn: {
+  centerColumn: {
     flex: 1,
-    gap: 4,
+    gap: 6,
+  },
+  waveformTouchArea: {
+    height: 44,
+    justifyContent: 'center',
+  },
+  waveformContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 36,
+    gap: 2,
+  },
+  waveformBar: {
+    flex: 1,
+    borderRadius: 2,
+    minHeight: 4,
+  },
+  waveformBarActive: {
+    shadowColor: colors.teal,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius: 4,
+  },
+  timeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  timeText: {
+    color: 'rgba(255,255,255,0.55)',
+    fontSize: 11,
+    fontWeight: '500' as const,
+  },
+  speedIndicator: {
+    color: colors.teal,
+    fontSize: 10,
+    fontWeight: '700' as const,
+    backgroundColor: 'rgba(0,229,182,0.12)',
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  bottomRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingTop: 2,
+  },
+  speedButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  speedPressed: {
+    opacity: 0.7,
+  },
+  speedText: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 11,
+    fontWeight: '700' as const,
+  },
+  speedTextActive: {
+    color: colors.teal,
+  },
+  replayBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  replayText: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 11,
+    fontWeight: '600' as const,
+  },
+  replayTextLimit: {
+    color: colors.amber,
   },
   replayButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    marginLeft: 'auto',
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(0,229,182,0.12)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   replayPressed: {
     opacity: 0.7,
-  },
-  barTrack: {
-    height: 6,
-    borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    overflow: 'hidden',
-  },
-  barFill: {
-    height: '100%',
-    borderRadius: 999,
-    backgroundColor: Colors.accent,
-  },
-  timeText: {
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: 11,
-    fontWeight: '500' as const,
   },
   errorRow: {
     flexDirection: 'row',
