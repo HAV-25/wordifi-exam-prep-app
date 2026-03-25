@@ -80,8 +80,9 @@ async function signInWithGoogleNative() {
   const isExpoGo = Constants.appOwnership === 'expo';
 
   const redirectTo = isExpoGo
-    ? makeRedirectUri({ path: '/' })
-    : makeRedirectUri({ scheme: 'rork-app', path: '/' });
+    ? makeRedirectUri()
+    : makeRedirectUri({ scheme: 'rork-app' });
+
   console.log('[Auth] Google OAuth native redirectTo:', redirectTo);
   console.log('[Auth] Google OAuth native isExpoGo:', isExpoGo);
   console.log('[Auth] Google OAuth native appOwnership:', Constants.appOwnership);
@@ -95,7 +96,7 @@ async function signInWithGoogleNative() {
   });
 
   if (error) {
-    console.log('signInWithGoogle auth error', error);
+    console.log('[Auth] signInWithGoogle auth error', error);
     throw error;
   }
 
@@ -103,28 +104,53 @@ async function signInWithGoogleNative() {
     throw new Error('Google sign-in URL missing');
   }
 
-  const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+  console.log('[Auth] Google OAuth opening browser with URL:', data.url.substring(0, 120) + '...');
+
+  const result = await WebBrowser.openAuthSessionAsync(
+    data.url,
+    redirectTo,
+    { preferEphemeralSession: true }
+  );
 
   console.log('[Auth] Google OAuth browser result type:', result.type);
+
   if (result.type !== 'success') {
     console.log('[Auth] Google OAuth browser result:', JSON.stringify(result));
+    if (result.type === 'cancel' || result.type === 'dismiss') {
+      return null;
+    }
     throw new Error('Google sign-in was cancelled');
   }
 
-  const { params, errorCode } = QueryParams.getQueryParams(result.url);
+  console.log('[Auth] Google OAuth result URL:', result.url?.substring(0, 200));
 
-  if (errorCode) {
-    throw new Error(errorCode);
+  const url = result.url;
+  let accessToken: string | undefined;
+  let refreshToken: string | undefined;
+
+  const hashIndex = url.indexOf('#');
+  if (hashIndex !== -1) {
+    const hashParams = new URLSearchParams(url.substring(hashIndex + 1));
+    accessToken = hashParams.get('access_token') ?? undefined;
+    refreshToken = hashParams.get('refresh_token') ?? undefined;
+    console.log('[Auth] Extracted tokens from hash fragment');
   }
 
-  const accessToken = params.access_token;
-  const refreshToken = params.refresh_token;
+  if (!accessToken || !refreshToken) {
+    const { params, errorCode } = QueryParams.getQueryParams(url);
+    console.log('[Auth] QueryParams keys:', Object.keys(params));
+    if (errorCode) {
+      console.log('[Auth] QueryParams errorCode:', errorCode);
+      throw new Error(errorCode);
+    }
+    accessToken = accessToken ?? params.access_token;
+    refreshToken = refreshToken ?? params.refresh_token;
+  }
 
-  console.log('[Auth] Google OAuth params received - hasAccessToken:', !!accessToken, 'hasRefreshToken:', !!refreshToken);
+  console.log('[Auth] Google OAuth tokens - hasAccess:', !!accessToken, 'hasRefresh:', !!refreshToken);
 
   if (!accessToken || !refreshToken) {
-    console.log('[Auth] Google OAuth all params:', JSON.stringify(Object.keys(params)));
-    throw new Error('Google session data missing');
+    throw new Error('Google session data missing — tokens not found in redirect URL');
   }
 
   const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
@@ -133,7 +159,7 @@ async function signInWithGoogleNative() {
   });
 
   if (sessionError) {
-    console.log('signInWithGoogle setSession error', sessionError);
+    console.log('[Auth] signInWithGoogle setSession error', sessionError);
     throw sessionError;
   }
 
