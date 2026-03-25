@@ -187,9 +187,19 @@ export type RecentIncorrectAnswer = {
   question_text: string;
   correct_answer: string;
   explanation_en: string | null;
+  explanation_de: string | null;
   section: string;
   level: string;
   created_at: string | null;
+  options: Array<{ key: string; text: string }>;
+  stimulus_text: string | null;
+  stimulus_type: string | null;
+  audio_url: string | null;
+  question_type: string;
+  teil: number;
+  audio_script: string | null;
+  grammar_rule: string | null;
+  grammar_rule_de: string | null;
 };
 
 export async function fetchRecentIncorrect(userId: string): Promise<RecentIncorrectAnswer[]> {
@@ -212,7 +222,7 @@ export async function fetchRecentIncorrect(userId: string): Promise<RecentIncorr
 
     const { data: questions, error: qError } = await supabase
       .from('app_questions')
-      .select('id, question_text, correct_answer, explanation_en, section, level')
+      .select('id, question_text, correct_answer, explanation_en, explanation_de, section, level, options, stimulus_text, stimulus_type, audio_url, question_type, teil, audio_script, grammar_rule, grammar_rule_de')
       .in('id', questionIds);
 
     if (qError || !questions) {
@@ -220,8 +230,26 @@ export async function fetchRecentIncorrect(userId: string): Promise<RecentIncorr
       return [];
     }
 
-    const qMap = new Map<string, { question_text: string; correct_answer: string; explanation_en: string | null; section: string; level: string }>();
-    for (const q of questions as Array<{ id: string; question_text: string; correct_answer: string; explanation_en: string | null; section: string; level: string }>) {
+    type QRow = {
+      id: string;
+      question_text: string;
+      correct_answer: string;
+      explanation_en: string | null;
+      explanation_de: string | null;
+      section: string;
+      level: string;
+      options: Array<{ key: string; text: string }>;
+      stimulus_text: string | null;
+      stimulus_type: string | null;
+      audio_url: string | null;
+      question_type: string;
+      teil: number;
+      audio_script: string | null;
+      grammar_rule: string | null;
+      grammar_rule_de: string | null;
+    };
+    const qMap = new Map<string, QRow>();
+    for (const q of questions as QRow[]) {
       qMap.set(q.id, q);
     }
 
@@ -237,9 +265,19 @@ export async function fetchRecentIncorrect(userId: string): Promise<RecentIncorr
         question_text: q.question_text,
         correct_answer: q.correct_answer,
         explanation_en: q.explanation_en,
+        explanation_de: q.explanation_de,
         section: q.section,
         level: q.level,
         created_at: row.created_at,
+        options: q.options,
+        stimulus_text: q.stimulus_text,
+        stimulus_type: q.stimulus_type,
+        audio_url: q.audio_url,
+        question_type: q.question_type,
+        teil: q.teil,
+        audio_script: q.audio_script,
+        grammar_rule: q.grammar_rule,
+        grammar_rule_de: q.grammar_rule_de,
       });
     }
 

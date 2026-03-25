@@ -68,6 +68,7 @@ function RootLayoutNav() {
         <Stack.Screen name="mock-test" options={{ title: 'Mock Test' }} />
         <Stack.Screen name="mock-results" options={{ title: 'Mock Results', headerBackVisible: false }} />
         <Stack.Screen name="leaderboard" options={{ headerShown: false }} />
+        <Stack.Screen name="review-mistakes" options={{ headerShown: false }} />
         <Stack.Screen name="+not-found" options={{ title: 'Not found' }} />
       </Stack>
     </>

@@ -188,9 +188,6 @@ export default function ProfileScreen() {
     }
   }, [user, nameInput, refreshProfile, closeNameModal]);
 
-  const [expandedMistakeIds, setExpandedMistakeIds] = useState<Set<string>>(new Set());
-  const [showAllMistakes, setShowAllMistakes] = useState<boolean>(false);
-
   const mistakesQuery = useQuery({
     queryKey: ['recent-incorrect', user?.id],
     enabled: Boolean(user?.id),
@@ -538,55 +535,29 @@ export default function ProfileScreen() {
           </View>
         ) : null}
 
-        <View style={styles.mistakesSection}>
-          <Text style={styles.mistakesSectionTitle}>Review Mistakes</Text>
-          <Text style={styles.mistakesSectionSub}>Your recent incorrect answers</Text>
-          {mistakesQuery.isLoading ? (
-            <Text style={styles.mistakesEmpty}>Loading...</Text>
-          ) : !mistakesQuery.data || mistakesQuery.data.length === 0 ? (
-            <Text style={styles.mistakesEmpty}>No mistakes yet - keep practising!</Text>
-          ) : (
-            <View style={styles.mistakesList}>
-              {(showAllMistakes ? mistakesQuery.data : mistakesQuery.data.slice(0, 5)).map((item: RecentIncorrectAnswer) => {
-                const isExpanded = expandedMistakeIds.has(item.question_id);
-                return (
-                  <Pressable
-                    key={item.question_id}
-                    style={styles.mistakeRow}
-                    onPress={() => {
-                      if (!item.explanation_en) return;
-                      setExpandedMistakeIds((prev) => {
-                        const next = new Set(prev);
-                        if (next.has(item.question_id)) next.delete(item.question_id);
-                        else next.add(item.question_id);
-                        return next;
-                      });
-                    }}
-                    testID={`mistake-row-${item.question_id}`}
-                  >
-                    <View style={styles.mistakeRowTop}>
-                      <View style={[styles.mistakeSectionPill, item.section === 'Lesen' ? styles.mistakePillLesen : styles.mistakePillHoren]}>
-                        <Text style={styles.mistakePillText}>{item.section}</Text>
-                      </View>
-                      <Text style={styles.mistakeQuestion} numberOfLines={2}>{item.question_text}</Text>
-                    </View>
-                    <Text style={styles.mistakeCorrect}>Correct: {item.correct_answer}</Text>
-                    {isExpanded && item.explanation_en ? (
-                      <View style={styles.mistakeExplanationBox}>
-                        <Text style={styles.mistakeExplanationText}>{item.explanation_en}</Text>
-                      </View>
-                    ) : null}
-                  </Pressable>
-                );
-              })}
-              {!showAllMistakes && mistakesQuery.data.length > 5 ? (
-                <Pressable style={styles.showMoreBtn} onPress={() => setShowAllMistakes(true)} testID="show-more-mistakes">
-                  <Text style={styles.showMoreText}>Show more ({mistakesQuery.data.length - 5} more)</Text>
-                </Pressable>
-              ) : null}
+        <Pressable
+          style={styles.reviewMistakesCard}
+          onPress={() => router.push('/review-mistakes' as any)}
+          disabled={!mistakesQuery.data || mistakesQuery.data.length === 0}
+          testID="review-mistakes-button"
+        >
+          <View style={styles.reviewMistakesLeft}>
+            <View style={styles.reviewMistakesIcon}>
+              <Text style={styles.reviewMistakesEmoji}>📚</Text>
             </View>
-          )}
-        </View>
+            <View style={styles.reviewMistakesTextWrap}>
+              <Text style={styles.reviewMistakesTitle}>Review Mistakes</Text>
+              <Text style={styles.reviewMistakesSub}>
+                {mistakesQuery.isLoading
+                  ? 'Loading...'
+                  : !mistakesQuery.data || mistakesQuery.data.length === 0
+                    ? 'No mistakes yet — keep going! 🎯'
+                    : `${mistakesQuery.data.length} question${mistakesQuery.data.length === 1 ? '' : 's'} to review`}
+              </Text>
+            </View>
+          </View>
+          <ChevronRight color={Colors.textMuted} size={18} />
+        </Pressable>
 
         <Pressable accessibilityLabel="Sign out" disabled={isSigningOut} onPress={handleSignOut} style={styles.signOutButton} testID="sign-out-button">
           {isSigningOut ? <ActivityIndicator color={Colors.surface} /> : <><LogOut color={Colors.surface} size={18} /><Text style={styles.signOutText}>Sign Out</Text></>}
@@ -791,21 +762,11 @@ const styles = StyleSheet.create({
   promptCta: { alignSelf: 'flex-start', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, backgroundColor: '#D97706', marginTop: 2 },
   promptCtaText: { color: colors.white, fontWeight: '700' as const, fontSize: 14 },
 
-  mistakesSection: { gap: 8 },
-  mistakesSectionTitle: { fontSize: 20, fontWeight: '800' as const, color: Colors.primary },
-  mistakesSectionSub: { fontSize: 13, color: Colors.textMuted, marginBottom: 4 },
-  mistakesEmpty: { fontSize: 14, color: Colors.textMuted, fontStyle: 'italic' as const, paddingVertical: 12 },
-  mistakesList: { gap: 8 },
-  mistakeRow: { backgroundColor: Colors.surface, borderRadius: 16, borderWidth: 1, borderColor: Colors.border, padding: 14, gap: 8 },
-  mistakeRowTop: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
-  mistakeSectionPill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
-  mistakePillHoren: { backgroundColor: colors.blue },
-  mistakePillLesen: { backgroundColor: '#6A1B9A' },
-  mistakePillText: { color: '#fff', fontSize: 10, fontWeight: '700' as const },
-  mistakeQuestion: { flex: 1, fontSize: 14, fontWeight: '600' as const, color: Colors.primary, lineHeight: 20 },
-  mistakeCorrect: { fontSize: 13, color: colors.green, fontWeight: '600' as const },
-  mistakeExplanationBox: { backgroundColor: '#F0F4FF', borderRadius: 10, padding: 12, marginTop: 4 },
-  mistakeExplanationText: { fontSize: 13, lineHeight: 20, color: Colors.text },
-  showMoreBtn: { alignItems: 'center', paddingVertical: 10 },
-  showMoreText: { fontSize: 14, fontWeight: '700' as const, color: colors.blue },
+  reviewMistakesCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: Colors.surface, borderRadius: 20, borderWidth: 1, borderColor: Colors.border, padding: 16 },
+  reviewMistakesLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
+  reviewMistakesIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#F0F4FF', alignItems: 'center', justifyContent: 'center' },
+  reviewMistakesEmoji: { fontSize: 20 },
+  reviewMistakesTextWrap: { flex: 1, gap: 2 },
+  reviewMistakesTitle: { fontSize: 15, fontWeight: '700' as const, color: Colors.primary },
+  reviewMistakesSub: { fontSize: 13, color: Colors.textMuted, lineHeight: 18 },
 });
