@@ -12,7 +12,6 @@ import {
 } from 'react-native';
 
 import { AudioPlayer } from '@/components/AudioPlayer';
-import { EmptyState } from '@/components/EmptyState';
 import { OptionButton } from '@/components/OptionButton';
 import { StimulusCard } from '@/components/StimulusCard';
 import Colors from '@/constants/colors';
@@ -207,13 +206,18 @@ export default function SectionalTestScreen() {
       <View style={styles.screen}>
         <Stack.Screen options={{ title: 'Sectional Test', headerShown: true }} />
         <View style={styles.emptyWrap}>
-          <EmptyState
-            title="This Teil has no questions yet."
-            description="We're adding content soon."
-            actionLabel="Go Back"
-            onActionPress={() => router.back()}
-            testID="sectional-empty-state"
-          />
+          <View style={styles.emptyContent}>
+            <Text style={styles.emptyEmoji}>📚</Text>
+            <Text style={styles.emptyTitle}>Noch keine Fragen verfügbar</Text>
+            <Text style={styles.emptyDesc}>Dieser Abschnitt wird bald freigeschaltet.</Text>
+            <Pressable
+              onPress={() => router.back()}
+              style={styles.emptyBackButton}
+              testID="sectional-empty-back"
+            >
+              <Text style={styles.emptyBackText}>Zurück</Text>
+            </Pressable>
+          </View>
         </View>
       </View>
     );
@@ -492,5 +496,37 @@ const styles = StyleSheet.create({
     color: Colors.surface,
     fontSize: 16,
     fontWeight: '800' as const,
+  },
+  emptyContent: {
+    alignItems: 'center',
+    gap: 12,
+  },
+  emptyEmoji: {
+    fontSize: 48,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: '700' as const,
+    color: Colors.primary,
+    textAlign: 'center' as const,
+  },
+  emptyDesc: {
+    fontSize: 15,
+    color: Colors.textMuted,
+    textAlign: 'center' as const,
+  },
+  emptyBackButton: {
+    marginTop: 12,
+    paddingHorizontal: 28,
+    paddingVertical: 12,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    backgroundColor: 'transparent',
+  },
+  emptyBackText: {
+    fontSize: 15,
+    fontWeight: '700' as const,
+    color: Colors.primary,
   },
 });

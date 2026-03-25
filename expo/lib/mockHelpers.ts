@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabaseClient';
-import type { AppQuestion, MockTest, StudyPlanItem, UserProfile } from '@/types/database';
+import { MOCK_TEST_QUESTION_COUNTS, shuffleArray } from '@/theme/constants';
+import type { AppQuestion, StudyPlanItem, UserProfile } from '@/types/database';
 
 export type MockTestInfo = {
   level: string;
@@ -100,8 +101,40 @@ export async function fetchMockQuestions(
   }
 
   const all = (data ?? []) as AppQuestion[];
-  const horen = all.filter((q) => q.section === 'Hören');
-  const lesen = all.filter((q) => q.section === 'Lesen');
+
+  const sectionCounts = MOCK_TEST_QUESTION_COUNTS[level];
+
+  const selectForSection = (section: string): AppQuestion[] => {
+    const sectionQuestions = all.filter((q) => q.section === section);
+    const teilMap = new Map<number, AppQuestion[]>();
+    for (const q of sectionQuestions) {
+      const teil = q.teil ?? 1;
+      if (!teilMap.has(teil)) teilMap.set(teil, []);
+      teilMap.get(teil)!.push(q);
+    }
+
+    const teilCounts = sectionCounts?.[section];
+    if (!teilCounts) return sectionQuestions;
+
+    const selected: AppQuestion[] = [];
+    for (const [teil, questions] of teilMap) {
+      const targetCount = teilCounts[teil] ?? questions.length;
+      const shuffled = shuffleArray(questions);
+      selected.push(...shuffled.slice(0, targetCount));
+    }
+
+    selected.sort((a, b) => {
+      if ((a.teil ?? 1) !== (b.teil ?? 1)) return (a.teil ?? 1) - (b.teil ?? 1);
+      return (a.question_number ?? 0) - (b.question_number ?? 0);
+    });
+
+    return selected;
+  };
+
+  const horen = selectForSection('Hören');
+  const lesen = selectForSection('Lesen');
+
+  console.log('fetchMockQuestions selected', { horenCount: horen.length, lesenCount: lesen.length, level });
 
   return { horen, lesen };
 }

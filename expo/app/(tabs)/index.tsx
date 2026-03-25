@@ -55,57 +55,77 @@ type AnswerRecord = {
 };
 
 function SessionProgressBar({ answered, total }: { answered: number; total: number }) {
-  const segmentAnims = useRef<Animated.Value[]>(
-    Array.from({ length: total }, (_, i) => new Animated.Value(i < answered ? 1 : 0))
-  ).current;
+  const progressAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    if (answered > 0 && answered <= segmentAnims.length) {
-      const anim = segmentAnims[answered - 1];
-      if (anim) {
-        Animated.timing(anim, {
-          toValue: 1,
-          duration: 150,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: false,
-        }).start();
-      }
+    if (answered > 0 && total > 0) {
+      Animated.timing(progressAnim, {
+        toValue: answered / total,
+        duration: 400,
+        useNativeDriver: false,
+      }).start();
     }
-  }, [answered, segmentAnims]);
+  }, [answered, total, progressAnim]);
 
   if (answered === 0) return null;
 
   return (
-    <View style={progressStyles.container}>
-      {segmentAnims.slice(0, total).map((anim, i) => (
+    <View style={progressStyles.wrapper}>
+      <View style={progressStyles.container}>
         <Animated.View
-          key={i}
           style={[
-            progressStyles.segment,
+            progressStyles.fill,
             {
-              backgroundColor: anim.interpolate({
+              width: progressAnim.interpolate({
                 inputRange: [0, 1],
-                outputRange: ['rgba(255,255,255,0.15)', 'rgba(255,255,255,0.7)'],
+                outputRange: ['0%', '100%'],
               }),
             },
           ]}
         />
-      ))}
+      </View>
+      <Text style={progressStyles.counter}>{answered} / {total}</Text>
     </View>
   );
 }
 
 const progressStyles = StyleSheet.create({
-  container: {
-    height: 4,
+  wrapper: {
     flexDirection: 'row',
-    gap: 2,
+    alignItems: 'center',
     paddingHorizontal: 16,
+    gap: 10,
+    paddingVertical: 6,
     backgroundColor: Colors.primaryDeep,
   },
-  segment: {
+  container: {
     flex: 1,
-    borderRadius: 2,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    overflow: 'hidden',
+    shadowColor: Colors.primaryDeep,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  fill: {
+    height: '100%',
+    borderRadius: 4,
+    backgroundColor: colors.blue,
+    shadowColor: colors.blue,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.4,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  counter: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 12,
+    fontWeight: '700' as const,
+    minWidth: 40,
+    textAlign: 'right' as const,
   },
 });
 

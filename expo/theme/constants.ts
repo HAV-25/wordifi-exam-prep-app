@@ -91,6 +91,34 @@ export const PAYWALL_TIMER = {
   sessionHours:   24,
 } as const;
 
+// ─── Mock Test Official Exam Question Counts per Teil ────────────────────────
+export const MOCK_TEST_QUESTION_COUNTS: Record<string, Record<string, Record<number, number>>> = {
+  A1: {
+    Hören:    { 1: 6, 2: 4, 3: 5 },
+    Lesen:    { 1: 5, 2: 5, 3: 5 },
+    Schreiben:{ 1: 1, 2: 1 },
+  },
+  A2: {
+    Hören:    { 1: 5, 2: 5, 3: 5, 4: 5 },
+    Lesen:    { 1: 5, 2: 5, 3: 5, 4: 5 },
+    Schreiben:{ 1: 1, 2: 1 },
+  },
+  B1: {
+    Hören:    { 1: 10, 2: 5, 3: 7, 4: 8 },
+    Lesen:    { 1: 6,  2: 6, 3: 7, 4: 7, 5: 4 },
+    Schreiben:{ 1: 1,  2: 1, 3: 1 },
+  },
+};
+
+export function shuffleArray<T>(array: T[]): T[] {
+  const arr = [...array];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
 // ─── AsyncStorage Keys ───────────────────────────────────────────────────────
 // Centralised to prevent key typos across the codebase
 export const STORAGE_KEYS = {
