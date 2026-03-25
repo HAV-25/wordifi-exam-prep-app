@@ -4,22 +4,42 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Animated,
   Dimensions,
+  Easing,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import * as Haptics from 'expo-haptics';
 
 import { AudioPlayer } from '@/components/AudioPlayer';
 import Colors from '@/constants/colors';
-// DESIGN SYSTEM — import tokens
 import { colors, shadows, fontSize } from '@/theme';
 import type { AppQuestion } from '@/types/database';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 const EXPLANATION_HEIGHT = SCREEN_HEIGHT * 0.42;
 const LANG_PREF_KEY = 'wordifi_explanation_lang';
+
+const CORRECT_AFFIRMATIONS = [
+  'Sehr gut! ✦',
+  'Genau! ✦',
+  'Klasse! ✦',
+  'Perfekt! ✦',
+  'Ausgezeichnet! ✦',
+  'Wunderbar! ✦',
+  'Bravo! ✦',
+];
+
+const PROGRESS_REINFORCEMENTS = [
+  '+1 Schritt näher an dein Ziel',
+  'Du verbesserst dein Deutsch',
+  'Dein Fortschritt zählt',
+];
+
+const WRONG_HEADER = 'Fast! Hier ist die Antwort:';
 
 type StreamCardProps = {
   question: AppQuestion;
@@ -46,8 +66,21 @@ export const StreamCard = React.memo(function StreamCard({
   const needsAudioGate = isHoren && Boolean(question.audio_url) && !audioUnlocked && !reviewMode;
 
   const [explanationLang, setExplanationLang] = useState<'en' | 'de'>('en');
+  const [showFeedback, setShowFeedback] = useState<boolean>(isAnswered);
   const explanationAnim = useRef(new Animated.Value(isAnswered ? 1 : 0)).current;
   const optionFlashAnim = useRef(new Animated.Value(1)).current;
+  const correctScaleAnim = useRef(new Animated.Value(1)).current;
+  const wrongShakeAnim = useRef(new Animated.Value(0)).current;
+  const explanationSlideAnim = useRef(new Animated.Value(isAnswered ? 0 : 30)).current;
+
+  const affirmation = useMemo(
+    () => CORRECT_AFFIRMATIONS[Math.floor(Math.random() * CORRECT_AFFIRMATIONS.length)] ?? CORRECT_AFFIRMATIONS[0],
+    []
+  );
+  const progressMsg = useMemo(
+    () => PROGRESS_REINFORCEMENTS[Math.floor(Math.random() * PROGRESS_REINFORCEMENTS.length)] ?? PROGRESS_REINFORCEMENTS[0],
+    []
+  );
 
   useEffect(() => {
     AsyncStorage.getItem(LANG_PREF_KEY).then((val) => {
@@ -59,16 +92,25 @@ export const StreamCard = React.memo(function StreamCard({
 
   useEffect(() => {
     if (isAnswered) {
+      setShowFeedback(true);
       Animated.spring(explanationAnim, {
         toValue: 1,
         friction: 10,
         tension: 50,
         useNativeDriver: false,
       }).start();
+      Animated.timing(explanationSlideAnim, {
+        toValue: 0,
+        duration: 300,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }).start();
     } else {
       explanationAnim.setValue(0);
+      explanationSlideAnim.setValue(30);
+      setShowFeedback(false);
     }
-  }, [isAnswered, explanationAnim]);
+  }, [isAnswered, explanationAnim, explanationSlideAnim]);
 
   const toggleLang = useCallback(() => {
     setExplanationLang((prev) => {
@@ -78,14 +120,42 @@ export const StreamCard = React.memo(function StreamCard({
     });
   }, []);
 
+  const animateCorrect = useCallback(() => {
+    Animated.sequence([
+      Animated.timing(correctScaleAnim, { toValue: 1.08, duration: 150, useNativeDriver: true }),
+      Animated.spring(correctScaleAnim, { toValue: 1, friction: 4, useNativeDriver: true }),
+    ]).start();
+  }, [correctScaleAnim]);
+
+  const animateWrong = useCallback(() => {
+    Animated.sequence([
+      Animated.timing(wrongShakeAnim, { toValue: 8, duration: 50, useNativeDriver: true }),
+      Animated.timing(wrongShakeAnim, { toValue: -8, duration: 50, useNativeDriver: true }),
+      Animated.timing(wrongShakeAnim, { toValue: 5, duration: 50, useNativeDriver: true }),
+      Animated.timing(wrongShakeAnim, { toValue: 0, duration: 50, useNativeDriver: true }),
+    ]).start();
+  }, [wrongShakeAnim]);
+
   const handleSelect = useCallback(
     (key: string) => {
       if (isAnswered || needsAudioGate || reviewMode) return;
       const normalizedKey = key.toLowerCase();
       const isCorrect = normalizedKey === question.correct_answer.toLowerCase();
-      onAnswer(question.id, normalizedKey, isCorrect);
+
+      if (Platform.OS !== 'web') {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      }
+
+      setTimeout(() => {
+        onAnswer(question.id, normalizedKey, isCorrect);
+        if (isCorrect) {
+          animateCorrect();
+        } else {
+          animateWrong();
+        }
+      }, 120);
     },
-    [isAnswered, needsAudioGate, reviewMode, question.id, question.correct_answer, onAnswer]
+    [isAnswered, needsAudioGate, reviewMode, question.id, question.correct_answer, onAnswer, animateCorrect, animateWrong]
   );
 
   const _flashOptions = useCallback(() => {
@@ -133,7 +203,7 @@ export const StreamCard = React.memo(function StreamCard({
       const isSelectedOption = normalizedOption === selectedAnswer.toLowerCase();
 
       if (isSelectedOption && isCorrectOption) return <Check color={colors.white} size={14} />;
-      if (isSelectedOption && !isCorrectOption) return <X color={colors.white} size={14} />;
+      if (isSelectedOption && !isCorrectOption) return <X color={colors.muted} size={14} />;
       if (isCorrectOption) return <Check color={colors.white} size={14} />;
       return null;
     },
@@ -144,6 +214,15 @@ export const StreamCard = React.memo(function StreamCard({
     if (!selectedAnswer) return false;
     return selectedAnswer.toLowerCase() === question.correct_answer.toLowerCase();
   }, [selectedAnswer, question.correct_answer]);
+
+  const isSelectedWrong = useCallback(
+    (optionKey: string) => {
+      if (!isAnswered || !selectedAnswer) return false;
+      const normalizedOption = optionKey.toLowerCase();
+      return normalizedOption === selectedAnswer.toLowerCase() && normalizedOption !== question.correct_answer.toLowerCase();
+    },
+    [isAnswered, selectedAnswer, question.correct_answer]
+  );
 
   const explanationText = useMemo(() => {
     if (explanationLang === 'de' && question.explanation_de) return question.explanation_de;
@@ -158,6 +237,24 @@ export const StreamCard = React.memo(function StreamCard({
 
   const isBinaryType = question.question_type === 'true_false' || question.question_type === 'ja_nein';
   const hasStimulus = !isHoren && Boolean(question.stimulus_text);
+
+  const getOptionAnimatedStyle = useCallback(
+    (optionKey: string) => {
+      if (!isAnswered || !selectedAnswer) return {};
+      const normalizedOption = optionKey.toLowerCase();
+      const isCorrectOption = normalizedOption === question.correct_answer.toLowerCase();
+      const isSelectedOption = normalizedOption === selectedAnswer.toLowerCase();
+
+      if (isSelectedOption && isCorrectOption) {
+        return { transform: [{ scale: correctScaleAnim }] };
+      }
+      if (isSelectedOption && !isCorrectOption) {
+        return { transform: [{ translateX: wrongShakeAnim }] };
+      }
+      return {};
+    },
+    [isAnswered, selectedAnswer, question.correct_answer, correctScaleAnim, wrongShakeAnim]
+  );
 
   return (
     <View style={styles.card}>
@@ -184,7 +281,6 @@ export const StreamCard = React.memo(function StreamCard({
           <View style={styles.stimulusWrap}>
             <View style={styles.stimulusHeader}>
               <BookOpenText color={Colors.textMuted} size={14} />
-              {/* FIX: sentence case — removed textTransform uppercase */}
               <Text style={styles.stimulusLabel}>
                 {question.stimulus_type === 'building_directory'
                   ? 'Building directory'
@@ -211,23 +307,25 @@ export const StreamCard = React.memo(function StreamCard({
                 const optStyle = getOptionStyle(option.key);
                 const textStyle = getOptionTextStyle(option.key);
                 const icon = renderIcon(option.key);
+                const animStyle = getOptionAnimatedStyle(option.key);
                 return (
-                  <Pressable
-                    key={option.key}
-                    style={[styles.binaryOption, optStyle]}
-                    onPress={() => handleSelect(option.key)}
-                    disabled={isAnswered || needsAudioGate}
-                    testID={`stream-option-${option.key}`}
-                  >
-                    <View style={[styles.optionLeading, isAnswered ? optStyle : null]}>
-                      {icon ?? (
-                        <Text style={[styles.optionKey, isAnswered ? textStyle : null]}>
-                          {option.key.toUpperCase()}
-                        </Text>
-                      )}
-                    </View>
-                    <Text style={[styles.binaryText, textStyle]}>{option.text}</Text>
-                  </Pressable>
+                  <Animated.View key={option.key} style={[{ flex: 1 }, animStyle]}>
+                    <Pressable
+                      style={[styles.binaryOption, optStyle]}
+                      onPress={() => handleSelect(option.key)}
+                      disabled={isAnswered || needsAudioGate}
+                      testID={`stream-option-${option.key}`}
+                    >
+                      <View style={[styles.optionLeading, isAnswered ? optStyle : null]}>
+                        {icon ?? (
+                          <Text style={[styles.optionKey, isAnswered ? textStyle : null]}>
+                            {option.key.toUpperCase()}
+                          </Text>
+                        )}
+                      </View>
+                      <Text style={[styles.binaryText, textStyle]}>{option.text}</Text>
+                    </Pressable>
+                  </Animated.View>
                 );
               })}
             </View>
@@ -237,26 +335,33 @@ export const StreamCard = React.memo(function StreamCard({
               const textStyle = getOptionTextStyle(option.key);
               const icon = renderIcon(option.key);
               const isLast = idx === question.options.length - 1;
+              const animStyle = getOptionAnimatedStyle(option.key);
 
               return (
                 <React.Fragment key={option.key}>
-                  <Pressable
-                    style={[styles.option, optStyle, needsAudioGate && styles.optionLocked]}
-                    onPress={() => handleSelect(option.key)}
-                    disabled={isAnswered || needsAudioGate}
-                    testID={`stream-option-${option.key}`}
-                  >
-                    <View style={[styles.optionLeading, isAnswered ? optStyle : null]}>
-                      {icon ?? (
-                        <Text style={[styles.optionKey, isAnswered ? textStyle : null]}>
-                          {option.key.toUpperCase()}
-                        </Text>
-                      )}
-                    </View>
-                    <Text style={[styles.optionLabel, textStyle]} numberOfLines={3}>
-                      {option.text}
-                    </Text>
-                  </Pressable>
+                  <Animated.View style={animStyle}>
+                    <Pressable
+                      style={[styles.option, optStyle, needsAudioGate && styles.optionLocked]}
+                      onPress={() => handleSelect(option.key)}
+                      disabled={isAnswered || needsAudioGate}
+                      testID={`stream-option-${option.key}`}
+                    >
+                      <View style={[
+                        styles.optionLeading,
+                        isAnswered ? optStyle : null,
+                        isSelectedWrong(option.key) ? styles.optionLeadingWrong : null,
+                      ]}>
+                        {icon ?? (
+                          <Text style={[styles.optionKey, isAnswered ? textStyle : null]}>
+                            {option.key.toUpperCase()}
+                          </Text>
+                        )}
+                      </View>
+                      <Text style={[styles.optionLabel, textStyle]} numberOfLines={3}>
+                        {option.text}
+                      </Text>
+                    </Pressable>
+                  </Animated.View>
                   {!isLast ? <View style={styles.optionDivider} /> : null}
                 </React.Fragment>
               );
@@ -265,57 +370,63 @@ export const StreamCard = React.memo(function StreamCard({
         </Animated.View>
       </ScrollView>
 
-      {/* FIX: white background, shadow instead of border */}
       <Animated.View style={[styles.explanationPanel, { height: panelHeight }]}>
-        {isAnswered ? (
-          <ScrollView
-            style={styles.explanationScroll}
-            contentContainerStyle={styles.explanationContent}
-            nestedScrollEnabled
-            showsVerticalScrollIndicator={false}
-          >
-            <View style={styles.explanationHeader}>
-              <Text
-                style={[
-                  styles.resultLabel,
-                  isCorrectAnswer ? styles.resultCorrect : styles.resultWrong,
-                ]}
-              >
-                {isCorrectAnswer ? '✓ Richtig' : '✗ Falsch'}
-              </Text>
-              <Pressable style={styles.langToggle} onPress={toggleLang} testID="lang-toggle">
-                <Text style={[styles.langOption, explanationLang === 'en' && styles.langActive]}>
-                  EN
-                </Text>
-                <Text style={styles.langSep}>|</Text>
-                <Text style={[styles.langOption, explanationLang === 'de' && styles.langActive]}>
-                  DE
-                </Text>
-              </Pressable>
-            </View>
-
-            <Text style={styles.explanationText}>{explanationText}</Text>
-
-            {question.grammar_rule ? (
-              <View style={styles.grammarCard}>
-                <Text style={styles.grammarLabel}>Grammar rule</Text>
-                <Text style={styles.grammarText}>
-                  {explanationLang === 'de' && question.grammar_rule_de
-                    ? question.grammar_rule_de
-                    : question.grammar_rule}
-                </Text>
-              </View>
-            ) : null}
-
-            <Pressable
-              style={styles.reportLink}
-              onPress={() => onReportPress(question.id)}
-              testID="report-issue-link"
+        {showFeedback ? (
+          <Animated.View style={{ flex: 1, transform: [{ translateY: explanationSlideAnim }], opacity: explanationAnim }}>
+            <ScrollView
+              style={styles.explanationScroll}
+              contentContainerStyle={styles.explanationContent}
+              nestedScrollEnabled
+              showsVerticalScrollIndicator={false}
             >
-              <Flag color={Colors.textMuted} size={13} />
-              <Text style={styles.reportText}>Report an issue</Text>
-            </Pressable>
-          </ScrollView>
+              <View style={styles.explanationHeader}>
+                <View style={styles.resultLabelWrap}>
+                  <Text
+                    style={[
+                      styles.resultLabel,
+                      isCorrectAnswer ? styles.resultCorrect : styles.resultWrong,
+                    ]}
+                  >
+                    {isCorrectAnswer ? affirmation : WRONG_HEADER}
+                  </Text>
+                  {isCorrectAnswer ? (
+                    <Text style={styles.progressReinforcement}>{progressMsg}</Text>
+                  ) : null}
+                </View>
+                <Pressable style={styles.langToggle} onPress={toggleLang} testID="lang-toggle">
+                  <Text style={[styles.langOption, explanationLang === 'en' && styles.langActive]}>
+                    EN
+                  </Text>
+                  <Text style={styles.langSep}>|</Text>
+                  <Text style={[styles.langOption, explanationLang === 'de' && styles.langActive]}>
+                    DE
+                  </Text>
+                </Pressable>
+              </View>
+
+              <Text style={styles.explanationText}>{explanationText}</Text>
+
+              {question.grammar_rule ? (
+                <View style={styles.grammarCard}>
+                  <Text style={styles.grammarLabel}>Grammar rule</Text>
+                  <Text style={styles.grammarText}>
+                    {explanationLang === 'de' && question.grammar_rule_de
+                      ? question.grammar_rule_de
+                      : question.grammar_rule}
+                  </Text>
+                </View>
+              ) : null}
+
+              <Pressable
+                style={styles.reportLink}
+                onPress={() => onReportPress(question.id)}
+                testID="report-issue-link"
+              >
+                <Flag color={Colors.textMuted} size={13} />
+                <Text style={styles.reportText}>Report an issue</Text>
+              </Pressable>
+            </ScrollView>
+          </Animated.View>
         ) : null}
       </Animated.View>
     </View>
@@ -351,7 +462,6 @@ const styles = StyleSheet.create({
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
   },
-  // FIX: sentence case — no textTransform uppercase
   audioGateText: {
     color: Colors.textMuted,
     fontSize: fontSize.bodySm,
@@ -373,7 +483,6 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 6,
   },
-  // FIX: removed textTransform uppercase — sentence case rule
   stimulusLabel: {
     fontSize: fontSize.label,
     fontWeight: '700' as const,
@@ -397,7 +506,6 @@ const styles = StyleSheet.create({
     height: 24,
     backgroundColor: 'rgba(255,255,255,0.8)',
   },
-  // FIX: color → colors.text (was Colors.primary)
   questionText: {
     fontSize: fontSize.displaySm,
     lineHeight: 28,
@@ -419,15 +527,14 @@ const styles = StyleSheet.create({
   optionDefault: {
     backgroundColor: 'transparent',
   },
-  // FIX: rgba green/red tints (not Material green/red)
   optionCorrect: {
     backgroundColor: 'rgba(20, 184, 106, 0.12)',
   },
   optionWrong: {
-    backgroundColor: 'rgba(226, 77, 77, 0.12)',
+    backgroundColor: 'rgba(156, 163, 175, 0.12)',
   },
   optionCorrectHighlight: {
-    backgroundColor: 'rgba(20, 184, 106, 0.12)',
+    backgroundColor: 'rgba(20, 184, 106, 0.10)',
   },
   optionFaded: {
     backgroundColor: 'transparent',
@@ -449,6 +556,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: Colors.surfaceMuted,
   },
+  optionLeadingWrong: {
+    backgroundColor: 'rgba(156, 163, 175, 0.3)',
+  },
   optionKey: {
     fontSize: fontSize.bodySm,
     fontWeight: '800' as const,
@@ -464,13 +574,12 @@ const styles = StyleSheet.create({
   optionTextDefault: {
     color: colors.text,
   },
-  // FIX: theme green/red (not Material #2E7D32 / #C62828)
   optionTextCorrect: {
     color: colors.green,
     fontWeight: '600' as const,
   },
   optionTextWrong: {
-    color: colors.red,
+    color: colors.muted,
     fontWeight: '600' as const,
   },
   optionTextFaded: {
@@ -496,7 +605,6 @@ const styles = StyleSheet.create({
     fontWeight: '600' as const,
     color: colors.text,
   },
-  // FIX: white bg + shadow instead of surface bg + border
   explanationPanel: {
     backgroundColor: colors.white,
     borderTopLeftRadius: 16,
@@ -513,19 +621,29 @@ const styles = StyleSheet.create({
   },
   explanationHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
+  },
+  resultLabelWrap: {
+    flex: 1,
+    gap: 2,
+    marginRight: 12,
   },
   resultLabel: {
     fontSize: fontSize.bodyLg,
     fontWeight: '700' as const,
   },
-  // FIX: theme green/red (not Material colours)
   resultCorrect: {
     color: colors.green,
   },
   resultWrong: {
-    color: colors.red,
+    color: colors.amber,
+  },
+  progressReinforcement: {
+    fontSize: fontSize.label,
+    fontWeight: '500' as const,
+    color: colors.muted,
+    marginTop: 2,
   },
   langToggle: {
     flexDirection: 'row',
@@ -560,7 +678,6 @@ const styles = StyleSheet.create({
     padding: 14,
     gap: 4,
   },
-  // FIX: sentence case label — removed uppercase (grammar rule is not a chip)
   grammarLabel: {
     fontSize: fontSize.micro,
     fontWeight: '700' as const,

@@ -46,12 +46,68 @@ const SCREEN_HEIGHT = Dimensions.get('window').height;
 const SWIPE_THRESHOLD = SCREEN_HEIGHT * 0.15;
 const SWIPE_VELOCITY = 800;
 const SWIPE_HINT_KEY = 'wordifi_total_answered';
+const SESSION_SIZE = 20;
 
 type AnswerRecord = {
   questionId: string;
   selectedAnswer: string;
   isCorrect: boolean;
 };
+
+function SessionProgressBar({ answered, total }: { answered: number; total: number }) {
+  const segmentAnims = useRef<Animated.Value[]>(
+    Array.from({ length: total }, (_, i) => new Animated.Value(i < answered ? 1 : 0))
+  ).current;
+
+  useEffect(() => {
+    if (answered > 0 && answered <= segmentAnims.length) {
+      const anim = segmentAnims[answered - 1];
+      if (anim) {
+        Animated.timing(anim, {
+          toValue: 1,
+          duration: 150,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: false,
+        }).start();
+      }
+    }
+  }, [answered, segmentAnims]);
+
+  if (answered === 0) return null;
+
+  return (
+    <View style={progressStyles.container}>
+      {segmentAnims.slice(0, total).map((anim, i) => (
+        <Animated.View
+          key={i}
+          style={[
+            progressStyles.segment,
+            {
+              backgroundColor: anim.interpolate({
+                inputRange: [0, 1],
+                outputRange: ['rgba(255,255,255,0.15)', 'rgba(255,255,255,0.7)'],
+              }),
+            },
+          ]}
+        />
+      ))}
+    </View>
+  );
+}
+
+const progressStyles = StyleSheet.create({
+  container: {
+    height: 4,
+    flexDirection: 'row',
+    gap: 2,
+    paddingHorizontal: 16,
+    backgroundColor: Colors.primaryDeep,
+  },
+  segment: {
+    flex: 1,
+    borderRadius: 2,
+  },
+});
 
 export default function TestStreamScreen() {
   const { profile, user, refreshProfile } = useAuth();
@@ -79,6 +135,11 @@ export default function TestStreamScreen() {
   const [horenPct, setHorenPct] = useState<number>(50);
   const [lesenPct, setLesenPct] = useState<number>(50);
   const [previousIndex, setPreviousIndex] = useState<number | null>(null);
+  const [sessionAnsweredCount, setSessionAnsweredCount] = useState<number>(0);
+  const [correctStreak, setCorrectStreak] = useState<number>(0);
+  const [comboToast, setComboToast] = useState<string | null>(null);
+  const [midSessionShown, setMidSessionShown] = useState<boolean>(false);
+  const [firstCorrectToday, setFirstCorrectToday] = useState<boolean>(false);
 
   const blockAnswersRef = useRef<AnswerRecord[]>([]);
   const blockStartTimeRef = useRef<number>(Date.now());
@@ -91,6 +152,7 @@ export default function TestStreamScreen() {
   const streakToastAnim = useRef(new Animated.Value(-80)).current;
   const swipeHintPulse = useRef(new Animated.Value(1)).current;
   const gaugeScaleAnim = useRef(new Animated.Value(1)).current;
+  const comboToastAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (profile) {
@@ -121,7 +183,7 @@ export default function TestStreamScreen() {
     enabled: Boolean(userId) && Boolean(targetLevel),
     queryFn: async (): Promise<AppQuestion[]> => {
       console.log('TestStream fetching questions for', targetLevel);
-      const result = await fetchStreamQuestions({ userId, targetLevel, limit: 20 });
+      const result = await fetchStreamQuestions({ userId, targetLevel, limit: SESSION_SIZE });
       if (result.isRecycled) {
         setIsRecycledBanner(true);
       }
@@ -151,7 +213,7 @@ export default function TestStreamScreen() {
   const fetchMoreQuestions = useCallback(async () => {
     console.log('TestStream prefetching more questions');
     try {
-      const result = await fetchStreamQuestions({ userId, targetLevel, limit: 20 });
+      const result = await fetchStreamQuestions({ userId, targetLevel, limit: SESSION_SIZE });
       if (result.isRecycled) {
         setIsRecycledBanner(true);
       }
@@ -196,6 +258,18 @@ export default function TestStreamScreen() {
     [streakToastAnim]
   );
 
+  const showComboToastBanner = useCallback(
+    (message: string) => {
+      setComboToast(message);
+      Animated.sequence([
+        Animated.timing(comboToastAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
+        Animated.delay(1500),
+        Animated.timing(comboToastAnim, { toValue: 0, duration: 200, useNativeDriver: true }),
+      ]).start(() => setComboToast(null));
+    },
+    [comboToastAnim]
+  );
+
   const checkMilestones = useCallback(
     (streak: number, xp: number) => {
       if ([7, 30, 60, 100].includes(streak)) {
@@ -218,6 +292,8 @@ export default function TestStreamScreen() {
     async (questionId: string, selectedKey: string, isCorrect: boolean) => {
       setAnsweredMap((prev) => ({ ...prev, [questionId]: selectedKey }));
       answeredCountRef.current += 1;
+      const newSessionCount = sessionAnsweredCount + 1;
+      setSessionAnsweredCount(newSessionCount);
 
       decrementStreamRemaining();
       incrementDailyStreamCount().catch(() => {});
@@ -230,12 +306,33 @@ export default function TestStreamScreen() {
         setShowSwipeHint(true);
       }
 
-      if (Platform.OS !== 'web') {
-        if (isCorrect) {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-        } else {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
+      if (isCorrect) {
+        const newStrk = correctStreak + 1;
+        setCorrectStreak(newStrk);
+
+        if (newStrk === 1 && !firstCorrectToday && sessionAnsweredCount === 0) {
+          setFirstCorrectToday(true);
+          showComboToastBanner('First correct today! ✦');
+        } else if (newStrk === 3) {
+          showComboToastBanner('3 in a row! 🔥');
+        } else if (newStrk === 5) {
+          showComboToastBanner('5 in a row! ⚡');
         }
+      } else {
+        setCorrectStreak(0);
+      }
+
+      if (newSessionCount === Math.ceil(SESSION_SIZE / 2) && !midSessionShown) {
+        setMidSessionShown(true);
+        showStreakToastBanner('Halfway there — you\'re doing great 🔥');
+      }
+
+      if (newSessionCount === 10) {
+        showComboToastBanner('10 questions done! 💪');
+      }
+
+      if (Platform.OS !== 'web') {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
       }
 
       await ensureSession();
@@ -292,10 +389,11 @@ export default function TestStreamScreen() {
       }
     },
     [
-      userId, localXp, localStreak, profile, totalAnswered,
+      userId, localXp, localStreak, profile, totalAnswered, sessionAnsweredCount,
+      correctStreak, firstCorrectToday, midSessionShown,
       ensureSession, writeBlockSession, targetLevel, questions.length,
       currentIndex, fetchMoreQuestions, refreshProfile, checkMilestones, animateGaugePulse,
-      showStreakToastBanner, decrementStreamRemaining, incrementDailyStreamCount,
+      showStreakToastBanner, showComboToastBanner, decrementStreamRemaining, incrementDailyStreamCount,
     ]
   );
 
@@ -539,6 +637,8 @@ export default function TestStreamScreen() {
         </Pressable>
       </View>
 
+      <SessionProgressBar answered={sessionAnsweredCount} total={SESSION_SIZE} />
+
       {isRecycledBanner ? (
         <View style={styles.recycledBanner}>
           <Text style={styles.recycledText}>You've seen all questions this month! 🏆 Starting a new cycle.</Text>
@@ -587,9 +687,6 @@ export default function TestStreamScreen() {
       ) : null}
 
       <View style={styles.progressRow}>
-        <Text style={styles.progressText}>
-          {currentIndex + 1} / {questions.length}
-        </Text>
         <View style={styles.statsRow}>
           <Text style={styles.statText}>🔥 {localStreak}</Text>
           <View style={styles.xpRow}>
@@ -600,6 +697,12 @@ export default function TestStreamScreen() {
           </View>
         </View>
       </View>
+
+      {comboToast ? (
+        <Animated.View style={[styles.comboPill, { opacity: comboToastAnim, transform: [{ scale: comboToastAnim.interpolate({ inputRange: [0, 1], outputRange: [0.8, 1] }) }] }]}>
+          <Text style={styles.comboPillText}>{comboToast}</Text>
+        </Animated.View>
+      ) : null}
 
       {celebrationBadge ? (
         <CelebrationOverlay
@@ -805,15 +908,10 @@ const styles = StyleSheet.create({
   progressRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     paddingHorizontal: 16,
     paddingVertical: 8,
     backgroundColor: Colors.background,
-  },
-  progressText: {
-    color: Colors.textMuted,
-    fontSize: 12,
-    fontWeight: '700' as const,
   },
   statsRow: {
     flexDirection: 'row',
@@ -839,6 +937,21 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '800' as const,
     color: colors.text,
+  },
+  comboPill: {
+    position: 'absolute',
+    top: 110,
+    alignSelf: 'center',
+    backgroundColor: colors.amber,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 99,
+    zIndex: 200,
+  },
+  comboPillText: {
+    color: colors.navy,
+    fontSize: 13,
+    fontWeight: '800' as const,
   },
   toast: {
     position: 'absolute',

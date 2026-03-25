@@ -1,22 +1,29 @@
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { Share } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Platform, Pressable, ScrollView, Share as RNShare, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, Platform, Pressable, ScrollView, Share as RNShare, StyleSheet, Text, View } from 'react-native';
+import * as Haptics from 'expo-haptics';
 
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { QuestionCard } from '@/components/QuestionCard';
 import { ScoreRing } from '@/components/ScoreRing';
 import { StimulusCard } from '@/components/StimulusCard';
 import Colors from '@/constants/colors';
+import { colors } from '@/theme';
 import { updatePreparednessScore } from '@/lib/streamHelpers';
 import { useAuth } from '@/providers/AuthProvider';
 import type { AppQuestion } from '@/types/database';
 
-function performanceLabel(score: number): string {
-  if (score < 50) return 'Keep going 💪';
-  if (score < 75) return 'Good effort 👍';
-  if (score < 90) return 'Well done ⭐';
-  return 'Excellent 🏆';
+function performanceLabel(score: number): { text: string; color: string } {
+  if (score >= 70) return { text: 'Exam-ready performance', color: colors.green };
+  if (score >= 40) return { text: 'Good progress — keep practising', color: colors.amber };
+  return { text: 'Every answer is a learning step', color: colors.navy };
+}
+
+function scoreColor(score: number): string {
+  if (score >= 70) return colors.green;
+  if (score >= 40) return colors.amber;
+  return colors.navy;
 }
 
 function formatDuration(seconds: number): string {
@@ -30,6 +37,19 @@ function retestDateString(): string {
   const d = new Date();
   d.setDate(d.getDate() + 7);
   return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function AnimatedXpText({ value, style }: { value: Animated.AnimatedInterpolation<number>; style: object }) {
+  const [display, setDisplay] = useState<number>(0);
+
+  useEffect(() => {
+    const id = value.addListener(({ value: v }) => {
+      setDisplay(Math.round(v));
+    });
+    return () => value.removeListener(id);
+  }, [value]);
+
+  return <Text style={style}>{display}</Text>;
 }
 
 export default function SectionalResultsScreen() {
@@ -64,7 +84,7 @@ export default function SectionalResultsScreen() {
 
   const scorePct = Number(params.scorePct ?? '0');
   const correctCount = Number(params.correctCount ?? '0');
-  const total = Number(params.total ?? '0');
+  const _total = Number(params.total ?? '0');
   const level = params.level ?? 'A1';
   const section = params.section ?? 'Hören';
   const teil = params.teil ?? '1';
@@ -87,8 +107,30 @@ export default function SectionalResultsScreen() {
     }
   }, [params.answers]);
 
+  const xpAnim = useRef(new Animated.Value(0)).current;
+  const perf = performanceLabel(scorePct);
+  const sColor = scoreColor(scorePct);
+
+  useEffect(() => {
+    Animated.timing(xpAnim, {
+      toValue: correctCount,
+      duration: 800,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start(() => {
+      if (Platform.OS !== 'web') {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      }
+    });
+  }, [xpAnim, correctCount]);
+
+  const xpDisplay = xpAnim.interpolate({
+    inputRange: [0, correctCount || 1],
+    outputRange: [0, correctCount || 1],
+  });
+
   const handleShare = useCallback(async () => {
-    const message = `Wordifi — ${section} · Teil ${teil} · ${level}\nScore: ${correctCount}/${total} (${Math.round(scorePct)}%)\n${performanceLabel(scorePct)}`;
+    const message = `Wordifi — ${section} · Teil ${teil} · ${level}\nScore: ${Math.round(scorePct)}%\n${perf.text}`;
     try {
       if (Platform.OS === 'web') {
         if (navigator.share) {
@@ -100,7 +142,7 @@ export default function SectionalResultsScreen() {
     } catch (err) {
       console.log('SectionalResults share error', err);
     }
-  }, [section, teil, level, correctCount, total, scorePct]);
+  }, [section, teil, level, scorePct, perf.text]);
 
   const retestDate = useMemo(() => retestDateString(), []);
 
@@ -131,14 +173,18 @@ export default function SectionalResultsScreen() {
           </Text>
           <View style={styles.heroRow}>
             <View style={styles.heroTextWrap}>
-              <Text style={styles.scoreLine}>
-                {correctCount} / {total}
+              <Text style={[styles.scoreLine, { color: sColor }]}>
+                {Math.round(scorePct)}%
               </Text>
-              <Text style={styles.performance}>{performanceLabel(scorePct)}</Text>
+              <Text style={[styles.performance, { color: perf.color }]}>{perf.text}</Text>
               {isTimed && timeTaken > 0 ? (
                 <Text style={styles.timeLine}>⏱ {formatDuration(timeTaken)}</Text>
               ) : null}
-              <Text style={styles.xpLine}>+{correctCount} XP</Text>
+              <View style={styles.xpWrap}>
+                <Text style={styles.xpLabel}>+</Text>
+                <AnimatedXpText value={xpDisplay} style={styles.xpValue} />
+                <Text style={styles.xpLabel}> XP</Text>
+              </View>
             </View>
             <ScoreRing label="Score" score={scorePct} size={96} />
           </View>
@@ -168,14 +214,12 @@ export default function SectionalResultsScreen() {
                 subtitle={`Question ${index + 1}`}
               >
                 <View style={styles.answerRow}>
-                  <Text
+                  <View
                     style={[
-                      styles.answerBadge,
-                      isCorrect ? styles.correctBadge : styles.incorrectBadge,
+                      styles.answerDot,
+                      isCorrect ? styles.correctDot : styles.incorrectDot,
                     ]}
-                  >
-                    {isCorrect ? '✓' : '✗'}
-                  </Text>
+                  />
                   <Text
                     style={[
                       styles.answerText,
@@ -295,23 +339,33 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   scoreLine: {
-    color: Colors.surface,
-    fontSize: 34,
+    fontSize: 42,
     fontWeight: '800' as const,
   },
   performance: {
-    color: Colors.surface,
-    fontSize: 18,
-    fontWeight: '700' as const,
+    fontSize: 15,
+    fontWeight: '600' as const,
+    lineHeight: 20,
   },
   timeLine: {
     color: 'rgba(255,255,255,0.74)',
     fontWeight: '700' as const,
     fontSize: 14,
   },
-  xpLine: {
+  xpWrap: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    marginTop: 4,
+  },
+  xpLabel: {
     color: 'rgba(255,255,255,0.74)',
     fontWeight: '700' as const,
+    fontSize: 16,
+  },
+  xpValue: {
+    color: colors.amber,
+    fontSize: 22,
+    fontWeight: '800' as const,
   },
   retestNotice: {
     backgroundColor: Colors.surfaceMuted,
@@ -332,22 +386,16 @@ const styles = StyleSheet.create({
     gap: 10,
     alignItems: 'center',
   },
-  answerBadge: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    textAlign: 'center',
-    lineHeight: 26,
-    overflow: 'hidden',
-    fontWeight: '800' as const,
+  answerDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
   },
-  correctBadge: {
-    backgroundColor: Colors.accentSoft,
-    color: Colors.accent,
+  correctDot: {
+    backgroundColor: colors.green,
   },
-  incorrectBadge: {
-    backgroundColor: Colors.dangerSoft,
-    color: Colors.danger,
+  incorrectDot: {
+    backgroundColor: colors.amber,
   },
   answerText: {
     flex: 1,
@@ -357,7 +405,7 @@ const styles = StyleSheet.create({
     color: Colors.accent,
   },
   incorrectText: {
-    color: Colors.danger,
+    color: colors.amber,
   },
   correctAnswerText: {
     color: Colors.accent,

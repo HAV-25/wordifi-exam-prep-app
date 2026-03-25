@@ -1,6 +1,6 @@
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { router } from 'expo-router';
-import { AlertTriangle, Award, Calendar, CalendarDays, ChevronRight, GraduationCap, Headphones, BookOpen, LogOut, Minus, Plus, Trophy, TrendingUp, User, X } from 'lucide-react-native';
+import { AlertTriangle, Award, Calendar, CalendarDays, ChevronRight, GraduationCap, Headphones, BookOpen, LogOut, Mail, Minus, Plus, Trophy, TrendingUp, User, X } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Animated, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -229,6 +229,24 @@ export default function ProfileScreen() {
               </View>
             ) : null}
             <Text style={styles.email}>{user?.email ?? 'wordifi@user.com'}</Text>
+            {(() => {
+              const provider = user?.app_metadata?.provider ?? 'email';
+              const isGoogle = provider === 'google';
+              return (
+                <View style={[styles.providerPill, isGoogle ? styles.providerPillGoogle : styles.providerPillEmail]}>
+                  {isGoogle ? (
+                    <View style={styles.providerGoogleIcon}>
+                      <Text style={styles.providerGoogleIconText}>G</Text>
+                    </View>
+                  ) : (
+                    <Mail color={Colors.primary} size={13} />
+                  )}
+                  <Text style={[styles.providerPillText, isGoogle ? styles.providerPillTextGoogle : null]}>
+                    {isGoogle ? 'Google' : 'Email'}
+                  </Text>
+                </View>
+              );
+            })()}
             <LevelBadge level={profile.target_level ?? 'A1'} />
             <Text style={styles.meta}>Target exam: {profile.exam_type?.toUpperCase() ?? 'TELC'} {profile.target_level ?? 'A1'}{profile.exam_date ? ` · ${profile.exam_date}` : ''}</Text>
           </View>
@@ -584,6 +602,43 @@ const styles = StyleSheet.create({
   infoText: { color: Colors.text, fontSize: 15, fontWeight: '600' as const },
   signOutButton: { minHeight: 52, borderRadius: 26, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8 },
   signOutText: { color: Colors.surface, fontWeight: '800' as const, fontSize: 16 },
+
+  providerPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-start' as const,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 10,
+  },
+  providerPillGoogle: {
+    backgroundColor: '#E8F0FE',
+  },
+  providerPillEmail: {
+    backgroundColor: Colors.surfaceMuted,
+  },
+  providerGoogleIcon: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#4285F4',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  providerGoogleIconText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '800' as const,
+  },
+  providerPillText: {
+    fontSize: 12,
+    fontWeight: '600' as const,
+    color: Colors.primary,
+  },
+  providerPillTextGoogle: {
+    color: '#1A73E8',
+  },
 
   playerNameRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 2 },
   avatarCircle: { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.accent, alignItems: 'center', justifyContent: 'center' },

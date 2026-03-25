@@ -81,6 +81,13 @@ function getMotivationalMessage(
   return tips[Math.floor(Math.random() * tips.length)] ?? tips[0]!;
 }
 
+function getStreakReinforcement(streak: number): string {
+  if (streak === 0) return 'Start your streak today';
+  if (streak === 1) return 'Day 1 — great start!';
+  if (streak <= 6) return "You're building a habit 🔥";
+  return `${streak} day streak — don't break it!`;
+}
+
 export function HomeDashboard({ onStartPractice }: HomeDashboardProps) {
   const { profile, user } = useAuth();
   useAccess();
@@ -208,7 +215,8 @@ export function HomeDashboard({ onStartPractice }: HomeDashboardProps) {
   const dailyStreamCount = (profile as Record<string, unknown> | null)?.daily_stream_count as number | undefined;
   const hasPracticedToday = (dailyStreamCount ?? 0) > 0;
 
-  const ctaLabel = hasPracticedToday ? 'Resume practice' : 'Start today\'s practice';
+  const ctaLabel = hasPracticedToday ? 'Continue where you left off' : 'Start today\'s session';
+  const streakReinforcement = useMemo(() => getStreakReinforcement(streak), [streak]);
 
   const motivationalMsg = useMemo(
     () => getMotivationalMessage(streak, daysToExam, preparedness),
@@ -340,6 +348,8 @@ export function HomeDashboard({ onStartPractice }: HomeDashboardProps) {
                 <Text style={styles.statLabel}>tier</Text>
               </View>
             </View>
+
+            <Text style={styles.streakReinforcement}>{streakReinforcement}</Text>
           </View>
         </Pressable>
 
@@ -363,6 +373,8 @@ export function HomeDashboard({ onStartPractice }: HomeDashboardProps) {
           </View>
           <ChevronRight color={colors.white} size={20} />
         </Pressable>
+
+        <Text style={styles.lowFrictionHint}>Takes less than 3 minutes</Text>
 
         <View style={styles.quickAccessRow}>
           <Pressable
@@ -519,6 +531,13 @@ const styles = StyleSheet.create({
     height: 20,
     backgroundColor: 'rgba(255,255,255,0.15)',
   },
+  streakReinforcement: {
+    color: 'rgba(255,255,255,0.55)',
+    fontSize: fontSize.label,
+    fontWeight: '600' as const,
+    textAlign: 'center',
+    marginTop: 2,
+  },
   badgeDot: {
     width: 10,
     height: 10,
@@ -559,6 +578,13 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.7)',
     fontSize: fontSize.bodySm,
     fontWeight: '500' as const,
+  },
+  lowFrictionHint: {
+    color: colors.muted,
+    fontSize: fontSize.label,
+    fontWeight: '500' as const,
+    textAlign: 'center',
+    marginTop: -4,
   },
   quickAccessRow: {
     flexDirection: 'row',

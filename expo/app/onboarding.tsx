@@ -1,12 +1,13 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { Check, ChevronLeft, CircleCheck, Headphones, BookOpenText, Lock, Sparkles } from 'lucide-react-native';
+import { Check, ChevronLeft, CircleCheck, Eye, EyeOff, Headphones, BookOpenText, Lock, Mail, Sparkles, X } from 'lucide-react-native';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Animated,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -28,7 +29,7 @@ import { colors } from '@/theme';
 import { CTAButton } from '@/components/CTAButton';
 import { GermanConfetti } from '@/components/GermanConfetti';
 import { GermanFlagBadge } from '@/components/GermanFlagBadge';
-import { signInWithEmail, signInWithGoogle, signUpWithEmail } from '@/lib/authHelpers';
+import { resetPassword, signInWithEmail, signInWithGoogle, signUpWithEmail } from '@/lib/authHelpers';
 import { upsertOnboardingProfile, updatePlayerName } from '@/lib/profileHelpers';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/providers/AuthProvider';
@@ -78,10 +79,17 @@ export default function OnboardingScreen() {
   const [_isSaving, setIsSaving] = useState<boolean>(false);
   const [showPlayerNameModal, setShowPlayerNameModal] = useState<boolean>(false);
   const [pendingUserId, setPendingUserId] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState<boolean>(false);
+  const [showForgotModal, setShowForgotModal] = useState<boolean>(false);
+  const [forgotEmail, setForgotEmail] = useState<string>('');
+  const [forgotLoading, setForgotLoading] = useState<boolean>(false);
+  const [forgotSent, setForgotSent] = useState<boolean>(false);
+  const [forgotError, setForgotError] = useState<string>('');
 
   const splashOpacity = useRef(new Animated.Value(0)).current;
   const splashScale = useRef(new Animated.Value(0.8)).current;
   const _scoreAnim = useRef(new Animated.Value(0)).current;
+  const forgotModalFade = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (step === 1) {
@@ -673,16 +681,68 @@ export default function OnboardingScreen() {
     );
   };
 
+  const openForgotModal = () => {
+    setForgotEmail(email);
+    setForgotSent(false);
+    setForgotError('');
+    setShowForgotModal(true);
+    Animated.timing(forgotModalFade, { toValue: 1, duration: 250, useNativeDriver: true }).start();
+  };
+
+  const closeForgotModal = () => {
+    Animated.timing(forgotModalFade, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => {
+      setShowForgotModal(false);
+    });
+  };
+
+  const handleForgotPassword = async () => {
+    const trimmed = forgotEmail.trim();
+    if (!/\S+@\S+\.\S+/.test(trimmed)) {
+      setForgotError('Please enter a valid email address');
+      return;
+    }
+    setForgotLoading(true);
+    setForgotError('');
+    try {
+      await resetPassword(trimmed);
+      setForgotSent(true);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Something went wrong';
+      setForgotError(msg);
+    } finally {
+      setForgotLoading(false);
+    }
+  };
+
   const renderStep8 = () => (
     <View style={styles.stepContainer}>
       <SafeAreaView style={styles.safeInner}>
         {renderBackButton(() => setStep(7))}
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.flex}>
           <ScrollView contentContainerStyle={styles.stepContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
             <Text style={styles.stepHeading}>Save your progress</Text>
             <Text style={styles.stepSubheading}>Create a free account to track your score and streak</Text>
 
             <View style={styles.authCard}>
+              <Pressable
+                accessibilityLabel="Continue with Google"
+                disabled={isAuthLoading}
+                onPress={() => handleAuth('google')}
+                style={styles.googleButton}
+                testID="onboarding-google-auth"
+              >
+                <View style={styles.googleIconWrap}>
+                  <Text style={styles.googleIconText}>G</Text>
+                </View>
+                <Text style={styles.googleButtonText}>Continue with Google</Text>
+              </Pressable>
+
+              <View style={styles.dividerRow}>
+                <View style={styles.divider} />
+                <Text style={styles.dividerText}>or continue with email</Text>
+                <View style={styles.divider} />
+              </View>
+
               <View style={styles.authSegment}>
                 <Pressable
                   onPress={() => setAuthMode('signUp')}
@@ -690,7 +750,7 @@ export default function OnboardingScreen() {
                   testID="auth-signup-tab"
                 >
                   <Text style={[styles.authSegmentText, authMode === 'signUp' ? styles.authSegmentTextActive : null]}>
-                    Sign Up
+                    Create Account
                   </Text>
                 </Pressable>
                 <Pressable
@@ -704,57 +764,71 @@ export default function OnboardingScreen() {
                 </Pressable>
               </View>
 
-              <View style={styles.inputShell}>
+              <View style={styles.inputShellRow}>
+                <Mail color={Colors.textMuted} size={18} />
                 <TextInput
                   accessibilityLabel="Email"
                   autoCapitalize="none"
+                  autoComplete="email"
                   autoCorrect={false}
                   keyboardType="email-address"
                   onChangeText={setEmail}
                   placeholder="Email"
                   placeholderTextColor={Colors.textMuted}
-                  style={styles.input}
+                  style={styles.inputFlex}
                   testID="onboarding-email-input"
+                  textContentType="emailAddress"
                   value={email}
                 />
               </View>
 
-              <View style={styles.inputShell}>
-                <TextInput
-                  accessibilityLabel="Password"
-                  autoCapitalize="none"
-                  onChangeText={setPassword}
-                  placeholder="Password (8+ characters)"
-                  placeholderTextColor={Colors.textMuted}
-                  secureTextEntry
-                  style={styles.input}
-                  testID="onboarding-password-input"
-                  value={password}
-                />
+              <View style={styles.passwordFieldWrap}>
+                <View style={styles.inputShellRow}>
+                  <Lock color={Colors.textMuted} size={18} />
+                  <TextInput
+                    accessibilityLabel="Password"
+                    autoCapitalize="none"
+                    autoComplete={authMode === 'signUp' ? 'new-password' : 'current-password'}
+                    onChangeText={setPassword}
+                    placeholder="Password (8+ characters)"
+                    placeholderTextColor={Colors.textMuted}
+                    secureTextEntry={!showPassword}
+                    style={styles.inputFlex}
+                    testID="onboarding-password-input"
+                    textContentType={authMode === 'signUp' ? 'newPassword' : 'password'}
+                    value={password}
+                  />
+                  <Pressable
+                    accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+                    hitSlop={8}
+                    onPress={() => setShowPassword((v) => !v)}
+                    testID="onboarding-password-toggle"
+                  >
+                    {showPassword ? (
+                      <EyeOff color={Colors.textMuted} size={20} />
+                    ) : (
+                      <Eye color={Colors.textMuted} size={20} />
+                    )}
+                  </Pressable>
+                </View>
+                {authMode === 'signIn' ? (
+                  <Pressable
+                    accessibilityLabel="Forgot password"
+                    onPress={openForgotModal}
+                    style={styles.forgotLink}
+                    testID="onboarding-forgot-password"
+                  >
+                    <Text style={styles.forgotLinkText}>Forgot password?</Text>
+                  </Pressable>
+                ) : null}
               </View>
 
               <CTAButton
-                label="Continue with email"
+                label={authMode === 'signIn' ? 'Sign In' : 'Create Account'}
                 onPress={() => handleAuth('email')}
                 disabled={!canEmailAuth || isAuthLoading}
                 testID="onboarding-email-auth"
               />
-
-              <View style={styles.dividerRow}>
-                <View style={styles.divider} />
-                <Text style={styles.dividerText}>or</Text>
-                <View style={styles.divider} />
-              </View>
-
-              <Pressable
-                accessibilityLabel="Continue with Google"
-                disabled={isAuthLoading}
-                onPress={() => handleAuth('google')}
-                style={styles.googleButton}
-                testID="onboarding-google-auth"
-              >
-                <Text style={styles.googleButtonText}>Continue with Google</Text>
-              </Pressable>
             </View>
           </ScrollView>
         </KeyboardAvoidingView>
@@ -854,6 +928,71 @@ export default function OnboardingScreen() {
         visible={showPlayerNameModal}
         onConfirm={handlePlayerNameConfirm}
       />
+      <Modal visible={showForgotModal} transparent animationType="none" onRequestClose={closeForgotModal}>
+        <Animated.View style={[styles.forgotModalOverlay, { opacity: forgotModalFade }]}>
+          <Pressable style={styles.forgotModalBackdrop} onPress={closeForgotModal} />
+          <View style={styles.forgotModalCard}>
+            <View style={styles.forgotModalHeader}>
+              <Text style={styles.forgotModalHeading}>Reset Password</Text>
+              <Pressable onPress={closeForgotModal} hitSlop={8} testID="close-onboarding-forgot-modal">
+                <X color={Colors.textMuted} size={22} />
+              </Pressable>
+            </View>
+
+            {forgotSent ? (
+              <View style={styles.forgotSentWrap}>
+                <View style={styles.forgotSentIcon}>
+                  <Mail color={Colors.accent} size={28} />
+                </View>
+                <Text style={styles.forgotSentTitle}>Check your inbox</Text>
+                <Text style={styles.forgotSentBody}>
+                  We sent a password reset link to{'\n'}
+                  <Text style={styles.forgotSentEmail}>{forgotEmail.trim()}</Text>
+                </Text>
+                <Pressable style={styles.forgotDoneButton} onPress={closeForgotModal} testID="onboarding-forgot-done">
+                  <Text style={styles.forgotDoneButtonText}>Done</Text>
+                </Pressable>
+              </View>
+            ) : (
+              <>
+                <Text style={styles.forgotSubheading}>
+                  Enter your email and we'll send you a link to reset your password.
+                </Text>
+                <View style={styles.forgotInputShell}>
+                  <Mail color={Colors.textMuted} size={18} />
+                  <TextInput
+                    accessibilityLabel="Reset email"
+                    autoCapitalize="none"
+                    autoComplete="email"
+                    autoCorrect={false}
+                    keyboardType="email-address"
+                    onChangeText={(t) => { setForgotEmail(t); setForgotError(''); }}
+                    placeholder="Email"
+                    placeholderTextColor={Colors.textMuted}
+                    style={styles.forgotInput}
+                    testID="onboarding-forgot-email-input"
+                    textContentType="emailAddress"
+                    value={forgotEmail}
+                  />
+                </View>
+                {forgotError ? <Text style={styles.forgotErrorText}>{forgotError}</Text> : null}
+                <Pressable
+                  disabled={forgotLoading}
+                  onPress={handleForgotPassword}
+                  style={[styles.forgotSendButton, forgotLoading ? styles.forgotButtonDisabled : null]}
+                  testID="onboarding-forgot-send-button"
+                >
+                  {forgotLoading ? (
+                    <ActivityIndicator color={Colors.surface} />
+                  ) : (
+                    <Text style={styles.forgotSendButtonText}>Send Reset Link</Text>
+                  )}
+                </Pressable>
+              </>
+            )}
+          </View>
+        </Animated.View>
+      </Modal>
     </>
   );
 }
@@ -1557,16 +1696,128 @@ const styles = StyleSheet.create({
   googleButton: {
     minHeight: 52,
     borderRadius: 26,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: Colors.border,
+    backgroundColor: Colors.surface,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 10,
+  },
+  googleIconWrap: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#4285F4',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  googleIconText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '800' as const,
   },
   googleButtonText: {
     color: Colors.primary,
     fontWeight: '800' as const,
     fontSize: 16,
   },
+  inputShellRow: {
+    minHeight: 52,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    paddingHorizontal: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  inputFlex: {
+    flex: 1,
+    fontSize: 15,
+    color: Colors.text,
+    minHeight: 44,
+  },
+  passwordFieldWrap: {
+    gap: 6,
+  },
+  forgotLink: {
+    alignSelf: 'flex-end' as const,
+    paddingVertical: 2,
+  },
+  forgotLinkText: {
+    color: Colors.textMuted,
+    fontSize: 13,
+    fontWeight: '600' as const,
+  },
+  forgotModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(9,23,40,0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  forgotModalBackdrop: { ...StyleSheet.absoluteFillObject },
+  forgotModalCard: {
+    width: '100%',
+    maxWidth: 380,
+    backgroundColor: Colors.surface,
+    borderRadius: 24,
+    padding: 24,
+    gap: 14,
+    zIndex: 1,
+  },
+  forgotModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  forgotModalHeading: { fontSize: 20, fontWeight: '800' as const, color: Colors.primary },
+  forgotSubheading: { fontSize: 14, color: Colors.textMuted, lineHeight: 20 },
+  forgotInputShell: {
+    minHeight: 50,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    paddingHorizontal: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  forgotInput: { flex: 1, fontSize: 15, color: Colors.text },
+  forgotErrorText: { color: Colors.danger, fontSize: 13, fontWeight: '600' as const },
+  forgotSendButton: {
+    minHeight: 50,
+    borderRadius: 25,
+    backgroundColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 4,
+  },
+  forgotButtonDisabled: { opacity: 0.5 },
+  forgotSendButtonText: { color: Colors.surface, fontWeight: '800' as const, fontSize: 16 },
+  forgotSentWrap: { alignItems: 'center', gap: 10, paddingVertical: 8 },
+  forgotSentIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: Colors.accentSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  forgotSentTitle: { fontSize: 18, fontWeight: '800' as const, color: Colors.primary },
+  forgotSentBody: { fontSize: 14, color: Colors.textMuted, textAlign: 'center' as const, lineHeight: 20 },
+  forgotSentEmail: { fontWeight: '700' as const, color: Colors.primary },
+  forgotDoneButton: {
+    minHeight: 48,
+    borderRadius: 24,
+    backgroundColor: Colors.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'stretch',
+    marginTop: 4,
+  },
+  forgotDoneButtonText: { color: '#fff', fontWeight: '800' as const, fontSize: 16 },
   step9Heading: {
     fontSize: 32,
     fontWeight: '800' as const,

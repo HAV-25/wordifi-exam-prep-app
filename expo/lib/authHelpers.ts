@@ -2,6 +2,8 @@ import * as QueryParams from 'expo-auth-session/build/QueryParams';
 import { makeRedirectUri } from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
 
+import { Platform } from 'react-native';
+
 import { ensureUserProfile } from '@/lib/profileHelpers';
 import { supabase } from '@/lib/supabaseClient';
 
@@ -38,7 +40,45 @@ export async function signUpWithEmail(email: string, password: string) {
 }
 
 export async function signInWithGoogle() {
+  if (Platform.OS === 'web') {
+    return signInWithGoogleWeb();
+  }
+  return signInWithGoogleNative();
+}
+
+function getWebOrigin(): string {
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    return window.location.origin;
+  }
+  return 'https://2ydqsq98wysdgr153a9qi.rork.app';
+}
+
+async function signInWithGoogleWeb() {
+  const origin = getWebOrigin();
+  const redirectTo = origin;
+  console.log('[Auth] Google OAuth web - origin:', origin);
+  console.log('[Auth] Google OAuth web - redirectTo:', redirectTo);
+
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo,
+      skipBrowserRedirect: false,
+    },
+  });
+
+  if (error) {
+    console.log('signInWithGoogle web error', error);
+    throw error;
+  }
+
+  return data;
+}
+
+async function signInWithGoogleNative() {
   const redirectTo = makeRedirectUri({ path: 'auth' });
+  console.log('Google OAuth native redirectTo:', redirectTo);
+
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
@@ -90,6 +130,21 @@ export async function signInWithGoogle() {
   }
 
   return sessionData;
+}
+
+export async function resetPassword(email: string) {
+  const origin = Platform.OS === 'web' ? getWebOrigin() : 'https://2ydqsq98wysdgr153a9qi.rork.app';
+  const redirectTo = `${origin}/reset-password`;
+  console.log('[Auth] Reset password redirectTo:', redirectTo);
+
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo,
+  });
+
+  if (error) {
+    console.log('resetPassword error', error);
+    throw error;
+  }
 }
 
 export async function signOutUser() {

@@ -38,7 +38,7 @@ function getRankDecoration(rank: number): { icon: React.ReactNode; bg: string } 
 }
 
 export default function LeaderboardScreen() {
-  const { profile, user } = useAuth();
+  const { profile } = useAuth();
   const targetLevel = profile?.target_level ?? 'B1';
 
   const leaderboardQuery = useQuery({
@@ -48,15 +48,12 @@ export default function LeaderboardScreen() {
   });
 
   const entries = useMemo(() => {
-    return (leaderboardQuery.data ?? []).map((entry, index) => ({
-      ...entry,
-      rank: index + 1,
-    }));
+    return leaderboardQuery.data ?? [];
   }, [leaderboardQuery.data]);
 
   const currentUserRank = useMemo(() => {
-    return entries.find((e) => e.id === user?.id);
-  }, [entries, user?.id]);
+    return entries.find((e) => e.is_current_user);
+  }, [entries]);
 
   const handleRefresh = useCallback(() => {
     void leaderboardQuery.refetch();
@@ -147,11 +144,11 @@ export default function LeaderboardScreen() {
                 </View>
               ) : (
                 entries.map((entry) => {
-                  const isMe = entry.id === user?.id;
+                  const isMe = entry.is_current_user;
                   const decoration = getRankDecoration(entry.rank);
                   return (
                     <View
-                      key={entry.id}
+                      key={`${entry.rank}-${entry.display_name}`}
                       style={[
                         styles.row,
                         isMe ? styles.rowHighlight : null,
@@ -170,7 +167,7 @@ export default function LeaderboardScreen() {
 
                       <View style={styles.nameWrap}>
                         <Text style={[styles.playerName, isMe ? styles.playerNameMe : null]} numberOfLines={1}>
-                          {entry.player_name}
+                          {entry.display_name}
                         </Text>
                         {isMe ? <Text style={styles.youLabel}>You</Text> : null}
                       </View>
