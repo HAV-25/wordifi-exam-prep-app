@@ -80,10 +80,11 @@ async function signInWithGoogleNative() {
   const isExpoGo = Constants.appOwnership === 'expo';
 
   const redirectTo = isExpoGo
-    ? makeRedirectUri({ path: 'auth' })
-    : makeRedirectUri({ scheme: 'rork-app', path: 'auth' });
-  console.log('Google OAuth native redirectTo:', redirectTo);
-  console.log('Google OAuth native isExpoGo:', isExpoGo);
+    ? makeRedirectUri({ path: '/' })
+    : makeRedirectUri({ scheme: 'rork-app', path: '/' });
+  console.log('[Auth] Google OAuth native redirectTo:', redirectTo);
+  console.log('[Auth] Google OAuth native isExpoGo:', isExpoGo);
+  console.log('[Auth] Google OAuth native appOwnership:', Constants.appOwnership);
 
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
@@ -104,7 +105,9 @@ async function signInWithGoogleNative() {
 
   const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
 
+  console.log('[Auth] Google OAuth browser result type:', result.type);
   if (result.type !== 'success') {
+    console.log('[Auth] Google OAuth browser result:', JSON.stringify(result));
     throw new Error('Google sign-in was cancelled');
   }
 
@@ -117,7 +120,10 @@ async function signInWithGoogleNative() {
   const accessToken = params.access_token;
   const refreshToken = params.refresh_token;
 
+  console.log('[Auth] Google OAuth params received - hasAccessToken:', !!accessToken, 'hasRefreshToken:', !!refreshToken);
+
   if (!accessToken || !refreshToken) {
+    console.log('[Auth] Google OAuth all params:', JSON.stringify(Object.keys(params)));
     throw new Error('Google session data missing');
   }
 
