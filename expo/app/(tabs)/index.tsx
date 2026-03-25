@@ -344,7 +344,7 @@ export default function TestStreamScreen() {
     async (questionId: string, selectedKey: string, isCorrect: boolean) => {
       setAnsweredMap((prev) => ({ ...prev, [questionId]: selectedKey }));
       answeredCountRef.current += 1;
-      const newSessionCount = sessionAnsweredCount + 1;
+      const newSessionCount = answeredCountRef.current;
       setSessionAnsweredCount(newSessionCount);
 
       decrementStreamRemaining();
@@ -363,7 +363,7 @@ export default function TestStreamScreen() {
         const newStrk = correctStreak + 1;
         setCorrectStreak(newStrk);
 
-        if (newStrk === 1 && !firstCorrectToday && sessionAnsweredCount === 0) {
+        if (newStrk === 1 && !firstCorrectToday && newSessionCount === 1) {
           setFirstCorrectToday(true);
           showComboToastBanner('First correct today! ✦');
         } else if (newStrk === 3) {
@@ -375,7 +375,7 @@ export default function TestStreamScreen() {
         setCorrectStreak(0);
       }
 
-      if (newSessionCount === Math.ceil(SESSION_SIZE / 2) && !midSessionShown) {
+      if (newSessionCount === Math.ceil(SESSION_SIZE / 2) && !midSessionShown && answeredCountRef.current === Math.ceil(SESSION_SIZE / 2)) {
         setMidSessionShown(true);
         showStreakToastBanner('Halfway there — you\'re doing great 🔥');
       }
@@ -442,7 +442,7 @@ export default function TestStreamScreen() {
       }
     },
     [
-      userId, localXp, localStreak, profile, totalAnswered, sessionAnsweredCount,
+      userId, localXp, localStreak, profile, totalAnswered,
       correctStreak, firstCorrectToday, midSessionShown,
       ensureSession, writeBlockSession, targetLevel, questions.length,
       currentIndex, fetchMoreQuestions, refreshProfile, checkMilestones, animateGaugePulse,

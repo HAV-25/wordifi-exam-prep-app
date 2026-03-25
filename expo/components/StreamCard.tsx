@@ -103,7 +103,7 @@ export const StreamCard = React.memo(function StreamCard({
         toValue: 0,
         duration: 300,
         easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
+        useNativeDriver: false,
       }).start();
     } else {
       explanationAnim.setValue(0);

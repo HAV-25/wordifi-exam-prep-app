@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabaseClient';
+import { MOCK_TEST_QUESTION_COUNTS, shuffleArray } from '@/theme/constants';
 import type { AppQuestion, UserProfile } from '@/types/database';
 
 export type TeilInfo = {
@@ -63,12 +64,14 @@ export async function fetchAvailableTeile(level: string): Promise<TeilInfo[]> {
 
   const result: TeilInfo[] = [];
   for (const entry of grouped.values()) {
+    const examCount = MOCK_TEST_QUESTION_COUNTS[level]?.[entry.section]?.[entry.teil];
+    const displayCount = examCount ?? entry.count;
     result.push({
       section: entry.section,
       teil: entry.teil,
       question_type: entry.question_type,
-      q_count: entry.count,
-      estimated_minutes: Math.max(1, Math.round((entry.count * 45) / 60)),
+      q_count: displayCount,
+      estimated_minutes: Math.max(1, Math.round((displayCount * 45) / 60)),
     });
   }
 
@@ -133,15 +136,25 @@ export async function fetchSectionalQuestions(
     .eq('level', level)
     .eq('section', section)
     .eq('teil', teil)
-    .eq('is_active', true)
-    .order('question_number', { ascending: true });
+    .eq('is_active', true);
 
   if (error) {
     console.log('fetchSectionalQuestions error', error);
     throw error;
   }
 
-  return (data ?? []) as AppQuestion[];
+  const allQuestions = (data ?? []) as AppQuestion[];
+  const targetCount = MOCK_TEST_QUESTION_COUNTS[level]?.[section]?.[teil];
+
+  if (targetCount && allQuestions.length > targetCount) {
+    const shuffled = shuffleArray(allQuestions).slice(0, targetCount);
+    shuffled.sort((a, b) => (a.question_number ?? 0) - (b.question_number ?? 0));
+    console.log('fetchSectionalQuestions selected', { total: allQuestions.length, target: targetCount, selected: shuffled.length });
+    return shuffled;
+  }
+
+  console.log('fetchSectionalQuestions returning all', { total: allQuestions.length, targetCount });
+  return allQuestions;
 }
 
 export async function createSectionalSession(params: {

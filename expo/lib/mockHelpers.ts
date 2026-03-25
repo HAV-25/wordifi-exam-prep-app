@@ -41,11 +41,24 @@ export async function fetchMockTestInfo(level: string): Promise<MockTestInfo> {
   }
 
   const rows = (data ?? []) as Array<{ section: string }>;
-  const horenCount = rows.filter((r) => r.section === 'Hören').length;
-  const lesenCount = rows.filter((r) => r.section === 'Lesen').length;
+  const dbHorenCount = rows.filter((r) => r.section === 'Hören').length;
+  const dbLesenCount = rows.filter((r) => r.section === 'Lesen').length;
+
+  const levelCounts = MOCK_TEST_QUESTION_COUNTS[level];
+  const examHorenCount = levelCounts?.['Hören']
+    ? Object.values(levelCounts['Hören']).reduce((s, n) => s + n, 0)
+    : dbHorenCount;
+  const examLesenCount = levelCounts?.['Lesen']
+    ? Object.values(levelCounts['Lesen']).reduce((s, n) => s + n, 0)
+    : dbLesenCount;
+
+  const horenCount = Math.min(dbHorenCount, examHorenCount);
+  const lesenCount = Math.min(dbLesenCount, examLesenCount);
   const totalCount = horenCount + lesenCount;
   const timing = getMockTiming(level);
   const estimatedMinutes = timing.horenMinutes + timing.lesenMinutes;
+
+  console.log('fetchMockTestInfo counts', { level, dbHorenCount, dbLesenCount, examHorenCount, examLesenCount, horenCount, lesenCount });
 
   return { level, horenCount, lesenCount, totalCount, estimatedMinutes };
 }
