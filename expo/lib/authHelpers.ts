@@ -1,6 +1,7 @@
 import * as QueryParams from 'expo-auth-session/build/QueryParams';
 import { makeRedirectUri } from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
+import Constants from 'expo-constants';
 
 import { Platform } from 'react-native';
 
@@ -76,8 +77,13 @@ async function signInWithGoogleWeb() {
 }
 
 async function signInWithGoogleNative() {
-  const redirectTo = makeRedirectUri({ scheme: 'rork-app', path: 'auth' });
+  const isExpoGo = Constants.appOwnership === 'expo';
+
+  const redirectTo = isExpoGo
+    ? makeRedirectUri({ path: 'auth' })
+    : makeRedirectUri({ scheme: 'rork-app', path: 'auth' });
   console.log('Google OAuth native redirectTo:', redirectTo);
+  console.log('Google OAuth native isExpoGo:', isExpoGo);
 
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
