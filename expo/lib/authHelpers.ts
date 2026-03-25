@@ -76,7 +76,7 @@ async function signInWithGoogleWeb() {
 }
 
 async function signInWithGoogleNative() {
-  const redirectTo = makeRedirectUri({ path: 'auth' });
+  const redirectTo = makeRedirectUri({ scheme: 'rork-app', path: 'auth' });
   console.log('Google OAuth native redirectTo:', redirectTo);
 
   const { data, error } = await supabase.auth.signInWithOAuth({
