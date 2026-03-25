@@ -81,6 +81,7 @@ export default function SectionalResultsScreen() {
   }>();
 
   const [expandedStimulusId, setExpandedStimulusId] = useState<string | null>(null);
+  const [expandedExplanationId, setExpandedExplanationId] = useState<string | null>(null);
 
   const scorePct = Number(params.scorePct ?? '0');
   const correctCount = Number(params.correctCount ?? '0');
@@ -263,6 +264,28 @@ export default function SectionalResultsScreen() {
                       />
                     ) : null}
                   </View>
+                ) : null}
+                {(question.explanation_en ?? question.explanation_de ?? null) != null ? (
+                  <>
+                    <Pressable
+                      onPress={() => setExpandedExplanationId((v) => v === question.id ? null : question.id)}
+                      style={styles.explanationToggle}
+                      testID={`explanation-toggle-${question.id}`}
+                    >
+                      <Text style={styles.explanationToggleText}>
+                        {expandedExplanationId === question.id
+                          ? 'Hide explanation ↑'
+                          : 'See explanation ↓'}
+                      </Text>
+                    </Pressable>
+                    {expandedExplanationId === question.id ? (
+                      <View style={styles.explanationBox}>
+                        <Text style={styles.explanationBoxText}>
+                          {question.explanation_en ?? question.explanation_de}
+                        </Text>
+                      </View>
+                    ) : null}
+                  </>
                 ) : null}
               </QuestionCard>
             );
