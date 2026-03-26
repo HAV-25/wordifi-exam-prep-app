@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
-import { BookOpen, Clock, Headphones, Lock, Play, Shield, Trophy } from 'lucide-react-native';
+import { BookOpen, Clock, Headphones, Lock, Monitor, Play, Shield, Trophy } from 'lucide-react-native';
 import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
@@ -344,6 +344,21 @@ export default function MockScreen() {
                     <Text style={styles.startButtonText}>Start Mock Test</Text>
                   </>
                 )}
+              </Pressable>
+              <Pressable
+                accessibilityLabel="Auf Computer fortsetzen"
+                onPress={() => {
+                  closeSetup();
+                  router.push({
+                    pathname: '/desktop-code' as any,
+                    params: { level: targetLevel, examType },
+                  });
+                }}
+                style={styles.desktopButton}
+                testID="desktop-mock-button"
+              >
+                <Monitor color={Colors.primary} size={16} />
+                <Text style={styles.desktopButtonText}>📺 Auf Computer fortsetzen</Text>
               </Pressable>
               <Pressable
                 accessibilityLabel="Cancel"
@@ -732,6 +747,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   cancelButtonText: {
+    color: Colors.primary,
+    fontSize: 15,
+    fontWeight: '700' as const,
+  },
+  desktopButton: {
+    minHeight: 48,
+    borderRadius: 24,
+    backgroundColor: Colors.surfaceMuted,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  desktopButtonText: {
     color: Colors.primary,
     fontSize: 15,
     fontWeight: '700' as const,

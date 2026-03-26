@@ -5,7 +5,6 @@ import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
-  Linking,
   Modal,
   Pressable,
   ScrollView,
@@ -26,7 +25,6 @@ import {
 } from '@/lib/sprechenHelpers';
 import {
   checkRetestAvailability,
-  createSessionLink,
   fetchAvailableTeile,
   fetchPreviousSessionResult,
   fetchSectionalQuestions,
@@ -46,7 +44,6 @@ type SetupState = {
   retestInfo: RetestInfo | null;
   isLoadingRetest: boolean;
   isStarting: boolean;
-  isSendingLink: boolean;
   isLoadingReview: boolean;
 };
 
@@ -77,7 +74,6 @@ export default function TestsScreen() {
     retestInfo: null,
     isLoadingRetest: false,
     isStarting: false,
-    isSendingLink: false,
     isLoadingReview: false,
   });
 
@@ -181,7 +177,6 @@ export default function TestsScreen() {
         retestInfo: null,
         isLoadingRetest: true,
         isStarting: false,
-        isSendingLink: false,
         isLoadingReview: false,
       });
 
@@ -243,53 +238,6 @@ export default function TestsScreen() {
     }
   }, [setup.teilInfo, setup.isTimed, setup.isStarting, targetLevel, profile?.exam_type]);
 
-  const handleSendLink = useCallback(async () => {
-    if (!setup.teilInfo || setup.isSendingLink) return;
-
-    setSetup((prev) => ({ ...prev, isSendingLink: true }));
-
-    try {
-      const questions = await fetchSectionalQuestions(
-        targetLevel,
-        setup.teilInfo.section,
-        setup.teilInfo.teil
-      );
-
-      if (questions.length === 0) {
-        setSetup((prev) => ({ ...prev, isSendingLink: false }));
-        return;
-      }
-
-      const examType = profile?.exam_type ?? 'TELC';
-      const questionIds = questions.map((q) => q.id);
-
-      const token = await createSessionLink({
-        userId,
-        level: targetLevel,
-        section: setup.teilInfo.section,
-        teil: setup.teilInfo.teil,
-        examType,
-        isTimed: setup.isTimed,
-        questionIds,
-      });
-
-      const userEmail = user?.email ?? '';
-      const subject = encodeURIComponent('Your Wordifi Test — Continue on Desktop');
-      const body = encodeURIComponent(
-        'Tap the link below to continue your test in any browser.\n\n' +
-          'Section: ' + setup.teilInfo.section + ' · Teil ' + setup.teilInfo.teil + ' · ' + targetLevel + '\n' +
-          'Link expires in 48 hours.\n\n' +
-          'https://wordifi.app/test?token=' + token + '\n\n' +
-          'This link can only be used once.'
-      );
-
-      await Linking.openURL('mailto:' + userEmail + '?subject=' + subject + '&body=' + body);
-      setSetup((prev) => ({ ...prev, isSendingLink: false }));
-    } catch (err) {
-      console.log('TestsScreen handleSendLink error', err);
-      setSetup((prev) => ({ ...prev, isSendingLink: false }));
-    }
-  }, [setup.teilInfo, setup.isTimed, setup.isSendingLink, userId, targetLevel, user?.email, profile?.exam_type]);
 
   const handleReviewPrevious = useCallback(async () => {
     if (!setup.teilInfo || setup.isLoadingReview) return;
@@ -708,21 +656,7 @@ export default function TestsScreen() {
                         </>
                       )}
                     </Pressable>
-                  ) : (
-                    <Pressable
-                      accessibilityLabel="Continue on desktop"
-                      disabled={setup.isSendingLink}
-                      onPress={handleSendLink}
-                      style={styles.desktopButton}
-                      testID="desktop-link-button"
-                    >
-                      {setup.isSendingLink ? (
-                        <ActivityIndicator color={Colors.primary} />
-                      ) : (
-                        <Text style={styles.desktopButtonText}>📧 Continue on Desktop</Text>
-                      )}
-                    </Pressable>
-                  )}
+                  ) : null}
                 </View>
               </>
             ) : null}
@@ -1069,18 +1003,7 @@ const styles = StyleSheet.create({
   buttonDisabled: {
     opacity: 0.4,
   },
-  desktopButton: {
-    minHeight: 48,
-    borderRadius: 24,
-    backgroundColor: Colors.surfaceMuted,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  desktopButtonText: {
-    color: Colors.primary,
-    fontSize: 15,
-    fontWeight: '700' as const,
-  },
+
   reviewButton: {
     minHeight: 48,
     borderRadius: 24,
