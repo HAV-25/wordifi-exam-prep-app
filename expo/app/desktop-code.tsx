@@ -136,7 +136,7 @@ export default function DesktopCodeScreen() {
 
   const handleCopyUrl = useCallback(async () => {
     try {
-      await Clipboard.setStringAsync('https://wwfiauhsbssjowaxmqyn.supabase.co/functions/v1/desktop-test-player');
+      await Clipboard.setStringAsync('https://wordifi-desktop-test.netlify.app');
       setCopied(true);
       if (Platform.OS !== 'web') {
         void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -256,7 +256,7 @@ export default function DesktopCodeScreen() {
                 style={styles.urlChip}
                 testID="desktop-code-copy-url"
               >
-                <Text style={styles.urlText}>wwfiauhsbssjowaxmqyn.supabase.co/functions/v1/desktop-test-player</Text>
+                <Text style={styles.urlText}>wordifi-desktop-test.netlify.app</Text>
                 {copied ? (
                   <Check color={colors.green} size={16} />
                 ) : (

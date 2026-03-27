@@ -171,8 +171,9 @@ async function signInWithGoogleNative() {
 }
 
 export async function resetPassword(email: string) {
-  const origin = Platform.OS === 'web' ? getWebOrigin() : 'https://2ydqsq98wysdgr153a9qi.rork.app';
+  const origin = getWebOrigin();
   const redirectTo = `${origin}/reset-password`;
+  console.log('[Auth] Reset password origin:', origin);
   console.log('[Auth] Reset password redirectTo:', redirectTo);
 
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
