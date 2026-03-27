@@ -64,6 +64,7 @@ function RootLayoutNav() {
         <Stack.Screen name="sectional-test" options={{ title: 'Sectional Test' }} />
         <Stack.Screen name="schreiben-test" options={{ title: 'Schreiben' }} />
         <Stack.Screen name="sprechen-test" options={{ title: 'Sprechen' }} />
+        <Stack.Screen name="sprechen-realtime" options={{ title: 'Sprechen Live' }} />
         <Stack.Screen name="sectional-results" options={{ title: 'Results', headerBackVisible: false }} />
         <Stack.Screen name="mock-test" options={{ title: 'Mock Test' }} />
         <Stack.Screen name="mock-results" options={{ title: 'Mock Results', headerBackVisible: false }} />
