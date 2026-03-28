@@ -2,6 +2,7 @@
   "name": "expo-app",
   "main": "expo-router/entry",
   "version": "1.0.0",
+  "packageManager": "npm@11.8.0",
   "scripts": {
     "start": "bunx rork start -p 2ydqsq98wysdgr153a9qi --tunnel",
     "start-web": "bunx rork start -p 2ydqsq98wysdgr153a9qi --web --tunnel",
@@ -24,6 +25,7 @@
     "expo-blur": "~15.0.8",
     "expo-clipboard": "~8.0.8",
     "expo-constants": "~18.0.13",
+    "expo-dev-client": "~6.0.20",
     "expo-font": "~14.0.11",
     "expo-haptics": "~15.0.8",
     "expo-image": "~3.0.11",
