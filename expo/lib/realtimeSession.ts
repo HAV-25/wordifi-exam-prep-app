@@ -557,7 +557,6 @@ export class NativeWSRealtimeSession implements IRealtimeSession {
         break;
       }
       case 'response.done':
-        this.onNeedUserAudio?.();
         break;
       case 'conversation.item.input_audio_transcription.completed': {
         const t = (event.transcript as string) ?? '';
@@ -610,6 +609,7 @@ export class NativeWSRealtimeSession implements IRealtimeSession {
           sound.unloadAsync().catch(() => {});
           this.currentSound = null;
           this.onAiAudioReady?.();
+          this.onNeedUserAudio?.();
           this.callbacks.onStateChange('listening');
         }
       });
@@ -617,6 +617,7 @@ export class NativeWSRealtimeSession implements IRealtimeSession {
       console.log('[Realtime] Play audio error:', err);
       this.callbacks.onStateChange('listening');
       this.onAiAudioReady?.();
+      this.onNeedUserAudio?.();
     }
   }
 

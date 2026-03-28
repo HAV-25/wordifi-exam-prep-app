@@ -68,6 +68,7 @@ export default function SprechenRealtimeScreen() {
   const sessionIdRef = useRef<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startTimeRef = useRef<number>(0);
+  const isMountedRef = useRef<boolean>(true);
   const pulseAnim = useRef(new Animated.Value(0.4)).current;
   const isWebRTC = isWebRTCAvailable();
 
@@ -127,6 +128,7 @@ export default function SprechenRealtimeScreen() {
 
   useEffect(() => {
     return () => {
+      isMountedRef.current = false;
       if (timerRef.current) clearInterval(timerRef.current);
       sessionRef.current?.disconnect();
     };
@@ -180,19 +182,20 @@ export default function SprechenRealtimeScreen() {
       const realtimeSession = createRealtimeSession({
         onStateChange: (state) => {
           console.log('[SprechenRealtime] Conv state:', state);
-          setConvState(state);
+          if (isMountedRef.current) setConvState(state);
         },
         onTranscript: (entry) => {
           console.log('[SprechenRealtime] Transcript:', entry.role, entry.text.slice(0, 50));
+          if (!isMountedRef.current) return;
           setTranscriptEntries(prev => [...prev, entry]);
           setCurrentAiText('');
         },
         onAiSpeakingText: (delta) => {
-          setCurrentAiText(prev => prev + delta);
+          if (isMountedRef.current) setCurrentAiText(prev => prev + delta);
         },
         onError: (msg) => {
           console.log('[SprechenRealtime] Error:', msg);
-          setErrorMsg(msg);
+          if (isMountedRef.current) setErrorMsg(msg);
         },
       });
 
@@ -235,13 +238,16 @@ export default function SprechenRealtimeScreen() {
     setScreenState('scoring');
 
     try {
+      const durationSeconds = startTimeRef.current > 0
+        ? Math.floor((Date.now() - startTimeRef.current) / 1000)
+        : 0;
       const result = await scoreSprechenConversation({
         question_id: question.id,
         level: question.level,
         source_structure_type: question.source_structure_type,
         transcript,
         rubric_card: rubricCard,
-        duration_seconds: elapsedSeconds,
+        duration_seconds: durationSeconds,
         accessToken,
       });
 
@@ -260,7 +266,7 @@ export default function SprechenRealtimeScreen() {
       });
       setScreenState('results');
     }
-  }, [question, accessToken, rubricCard, elapsedSeconds]);
+  }, [question, accessToken, rubricCard]);
 
   useEffect(() => {
     handleEndRef.current = handleEndConversation;
