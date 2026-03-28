@@ -1,7 +1,28 @@
 import { Platform } from 'react-native';
 import { Audio } from 'expo-av';
-import { File as FSFile, Paths } from 'expo-file-system';
-import { EncodingType } from 'expo-file-system/src/ExpoFileSystem.types';
+import { File as FSFile, Paths } from 'expo-file-system/next';
+import { EncodingType } from 'expo-file-system';
+
+// Load react-native-webrtc on native platforms. Falls back gracefully if unavailable.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _NativeRTCPeerConnection: any = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _nativeMediaDevices: any = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _NativeRTCSessionDescription: any = null;
+
+if (Platform.OS !== 'web') {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const rnWebRTC = require('react-native-webrtc');
+    _NativeRTCPeerConnection = rnWebRTC.RTCPeerConnection;
+    _nativeMediaDevices = rnWebRTC.mediaDevices;
+    _NativeRTCSessionDescription = rnWebRTC.RTCSessionDescription;
+    console.log('[Realtime] react-native-webrtc loaded');
+  } catch {
+    console.log('[Realtime] react-native-webrtc not available — native WebRTC disabled');
+  }
+}
 
 const SUPABASE_URL = 'https://wwfiauhsbssjowaxmqyn.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind3ZmlhdWhzYnNzam93YXhtcXluIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE0MTQxMzUsImV4cCI6MjA4Njk5MDEzNX0.lSPPEQCtdigdXpwB2X5hUTrC2dThil6qleQtqcUEKAE';
@@ -171,7 +192,9 @@ function createWavBase64(pcmChunks: Uint8Array[], sampleRate = 24000): string {
 }
 
 export function isWebRTCAvailable(): boolean {
-  if (Platform.OS !== 'web') return false;
+  if (Platform.OS !== 'web') {
+    return _NativeRTCPeerConnection !== null && _nativeMediaDevices !== null;
+  }
   try {
     return typeof RTCPeerConnection !== 'undefined' &&
       typeof navigator !== 'undefined' &&
@@ -215,17 +238,25 @@ export class WebRTCRealtimeSession implements IRealtimeSession {
     this.callbacks.onStateChange('connecting');
 
     try {
-      this.pc = new RTCPeerConnection();
+      const PeerConnection = Platform.OS !== 'web' ? _NativeRTCPeerConnection : RTCPeerConnection;
+      this.pc = new PeerConnection();
 
-      this.audioEl = document.createElement('audio');
-      this.audioEl.autoplay = true;
-      this.pc.ontrack = (e: RTCTrackEvent) => {
-        if (this.audioEl && e.streams[0]) {
-          this.audioEl.srcObject = e.streams[0];
-        }
-      };
+      if (Platform.OS === 'web') {
+        this.audioEl = document.createElement('audio');
+        this.audioEl.autoplay = true;
+        this.pc.ontrack = (e: RTCTrackEvent) => {
+          if (this.audioEl && e.streams[0]) {
+            this.audioEl.srcObject = e.streams[0];
+          }
+        };
+      } else {
+        this.pc.ontrack = () => {
+          // react-native-webrtc routes audio to device speaker automatically
+        };
+      }
 
-      this.mediaStream = await navigator.mediaDevices.getUserMedia({
+      const mediaDevices = Platform.OS !== 'web' ? _nativeMediaDevices : navigator.mediaDevices;
+      this.mediaStream = await mediaDevices.getUserMedia({
         audio: { echoCancellation: true, noiseSuppression: true },
       });
       const track = this.mediaStream.getTracks()[0];
@@ -271,7 +302,10 @@ export class WebRTCRealtimeSession implements IRealtimeSession {
       }
 
       const answerSdp = await sdpRes.text();
-      await this.pc.setRemoteDescription({ type: 'answer' as RTCSdpType, sdp: answerSdp });
+      const sessionDesc = Platform.OS !== 'web'
+        ? new _NativeRTCSessionDescription({ type: 'answer', sdp: answerSdp })
+        : { type: 'answer' as RTCSdpType, sdp: answerSdp };
+      await this.pc.setRemoteDescription(sessionDesc);
       console.log('[Realtime] WebRTC connected');
     } catch (err) {
       console.log('[Realtime] Connect error:', err);
@@ -355,7 +389,7 @@ export class WebRTCRealtimeSession implements IRealtimeSession {
     this.pc?.close();
     if (this.audioEl) {
       this.audioEl.srcObject = null;
-      this.audioEl.remove();
+      if (Platform.OS === 'web') this.audioEl.remove();
     }
     this.pc = null;
     this.dc = null;

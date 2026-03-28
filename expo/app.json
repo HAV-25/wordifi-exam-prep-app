@@ -15,14 +15,18 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "app.rork.2ydqsq98wysdgr153a9qi"
+      "bundleIdentifier": "app.rork.2ydqsq98wysdgr153a9qi",
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "Wordifi needs your microphone for the live speaking practice."
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "app.rork.2ydqsq98wysdgr153a9qi"
+      "package": "app.rork.2ydqsq98wysdgr153a9qi",
+      "permissions": ["RECORD_AUDIO", "INTERNET", "MODIFY_AUDIO_SETTINGS"]
     },
     "web": {
       "favicon": "./assets/images/favicon.png"
