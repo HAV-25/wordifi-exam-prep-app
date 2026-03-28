@@ -585,8 +585,8 @@ export class NativeWSRealtimeSession implements IRealtimeSession {
       this.audioChunks = [];
 
       const tempFile = new FSFile(Paths.cache, `ai_response_${Date.now()}.wav`);
-      tempFile.create({ overwrite: true });
-      tempFile.write(wavB64, { encoding: EncodingType.Base64 });
+      await tempFile.create({ overwrite: true });
+      await tempFile.write(wavB64, { encoding: EncodingType.Base64 });
       const tempUri = tempFile.uri;
 
       await Audio.setAudioModeAsync({
