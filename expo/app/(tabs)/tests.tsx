@@ -84,7 +84,7 @@ export default function TestsScreen() {
     'Sprechen': true,
   });
   const [schreibenStarting, setSchreibenStarting] = useState<number | null>(null);
-  const [sprechenStarting] = useState<number | null>(null);
+  const [sprechenStarting, setSprechenStarting] = useState<number | null>(null);
 
   const teileQuery = useQuery({
     queryKey: ['sectional-teile', targetLevel],
@@ -124,6 +124,7 @@ export default function TestsScreen() {
       setShowPaywall(true);
       return;
     }
+    setSprechenStarting(teil);
     if (targetLevel === 'B1') {
       router.push({
         pathname: '/sprechen-realtime',
