@@ -402,7 +402,7 @@ export default function SprechenRealtimeScreen() {
           {moderatorAudioUrl ? (
             <View style={styles.moderatorWrap}>
               <Text style={styles.moderatorLabel}>Aufgabe anhören</Text>
-              <AudioPlayer audioUrl={moderatorAudioUrl} />
+              <AudioPlayer audioUrl={moderatorAudioUrl} onFirstPlay={() => setModeratorFinished(true)} />
             </View>
           ) : null}
 
