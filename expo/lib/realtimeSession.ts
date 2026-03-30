@@ -221,6 +221,7 @@ export class WebRTCRealtimeSession implements IRealtimeSession {
   private parts: TranscriptEntry[] = [];
   private currentAiText = '';
   private _isConnected = false;
+  private _isAiSpeaking = false;
 
   constructor(callbacks: RealtimeCallbacks) {
     this.callbacks = callbacks;
@@ -347,6 +348,7 @@ export class WebRTCRealtimeSession implements IRealtimeSession {
         const delta = (event.delta as string) ?? '';
         this.currentAiText += delta;
         this.callbacks.onAiSpeakingText(delta);
+        this._isAiSpeaking = true;
         this.callbacks.onStateChange('ai_speaking');
         // Mute mic while AI is speaking to prevent speaker bleed
         this.mediaStream?.getAudioTracks().forEach(t => { t.enabled = false; });
@@ -362,12 +364,16 @@ export class WebRTCRealtimeSession implements IRealtimeSession {
         break;
       }
       case 'response.done':
+        this._isAiSpeaking = false;
         // Unmute mic when AI finishes speaking
         this.mediaStream?.getAudioTracks().forEach(t => { t.enabled = true; });
         this.callbacks.onStateChange('listening');
         break;
       case 'input_audio_buffer.speech_started':
-        this.callbacks.onStateChange('listening');
+        // Ignore VAD triggers while AI is still speaking — prevents premature Zuhören state
+        if (!this._isAiSpeaking) {
+          this.callbacks.onStateChange('listening');
+        }
         break;
       case 'conversation.item.input_audio_transcription.completed': {
         const t = (event.transcript as string) ?? '';
