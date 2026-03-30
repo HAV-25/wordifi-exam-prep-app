@@ -257,7 +257,7 @@ export class WebRTCRealtimeSession implements IRealtimeSession {
 
       const mediaDevices = Platform.OS !== 'web' ? _nativeMediaDevices : navigator.mediaDevices;
       this.mediaStream = await mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: true },
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
       });
       const track = this.mediaStream.getTracks()[0];
       if (track) this.pc.addTrack(track, this.mediaStream);
@@ -348,6 +348,8 @@ export class WebRTCRealtimeSession implements IRealtimeSession {
         this.currentAiText += delta;
         this.callbacks.onAiSpeakingText(delta);
         this.callbacks.onStateChange('ai_speaking');
+        // Mute mic while AI is speaking to prevent speaker bleed
+        this.mediaStream?.getAudioTracks().forEach(t => { t.enabled = false; });
         break;
       }
       case 'response.audio_transcript.done': {
@@ -360,6 +362,8 @@ export class WebRTCRealtimeSession implements IRealtimeSession {
         break;
       }
       case 'response.done':
+        // Unmute mic when AI finishes speaking
+        this.mediaStream?.getAudioTracks().forEach(t => { t.enabled = true; });
         this.callbacks.onStateChange('listening');
         break;
       case 'input_audio_buffer.speech_started':
