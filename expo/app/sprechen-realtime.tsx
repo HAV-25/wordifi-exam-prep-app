@@ -570,7 +570,14 @@ export default function SprechenRealtimeScreen() {
   }
 
   if (screenState === 'results' && scores) {
-    const starCount = Math.max(0, Math.min(5, Math.round(scores.overall)));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const s = scores as any;
+    const overallNum = Number(s.overall_score ?? s.overall ?? 0);
+    const fluencyNum = Number(s.fluency_score ?? s.fluency ?? 0);
+    const grammarNum = Number(s.grammar_score ?? s.grammar ?? 0);
+    const vocabularyNum = Number(s.vocabulary_score ?? s.vocabulary ?? 0);
+    const taskCompletion: string = s.task_completion ?? '';
+    const starCount = Math.max(0, Math.min(5, Math.round(overallNum)));
 
     return (
       <View style={styles.screen}>
@@ -593,15 +600,15 @@ export default function SprechenRealtimeScreen() {
                 />
               ))}
             </View>
-            <Text style={styles.resultsScoreLabel}>{scores.overall} / 5</Text>
+            <Text style={styles.resultsScoreLabel}>{overallNum} / 5</Text>
           </View>
 
           <View style={[styles.scoresCard, shadows.card]}>
             <Text style={styles.scoresHeader}>Detailbewertung</Text>
             {[
-              { label: 'Flüssigkeit', value: scores.fluency },
-              { label: 'Grammatik', value: scores.grammar },
-              { label: 'Wortschatz', value: scores.vocabulary },
+              { label: 'Flüssigkeit', value: fluencyNum },
+              { label: 'Grammatik', value: grammarNum },
+              { label: 'Wortschatz', value: vocabularyNum },
             ].map(item => (
               <View key={item.label} style={styles.scoreRow}>
                 <Text style={styles.scoreLabel}>{item.label}</Text>
@@ -613,10 +620,20 @@ export default function SprechenRealtimeScreen() {
             ))}
           </View>
 
-          {scores.task_completion ? (
-            <View style={[styles.badgeCard, shadows.card]}>
+          {taskCompletion === 'full' ? (
+            <View style={[styles.badgeCard, shadows.card, { borderColor: colors.green }]}>
               <Text style={styles.badgeEmoji}>✅</Text>
-              <Text style={styles.badgeText}>Aufgabe erfüllt</Text>
+              <Text style={[styles.badgeText, { color: colors.green }]}>Aufgabe erfüllt</Text>
+            </View>
+          ) : taskCompletion === 'partial' ? (
+            <View style={[styles.badgeCard, shadows.card, { borderColor: colors.amber }]}>
+              <Text style={styles.badgeEmoji}>⚠️</Text>
+              <Text style={[styles.badgeText, { color: colors.amber }]}>Teilweise erfüllt</Text>
+            </View>
+          ) : taskCompletion === 'minimal' ? (
+            <View style={[styles.badgeCard, shadows.card, { borderColor: colors.red }]}>
+              <Text style={styles.badgeEmoji}>❌</Text>
+              <Text style={[styles.badgeText, { color: colors.red }]}>Nicht erfüllt</Text>
             </View>
           ) : null}
 
