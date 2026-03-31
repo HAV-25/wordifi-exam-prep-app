@@ -94,6 +94,8 @@ export default function SprechenRealtimeScreen() {
   const taskSubtype = (questionRaw?.task_subtype as string | null) ?? 'dialogue';
   const isMonologue = taskSubtype === 'monologue';
   const recordingTimeLimitSec = (questionRaw?.recording_time_limit_sec as number | null) ?? 240;
+  const stimulusText = (question?.stimulus_text ?? '');
+  const optionsInTaskCard = stimulusText.startsWith('Thema:') || stimulusText.startsWith('Situation:');
 
   useEffect(() => {
     let cancelled = false;
@@ -392,12 +394,39 @@ export default function SprechenRealtimeScreen() {
 
   const renderTaskCard = () => {
     if (!question) return null;
+
+    const stimulusText = question.stimulus_text ?? '';
+    let stimulusHeadline = '';
+    let stimulusChips: string[] = [];
+
+    if (stimulusText.startsWith('Thema:') || stimulusText.startsWith('Situation:')) {
+      const colonIdx = stimulusText.indexOf(':');
+      stimulusHeadline = stimulusText.slice(colonIdx + 1).trim();
+      const opts = question.options as Array<{ key?: string; text: string }> | null;
+      stimulusChips = (opts ?? []).map(o => o.text);
+    } else if (stimulusText.includes(' · ')) {
+      const parts = stimulusText.split(' · ');
+      stimulusHeadline = parts[0] ?? '';
+      stimulusChips = parts.slice(1);
+    } else if (stimulusText) {
+      stimulusHeadline = stimulusText;
+    }
+
     return (
       <View style={[styles.taskCard, shadows.card]}>
         <Text style={styles.taskCardTitle}>Thema</Text>
         <Text style={styles.taskCardText}>{question.question_text}</Text>
-        {question.stimulus_text ? (
-          <Text style={styles.taskCardStimulus}>{question.stimulus_text}</Text>
+        {stimulusHeadline ? (
+          <Text style={styles.taskCardStimulus}>{stimulusHeadline}</Text>
+        ) : null}
+        {stimulusChips.length > 0 ? (
+          <View style={styles.stimulusChipsRow}>
+            {stimulusChips.map((chip, idx) => (
+              <View key={String(idx)} style={styles.stimulusChip}>
+                <Text style={styles.stimulusChipText}>{chip}</Text>
+              </View>
+            ))}
+          </View>
         ) : null}
       </View>
     );
@@ -471,7 +500,7 @@ export default function SprechenRealtimeScreen() {
           </View>
 
           {renderTaskCard()}
-          {renderOptions()}
+          {!optionsInTaskCard && renderOptions()}
 
           {moderatorAudioUrl ? (
             <View style={styles.moderatorWrap}>
@@ -839,6 +868,23 @@ const styles = StyleSheet.create({
     fontWeight: '500' as const,
     marginTop: spacing.sm,
     lineHeight: 22,
+  },
+  stimulusChipsRow: {
+    flexDirection: 'row' as const,
+    flexWrap: 'wrap' as const,
+    gap: 6,
+    marginTop: spacing.sm,
+  },
+  stimulusChip: {
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 99,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+  },
+  stimulusChipText: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: fontSize.bodySm,
+    fontWeight: '500' as const,
   },
   optionsCard: {
     backgroundColor: colors.white,
