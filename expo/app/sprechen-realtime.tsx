@@ -20,12 +20,12 @@ import { colors, fontSize, radius, shadows, spacing } from '@/theme';
 import { fetchSprechenQuestions } from '@/lib/sprechenHelpers';
 import { SPRECHEN_STRUCTURE_LABELS } from '@/lib/sprechenHelpers';
 import {
-  createSprechenSession,
   scoreSprechenConversation,
   createRealtimeSession,
   isWebRTCAvailable,
   NativeWSRealtimeSession,
 } from '@/lib/realtimeSession';
+
 import type {
   ConversationState,
   SprechenScores,
@@ -34,6 +34,9 @@ import type {
 } from '@/lib/realtimeSession';
 import { useAuth } from '@/providers/AuthProvider';
 import type { AppQuestion } from '@/types/database';
+
+const SUPABASE_URL = 'https://wwfiauhsbssjowaxmqyn.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind3ZmlhdWhzYnNzam93YXhtcXluIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE0MTQxMzUsImV4cCI6MjA4Njk5MDEzNX0.lSPPEQCtdigdXpwB2X5hUTrC2dThil6qleQtqcUEKAE';
 
 type ScreenState =
   | 'loading'
@@ -63,6 +66,7 @@ export default function SprechenRealtimeScreen() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [moderatorFinished, setModeratorFinished] = useState<boolean>(false);
   const [isNativeRecording, setIsNativeRecording] = useState<boolean>(false);
+  const [countdownValue, setCountdownValue] = useState<number | null>(null);
 
   const sessionRef = useRef<IRealtimeSession | null>(null);
   const sessionIdRef = useRef<string | null>(null);
@@ -70,6 +74,9 @@ export default function SprechenRealtimeScreen() {
   const startTimeRef = useRef<number>(0);
   const isMountedRef = useRef<boolean>(true);
   const pulseAnim = useRef(new Animated.Value(0.4)).current;
+  const recordingLimitRef = useRef<number>(240);
+  const handleStartConversationRef = useRef<(() => Promise<void>) | null>(null);
+  const countdownTriggeredRef = useRef<boolean>(false);
   const isWebRTC = isWebRTCAvailable();
 
   const MAX_DURATION = 240;
@@ -84,6 +91,9 @@ export default function SprechenRealtimeScreen() {
   const questionRaw = question as Record<string, unknown> | null;
   const rubricCard = (questionRaw?.rubric_card as Record<string, string> | null) ?? null;
   const moderatorAudioUrl = (questionRaw?.audio_url as string | null) ?? (questionRaw?.moderator_audio_url as string | null) ?? null;
+  const taskSubtype = (questionRaw?.task_subtype as string | null) ?? 'dialogue';
+  const isMonologue = taskSubtype === 'monologue';
+  const recordingTimeLimitSec = (questionRaw?.recording_time_limit_sec as number | null) ?? 240;
 
   useEffect(() => {
     let cancelled = false;
@@ -141,7 +151,7 @@ export default function SprechenRealtimeScreen() {
     timerRef.current = setInterval(() => {
       const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
       setElapsedSeconds(elapsed);
-      if (elapsed >= MAX_DURATION) {
+      if (elapsed >= recordingLimitRef.current) {
         void handleEndRef.current?.();
       }
     }, 1000);
@@ -163,19 +173,39 @@ export default function SprechenRealtimeScreen() {
         }
       }
 
-      const turn1Text = partnerPromptsMemo.length > 0
-        ? partnerPromptsMemo[0]?.audio_script ?? ''
-        : '';
+      recordingLimitRef.current = recordingTimeLimitSec;
 
-      const { client_secret, session_id } = await createSprechenSession({
-        question_id: question.id,
-        level: question.level,
-        topic: question.question_text,
-        turn1_text: turn1Text,
-        partner_prompts: partnerPromptsMemo,
-        rubric_card: rubricCard,
-        accessToken,
+      const sessionRes = await fetch(`${SUPABASE_URL}/functions/v1/create-sprechen-session`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`,
+          'apikey': SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({
+          question_id: question.id,
+          level: question.level,
+          teil: question.teil,
+          topic: question.question_text,
+          task_subtype: taskSubtype,
+          turn1_text: partnerPromptsMemo[0]?.audio_script ?? '',
+          partner_prompts: partnerPromptsMemo,
+          rubric_card: rubricCard,
+          recording_time_limit_sec: recordingTimeLimitSec,
+        }),
       });
+
+      if (!sessionRes.ok) {
+        const errText = await sessionRes.text().catch(() => '');
+        console.log('[SprechenRealtime] Create session error:', sessionRes.status, errText);
+        throw new Error(`Sitzung konnte nicht erstellt werden (${sessionRes.status})`);
+      }
+
+      const sessionData = await sessionRes.json() as Record<string, unknown>;
+      const client_secret = typeof sessionData.client_secret === 'string'
+        ? sessionData.client_secret
+        : ((sessionData.client_secret as Record<string, unknown> | null)?.value as string | null) ?? '';
+      const session_id = sessionData.session_id as string;
 
       sessionIdRef.current = session_id;
 
@@ -183,6 +213,13 @@ export default function SprechenRealtimeScreen() {
         onStateChange: (state) => {
           console.log('[SprechenRealtime] Conv state:', state);
           if (isMountedRef.current) setConvState(state);
+          if (state === 'connected' && !isMonologue) {
+            // Trigger AI to speak first after session.update is queued by configureSession
+            setTimeout(() => {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              (sessionRef.current as any).sendEvent?.({ type: 'response.create' });
+            }, 0);
+          }
         },
         onTranscript: (entry) => {
           console.log('[SprechenRealtime] Transcript:', entry.role, entry.text.slice(0, 50));
@@ -218,7 +255,7 @@ export default function SprechenRealtimeScreen() {
       setErrorMsg(err instanceof Error ? err.message : 'Verbindung fehlgeschlagen');
       setScreenState('error');
     }
-  }, [question, accessToken, partnerPromptsMemo, rubricCard, startTimer]);
+  }, [question, accessToken, partnerPromptsMemo, rubricCard, startTimer, taskSubtype, recordingTimeLimitSec]);
 
   const handleEndConversation = useCallback(async () => {
     if (timerRef.current) {
@@ -272,6 +309,35 @@ export default function SprechenRealtimeScreen() {
     handleEndRef.current = handleEndConversation;
   }, [handleEndConversation]);
 
+  useEffect(() => {
+    handleStartConversationRef.current = handleStartConversation;
+  }, [handleStartConversation]);
+
+  // Tick countdown down 3→2→1→0 then auto-start for monologue
+  useEffect(() => {
+    if (countdownValue === null) return;
+    if (countdownValue <= 0) {
+      setCountdownValue(null);
+      void handleStartConversationRef.current?.();
+      return;
+    }
+    const t = setTimeout(() => setCountdownValue((v) => (v !== null ? v - 1 : null)), 1000);
+    return () => clearTimeout(t);
+  }, [countdownValue]);
+
+  // Trigger countdown automatically for monologue once moderator audio finishes
+  useEffect(() => {
+    if (screenState !== 'instruction') {
+      countdownTriggeredRef.current = false;
+      return;
+    }
+    if (!isMonologue) return;
+    if (moderatorAudioUrl && !moderatorFinished) return;
+    if (countdownTriggeredRef.current) return;
+    countdownTriggeredRef.current = true;
+    setCountdownValue(3);
+  }, [screenState, isMonologue, moderatorAudioUrl, moderatorFinished]);
+
   const handleNativeRecord = useCallback(async () => {
     const s = sessionRef.current;
     if (!(s instanceof NativeWSRealtimeSession)) return;
@@ -293,6 +359,8 @@ export default function SprechenRealtimeScreen() {
     setScores(null);
     setConvState('idle');
     setModeratorFinished(false);
+    setCountdownValue(null);
+    countdownTriggeredRef.current = false;
     setScreenState('instruction');
   }, []);
 
@@ -307,7 +375,7 @@ export default function SprechenRealtimeScreen() {
       case 'connecting': return 'Verbinde...';
       case 'connected': return 'Verbunden';
       case 'ai_speaking': return 'Partner spricht...';
-      case 'listening': return 'Zuhören...';
+      case 'listening': return isMonologue ? 'Ihre Aufnahme läuft...' : 'Zuhören...';
       default: return '';
     }
   };
@@ -412,23 +480,32 @@ export default function SprechenRealtimeScreen() {
             </View>
           ) : null}
 
-          {!moderatorAudioUrl ? (
+          {!isMonologue && !moderatorAudioUrl ? (
             <View style={styles.noModeratorNote}>
               <Text style={styles.noModeratorText}>
                 Drücken Sie unten, um das Live-Gespräch mit dem KI-Partner zu beginnen.
               </Text>
             </View>
           ) : null}
+
+          {isMonologue && countdownValue !== null ? (
+            <View style={styles.countdownWrap}>
+              <Text style={styles.countdownText}>{countdownValue}</Text>
+              <Text style={styles.countdownLabel}>Aufnahme startet...</Text>
+            </View>
+          ) : null}
         </ScrollView>
 
-        <View style={styles.footer}>
-          <CTAButton
-            label="Gespräch beginnen"
-            onPress={handleStartConversation}
-            disabled={moderatorAudioUrl != null && !moderatorFinished}
-            testID="realtime-start"
-          />
-        </View>
+        {!isMonologue ? (
+          <View style={styles.footer}>
+            <CTAButton
+              label="Gespräch beginnen"
+              onPress={handleStartConversation}
+              disabled={moderatorAudioUrl != null && !moderatorFinished}
+              testID="realtime-start"
+            />
+          </View>
+        ) : null}
       </View>
     );
   }
@@ -448,7 +525,10 @@ export default function SprechenRealtimeScreen() {
   if (screenState === 'conversation') {
     const statusLabel = getStatusLabel();
     const statusColor = getStatusColor();
-    const timeRemaining = MAX_DURATION - elapsedSeconds;
+    const displaySeconds = isMonologue
+      ? Math.max(0, recordingTimeLimitSec - elapsedSeconds)
+      : elapsedSeconds;
+    const timeRemaining = isMonologue ? displaySeconds : (MAX_DURATION - elapsedSeconds);
     const isTimeLow = timeRemaining <= 30;
 
     return (
@@ -479,7 +559,7 @@ export default function SprechenRealtimeScreen() {
           <View style={styles.timerWrap}>
             <Timer color={isTimeLow ? colors.red : colors.navy} size={14} />
             <Text style={[styles.timerText, isTimeLow && styles.timerTextRed]}>
-              {formatTime(elapsedSeconds)}
+              {formatTime(displaySeconds)}
             </Text>
           </View>
         </View>
@@ -538,7 +618,7 @@ export default function SprechenRealtimeScreen() {
           <Pressable
             onPress={() => {
               Alert.alert(
-                'Gespräch beenden?',
+                isMonologue ? 'Aufnahme beenden?' : 'Gespräch beenden?',
                 'Das Gespräch wird bewertet.',
                 [
                   { text: 'Weiter', style: 'cancel' },
@@ -550,7 +630,7 @@ export default function SprechenRealtimeScreen() {
             testID="realtime-end"
           >
             <PhoneOff color={colors.red} size={16} />
-            <Text style={styles.endBtnText}>Gespräch beenden</Text>
+            <Text style={styles.endBtnText}>{isMonologue ? 'Aufnahme beenden' : 'Gespräch beenden'}</Text>
           </Pressable>
         </View>
       </View>
@@ -814,6 +894,23 @@ const styles = StyleSheet.create({
     fontWeight: '500' as const,
     lineHeight: 22,
     textAlign: 'center',
+  },
+  countdownWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.xxl,
+    gap: spacing.md,
+  },
+  countdownText: {
+    fontSize: 72,
+    fontWeight: '800' as const,
+    color: colors.navy,
+    lineHeight: 80,
+  },
+  countdownLabel: {
+    fontSize: fontSize.bodyMd,
+    fontWeight: '600' as const,
+    color: colors.muted,
   },
   errorIcon: {
     width: 80,
