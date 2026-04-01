@@ -1,29 +1,30 @@
 /**
  * WORDIFI — Typography System
- * Source of truth: Design Language v1.0 · Section 1.4
+ * Source of truth: Google Stitch project 17418085725444489838
  *
  * CRITICAL RULES — NON-NEGOTIABLE:
  * 1. SENTENCE CASE everywhere. "Start your journey" not "Start Your Journey".
  * 2. wordmark is always lowercase: "wordifi"
  * 3. Never ALL CAPS except category chip labels (10–11px, intentional).
- * 4. Two typefaces only: BricolageGrotesque (display) + DMSans (body).
+ * 4. Two typefaces only: Plus Jakarta Sans (display/headlines) + Be Vietnam Pro (body/labels).
  *
- * Font setup required:
- *   expo install @expo-google-fonts/bricolage-grotesque @expo-google-fonts/dm-sans
- *   import { useFonts, BricolageGrotesque_800ExtraBold } from '@expo-google-fonts/bricolage-grotesque';
- *   import { DMSans_400Regular, DMSans_500Medium } from '@expo-google-fonts/dm-sans';
+ * Font setup:
+ *   Loaded in expo/app/_layout.tsx via useFonts()
+ *   Packages: @expo-google-fonts/plus-jakarta-sans @expo-google-fonts/be-vietnam-pro
  */
 
 export const fontFamily = {
-  display: 'BricolageGrotesque_800ExtraBold', // Headlines, CTAs, scores, wordmark
-  bodyRegular: 'DMSans_400Regular',            // Body copy, explanations, labels
-  bodyMedium:  'DMSans_500Medium',             // Sub-labels, option text, tags
+  display:     'PlusJakartaSans_800ExtraBold', // Headlines, CTAs, scores, wordmark
+  displaySemi: 'PlusJakartaSans_600SemiBold',  // Titles, sub-headers
+  bodyRegular: 'BeVietnamPro_400Regular',       // Body copy, explanations
+  bodyMedium:  'BeVietnamPro_500Medium',        // Option text, sub-labels
+  bodyBold:    'BeVietnamPro_700Bold',          // Labels, micro-copy (ALL CAPS)
 } as const;
 
 /**
  * Type scale — all sizes in px (React Native points)
- * Use fontFamily.display for displayXl/displayLg/displayMd
- * Use fontFamily.bodyRegular or bodyMedium for everything below
+ * Use fontFamily.display / displaySemi for displayXl–displaySm
+ * Use fontFamily.bodyRegular / bodyMedium / bodyBold for body and labels
  */
 export const fontSize = {
   displayXl:  36,  // Hero headlines on Splash
@@ -39,7 +40,9 @@ export const fontSize = {
 } as const;
 
 export const fontWeight = {
-  display: '800',  // BricolageGrotesque only
+  display: '800',  // Plus Jakarta Sans ExtraBold
+  semi:    '600',  // Plus Jakarta Sans SemiBold
+  bold:    '700',  // Be Vietnam Pro Bold (labels)
   medium:  '500',
   regular: '400',
 } as const;
@@ -100,23 +103,23 @@ export const textStyles = {
     lineHeight: fontSize.bodyMd * lineHeight.relaxed,
   },
   label: {
-    fontFamily:   fontFamily.bodyMedium,
-    fontSize:     fontSize.label,
-    fontWeight:   fontWeight.medium,
+    fontFamily:    fontFamily.bodyMedium,
+    fontSize:      fontSize.label,
+    fontWeight:    fontWeight.medium,
     letterSpacing: letterSpacing.normal,
   },
   chipLabel: {
-    fontFamily:    fontFamily.bodyMedium,
+    fontFamily:    fontFamily.bodyBold,
     fontSize:      fontSize.micro,
-    fontWeight:    fontWeight.medium,
+    fontWeight:    fontWeight.bold,
     // ONLY permitted uppercase usage in the entire app
     textTransform: 'uppercase' as const,
     letterSpacing: letterSpacing.wider,
   },
   scoreDisplay: {
-    fontFamily:  fontFamily.display,
-    fontSize:    34,
-    fontWeight:  fontWeight.display,
+    fontFamily:    fontFamily.display,
+    fontSize:      34,
+    fontWeight:    fontWeight.display,
     letterSpacing: letterSpacing.tight,
   },
   scoreLabel: {

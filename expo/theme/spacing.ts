@@ -61,15 +61,15 @@ export const radius = {
 export const shadows = {
   // CTA button blue glow — essential, defines the premium feel
   ctaButton: {
-    shadowColor:   '#2B70EF',
+    shadowColor:   '#0057CD',   // primary
     shadowOffset:  { width: 0, height: 8 },
     shadowOpacity: 0.35,
     shadowRadius:  24,
     elevation:     12,
   },
-  // Subtle card lift
+  // Subtle card lift — ambient, should be felt not seen
   card: {
-    shadowColor:   '#0A1628',
+    shadowColor:   '#171B28',   // onSurface
     shadowOffset:  { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius:  8,
@@ -77,7 +77,7 @@ export const shadows = {
   },
   // Floating sheet — bottom sheet, modals
   sheet: {
-    shadowColor:   '#0A1628',
+    shadowColor:   '#171B28',   // onSurface
     shadowOffset:  { width: 0, height: -4 },
     shadowOpacity: 0.12,
     shadowRadius:  16,
@@ -85,7 +85,7 @@ export const shadows = {
   },
   // Explanation panel
   panel: {
-    shadowColor:   '#0A1628',
+    shadowColor:   '#171B28',   // onSurface
     shadowOffset:  { width: 0, height: -2 },
     shadowOpacity: 0.08,
     shadowRadius:  12,

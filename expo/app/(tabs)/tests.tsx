@@ -125,23 +125,13 @@ export default function TestsScreen() {
       return;
     }
     setSprechenStarting(teil);
-    if (targetLevel === 'B1') {
-      router.push({
-        pathname: '/sprechen-realtime',
-        params: {
-          level: targetLevel,
-          teil: String(teil),
-        },
-      });
-    } else {
-      router.push({
-        pathname: '/sprechen-test',
-        params: {
-          level: targetLevel,
-          teil: String(teil),
-        },
-      });
-    }
+    router.push({
+      pathname: '/sprechen-realtime',
+      params: {
+        level: targetLevel,
+        teil: String(teil),
+      },
+    });
   }, [targetLevel, sprechenEnabled]);
 
   const handleStartSchreiben = useCallback(async (teil: number) => {

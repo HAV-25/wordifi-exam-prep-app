@@ -1,4 +1,14 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import {
+  PlusJakartaSans_600SemiBold,
+  PlusJakartaSans_800ExtraBold,
+} from '@expo-google-fonts/plus-jakarta-sans';
+import {
+  BeVietnamPro_400Regular,
+  BeVietnamPro_500Medium,
+  BeVietnamPro_700Bold,
+} from '@expo-google-fonts/be-vietnam-pro';
+import { useFonts } from 'expo-font';
 import { Redirect, Stack, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
@@ -9,6 +19,7 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { colors } from '@/theme';
 import { AccessProvider } from '@/providers/AccessProvider';
 import { AuthProvider, useAuth } from '@/providers/AuthProvider';
+import { ONBOARDING_VERSION } from '@/constants/onboardingVersion';
 
 void SplashScreen.preventAutoHideAsync();
 
@@ -34,14 +45,17 @@ function RouteGate() {
 
   const topSegment = segments[0] ?? '';
   const isAuthRoute = topSegment === 'auth';
-  const isOnboardingRoute = topSegment === 'onboarding';
+  const isOnboardingRoute =
+    topSegment === 'onboarding_prelaunch' || topSegment === 'onboarding_launch';
+  const onboardingHref =
+    ONBOARDING_VERSION === 'launch' ? '/onboarding_launch' : '/onboarding_prelaunch';
 
   if (!session && !isAuthRoute && !isOnboardingRoute) {
-    return <Redirect href="/onboarding" />;
+    return <Redirect href={onboardingHref} />;
   }
 
   if (session && !hasCompletedOnboarding && !isOnboardingRoute) {
-    return <Redirect href="/onboarding" />;
+    return <Redirect href={onboardingHref} />;
   }
 
   if (session && hasCompletedOnboarding && (isAuthRoute || isOnboardingRoute)) {
@@ -57,7 +71,8 @@ function RootLayoutNav() {
       <RouteGate />
       <Stack screenOptions={{ headerBackTitle: 'Back', headerTintColor: colors.navy }}>
         <Stack.Screen name="auth" options={{ headerShown: false }} />
-        <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+        <Stack.Screen name="onboarding_prelaunch" options={{ headerShown: false }} />
+        <Stack.Screen name="onboarding_launch" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="practice" options={{ title: 'Practice' }} />
         <Stack.Screen name="results" options={{ title: 'Results', headerBackVisible: false }} />
@@ -79,6 +94,22 @@ function RootLayoutNav() {
 }
 
 export default function RootLayout() {
+  const [fontsLoaded] = useFonts({
+    PlusJakartaSans_800ExtraBold,
+    PlusJakartaSans_600SemiBold,
+    BeVietnamPro_400Regular,
+    BeVietnamPro_500Medium,
+    BeVietnamPro_700Bold,
+  });
+
+  if (!fontsLoaded) {
+    return (
+      <View style={styles.loadingWrap}>
+        <ActivityIndicator color={colors.primary} size="large" />
+      </View>
+    );
+  }
+
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
