@@ -1,6 +1,10 @@
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { AlertTriangle, BookOpen, ChevronDown, ChevronUp, Flag, Headphones, Share as ShareIcon } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+const CTA_BUTTON_HEIGHT = 56;    // primary CTA / footer height
+const BOTTOM_CONTENT_BUFFER = 24; // breathing room below last content item
 import {
   Animated,
   Modal,
@@ -62,6 +66,7 @@ function retestDateString(): string {
 }
 
 export default function MockResultsScreen() {
+  const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{
     mockTestId?: string;
     horenCorrect?: string;
@@ -331,7 +336,7 @@ export default function MockResultsScreen() {
         }}
       />
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + CTA_BUTTON_HEIGHT + BOTTOM_CONTENT_BUFFER }]} showsVerticalScrollIndicator={false}>
         <View style={styles.heroCard}>
           <Text style={styles.heroMeta}>Mock Exam · {level}</Text>
           <View style={styles.verdictRow}>
@@ -463,7 +468,7 @@ export default function MockResultsScreen() {
         <View style={{ height: 180 }} />
       </ScrollView>
 
-      <View style={styles.footer}>
+      <View style={[styles.footer, { bottom: insets.bottom }]}>
         <Pressable
           accessibilityLabel="Share result"
           onPress={handleShare}

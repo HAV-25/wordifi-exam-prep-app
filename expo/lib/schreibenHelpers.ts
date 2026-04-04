@@ -107,12 +107,12 @@ export const assessSchreiben = async (
   return assessment;
 };
 
-export async function fetchSchreibenTeile(level: string): Promise<Array<{ teil: number; q_count: number }>> {
+export async function fetchSchreibenTeile(level: string): Promise<Array<{ teil: number; q_count: number; source_structure_type: string }>> {
   console.log('schreibenHelpers fetchSchreibenTeile', level);
 
   const { data, error } = await supabase
     .from('app_questions')
-    .select('teil')
+    .select('teil, source_structure_type')
     .eq('level', level)
     .eq('section', 'Schreiben')
     .eq('is_active', true);
@@ -124,14 +124,19 @@ export async function fetchSchreibenTeile(level: string): Promise<Array<{ teil: 
 
   if (!data || data.length === 0) return [];
 
-  const grouped = new Map<number, number>();
-  for (const row of data as Array<{ teil: number }>) {
-    grouped.set(row.teil, (grouped.get(row.teil) ?? 0) + 1);
+  const grouped = new Map<number, { count: number; source_structure_type: string }>();
+  for (const row of data as Array<{ teil: number; source_structure_type: string }>) {
+    const existing = grouped.get(row.teil);
+    if (existing) {
+      existing.count += 1;
+    } else {
+      grouped.set(row.teil, { count: 1, source_structure_type: row.source_structure_type });
+    }
   }
 
-  const result: Array<{ teil: number; q_count: number }> = [];
-  for (const [teil, count] of grouped.entries()) {
-    result.push({ teil, q_count: count });
+  const result: Array<{ teil: number; q_count: number; source_structure_type: string }> = [];
+  for (const [teil, entry] of grouped.entries()) {
+    result.push({ teil, q_count: entry.count, source_structure_type: entry.source_structure_type });
   }
 
   result.sort((a, b) => a.teil - b.teil);

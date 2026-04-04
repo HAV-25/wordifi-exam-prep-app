@@ -1,24 +1,38 @@
 import { Tabs } from 'expo-router';
-import { ClipboardList, Trophy, Zap, UserCircle2 } from 'lucide-react-native';
+import { ClipboardList, Home, Trophy, Zap } from 'lucide-react-native';
 import React from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { colors } from '@/theme';
+import { colors, componentSizes } from '@/theme';
 
 export default function TabLayout() {
+  const insets = useSafeAreaInsets();
+
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: colors.navy,
-        tabBarInactiveTintColor: colors.muted,
+        tabBarActiveTintColor: colors.iconActive,
+        tabBarInactiveTintColor: colors.iconInactive,
         tabBarStyle: {
-          borderTopColor: colors.border,
+          height: componentSizes.tabBarHeight + insets.bottom,
+          paddingBottom: insets.bottom,
+          paddingTop: 8,
           backgroundColor: colors.white,
+          borderTopWidth: 0.5,
+          borderTopColor: colors.cardBorder,
         },
       }}
     >
       <Tabs.Screen
         name="index"
+        options={{
+          title: 'Home',
+          tabBarIcon: ({ color, size }) => <Home color={color} size={size} />,
+        }}
+      />
+      <Tabs.Screen
+        name="stream"
         options={{
           title: 'Stream',
           tabBarIcon: ({ color, size }) => <Zap color={color} size={size} />,
@@ -27,22 +41,21 @@ export default function TabLayout() {
       <Tabs.Screen
         name="tests"
         options={{
-          title: 'Tests',
+          title: 'Sections',
           tabBarIcon: ({ color, size }) => <ClipboardList color={color} size={size} />,
         }}
       />
       <Tabs.Screen
         name="mock"
         options={{
-          title: 'Mock',
+          title: 'Complete Test',
           tabBarIcon: ({ color, size }) => <Trophy color={color} size={size} />,
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'Profile',
-          tabBarIcon: ({ color, size }) => <UserCircle2 color={color} size={size} />,
+          href: null,
         }}
       />
     </Tabs>

@@ -1,16 +1,17 @@
 /**
  * WORDIFI — CTAButton (Primary)
- * Source of truth: Design Language v1.0 · Section 1.7
+ * Master source: Wordifi Brand Brief · Section 07 — Component Language
  *
- * Uses React Native's built-in Animated API (not reanimated)
- * to avoid adding a dependency not yet installed in this project.
+ * Spec: full-width · 56px height · 16px corner radius · Outfit 800 · white text
+ * on flat Primary Blue (#2B70EF). NO GRADIENTS — ever.
  *
- * The blue glow shadow is non-negotiable — it defines the premium feel.
+ * Uses React Native's built-in Animated API (not reanimated).
+ * Press: scale 0.96 + slight darken. Release: spring back.
  */
 
 import React, { useRef } from 'react';
 import { Animated, Pressable, StyleSheet, Text, ViewStyle } from 'react-native';
-import { colors, fontSize, radius, shadows, layout } from '@/theme';
+import { colors, fontFamily, fontSize, fontWeight, layout, radius, shadows } from '@/theme';
 
 interface CTAButtonProps {
   label:     string;
@@ -25,16 +26,15 @@ export function CTAButton({ label, onPress, disabled = false, style, testID }: C
 
   const handlePressIn = () => {
     Animated.timing(scale, {
-      toValue:        0.97,
-      duration:       120,
+      toValue:         0.96,
+      duration:        120,
       useNativeDriver: true,
     }).start();
   };
 
   const handlePressOut = () => {
-    Animated.timing(scale, {
-      toValue:        1.0,
-      duration:       120,
+    Animated.spring(scale, {
+      toValue:         1.0,
       useNativeDriver: true,
     }).start();
   };
@@ -58,17 +58,17 @@ export function CTAButton({ label, onPress, disabled = false, style, testID }: C
 const styles = StyleSheet.create({
   button: {
     height:           56,
-    borderRadius:     radius.pill,
-    backgroundColor:  colors.blue,
+    borderRadius:     radius.lg,            // 16px — cards/buttons spec
+    backgroundColor:  colors.primaryBlue,   // #2B70EF — flat, no gradient
     alignItems:       'center',
     justifyContent:   'center',
-    marginHorizontal: layout.screenPadding,
-    // Blue glow — essential, non-negotiable
-    ...shadows.ctaButton,
+    marginHorizontal: layout.screenPadding, // 24px
+    ...shadows.ctaButton,                   // Subtle blue glow
   },
   label: {
-    fontSize:   fontSize.bodyLg,
-    fontWeight: '800' as const,
+    fontFamily: fontFamily.display,         // Outfit 800
+    fontSize:   fontSize.bodyLg,            // 16px
+    fontWeight: fontWeight.display,         // '800'
     color:      colors.white,
     // Always sentence case — never pass uppercase strings to this component
   },

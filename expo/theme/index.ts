@@ -18,7 +18,7 @@ export * from './constants';
 // ─── Convenience re-export of the full theme object ──────────────────────────
 import { colors } from './colors';
 import { fontFamily, fontSize, fontWeight, lineHeight, textStyles } from './typography';
-import { spacing, layout, radius, shadows, screen, zones, touchTargets, zIndex } from './spacing';
+import { spacing, layout, radius, shadows, screen, zones, touchTargets, zIndex, componentSizes } from './spacing';
 import * as motion from './motion';
 import * as constants from './constants';
 
@@ -37,6 +37,7 @@ export const theme = {
   zones,
   touchTargets,
   zIndex,
+  componentSizes,
   motion,
   constants,
 } as const;

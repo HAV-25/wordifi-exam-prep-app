@@ -59,13 +59,13 @@ export const radius = {
 // ─── Elevation Techniques (Section 1.6) ──────────────────────────────────────
 // React Native shadows — use these objects directly in StyleSheet
 export const shadows = {
-  // CTA button blue glow — essential, defines the premium feel
+  // CTA button blue glow — subtle, defines premium feel
   ctaButton: {
-    shadowColor:   '#0057CD',   // primary
-    shadowOffset:  { width: 0, height: 8 },
-    shadowOpacity: 0.35,
-    shadowRadius:  24,
-    elevation:     12,
+    shadowColor:   '#2B70EF',   // primaryBlue
+    shadowOffset:  { width: 0, height: 6 },
+    shadowOpacity: 0.30,
+    shadowRadius:  16,
+    elevation:     8,
   },
   // Subtle card lift — ambient, should be felt not seen
   card: {
@@ -112,4 +112,15 @@ export const zIndex = {
   sheet:      40,
   toast:      50,
   modal:      60,
+} as const;
+
+// ─── Component Sizes ─────────────────────────────────────────────────────────
+// Fixed height/dimension constants for core interactive components.
+// Use these instead of inline magic numbers.
+export const componentSizes = {
+  buttonHeight:      56,  // Primary CTA height
+  answerCardHeight:  68,  // Answer card min height (design range: 64–72)
+  progressBarHeight:  4,  // Thin progress bar fill height
+  tabBarHeight:      64,  // Rendered bottom tab bar height (nav bar + safe area zone)
+  contentBuffer:     24,  // Breathing room below the last content item
 } as const;

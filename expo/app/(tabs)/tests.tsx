@@ -21,7 +21,6 @@ import { colors } from '@/theme';
 import { fetchSchreibenQuestions, fetchSchreibenTeile } from '@/lib/schreibenHelpers';
 import {
   fetchSprechenTeile,
-  SPRECHEN_STRUCTURE_LABELS,
 } from '@/lib/sprechenHelpers';
 import {
   checkRetestAvailability,
@@ -34,7 +33,7 @@ import {
 } from '@/lib/sectionalHelpers';
 import { useAccess } from '@/providers/AccessProvider';
 import { useAuth } from '@/providers/AuthProvider';
-import { SCHREIBEN_TASK_TYPE, SCHREIBEN_TASK_LABELS } from '@/types/schreiben';
+import { useQuestionTypeMetaContext } from '@/lib/useQuestionTypeMeta';
 import type { SprechenTeilInfo } from '@/lib/sprechenHelpers';
 
 type SetupState = {
@@ -47,12 +46,6 @@ type SetupState = {
   isLoadingReview: boolean;
 };
 
-const QUESTION_TYPE_LABELS: Record<string, string> = {
-  mcq: 'Multiple Choice',
-  true_false: 'True / False',
-  matching: 'Matching',
-  opinion: 'Ja / Nein',
-};
 
 function formatRetestDate(dateStr: string): string {
   const d = new Date(dateStr);
@@ -62,6 +55,7 @@ function formatRetestDate(dateStr: string): string {
 export default function TestsScreen() {
   const { profile, user } = useAuth();
   const { access } = useAccess();
+  const { metaMap } = useQuestionTypeMetaContext();
   const userId = user?.id ?? '';
   const targetLevel = profile?.target_level ?? 'A1';
   const [showPaywall, setShowPaywall] = useState<boolean>(false);
@@ -284,26 +278,30 @@ export default function TestsScreen() {
   }, [setup.teilInfo, setup.isLoadingReview, userId, targetLevel]);
 
   const isLocked = setup.retestInfo?.is_locked ?? false;
+  const setupMeta = setup.teilInfo ? metaMap[setup.teilInfo.structure_type] : null;
 
   const renderTeilCard = useCallback(
     (info: TeilInfo) => {
-      const typeLabel = QUESTION_TYPE_LABELS[info.question_type] ?? info.question_type;
+      const m = metaMap[info.structure_type];
+      const nameEn = m?.name_en ?? info.structure_type.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+      const nameDe = m?.name_de ?? '';
       return (
         <Pressable
-          key={`${info.section}-${info.teil}-${info.question_type}`}
+          key={`${info.section}-${info.teil}-${info.structure_type}`}
           accessibilityLabel={`${info.section} Teil ${info.teil}`}
           onPress={() => openSetup(info)}
           style={[styles.teilCard, !sectionalEnabled && styles.teilCardDisabled]}
           testID={`teil-card-${info.section}-${info.teil}`}
         >
-          <View style={styles.teilCardLeft}>
+          <View style={styles.teilNumCol}>
+            <Text style={styles.teilLabel}>TEIL</Text>
             <View style={styles.teilNumberWrap}>
               <Text style={styles.teilNumber}>{info.teil}</Text>
             </View>
-            <View style={styles.teilCardMeta}>
-              <Text style={styles.teilTitle}>Teil {info.teil}</Text>
-              <Text style={styles.teilType}>{typeLabel}</Text>
-            </View>
+          </View>
+          <View style={styles.teilNamesCol}>
+            <Text style={styles.teilNameEn}>{nameEn}</Text>
+            {nameDe ? <Text style={styles.teilNameDe}>{nameDe}</Text> : null}
           </View>
           <View style={styles.teilCardRight}>
             <Text style={styles.teilCount}>{info.q_count} questions</Text>
@@ -316,7 +314,7 @@ export default function TestsScreen() {
         </Pressable>
       );
     },
-    [openSetup, sectionalEnabled]
+    [openSetup, sectionalEnabled, metaMap]
   );
 
   const renderSectionGroup = useCallback(
@@ -421,8 +419,9 @@ export default function TestsScreen() {
                     <Text style={styles.noContent}>No Schreiben content available for {targetLevel} yet.</Text>
                   ) : (
                     schreibenTeile.map((info) => {
-                      const taskType = SCHREIBEN_TASK_TYPE[targetLevel]?.[info.teil] ?? 'form_fill';
-                      const taskLabel = SCHREIBEN_TASK_LABELS[taskType] ?? taskType;
+                      const ms = metaMap[info.source_structure_type];
+                      const nameEn = ms?.name_en ?? info.source_structure_type.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+                      const nameDe = ms?.name_de ?? '';
                       const estimatedMin = Math.max(1, info.q_count * 5);
                       const isStarting = schreibenStarting === info.teil;
                       return (
@@ -433,14 +432,15 @@ export default function TestsScreen() {
                           style={[styles.teilCard, !schreibenEnabled && styles.teilCardDisabled]}
                           testID={`teil-card-Schreiben-${info.teil}`}
                         >
-                          <View style={styles.teilCardLeft}>
+                          <View style={styles.teilNumCol}>
+                            <Text style={styles.teilLabel}>TEIL</Text>
                             <View style={styles.teilNumberWrap}>
                               <Text style={styles.teilNumber}>{info.teil}</Text>
                             </View>
-                            <View style={styles.teilCardMeta}>
-                              <Text style={styles.teilTitle}>Teil {info.teil}</Text>
-                              <Text style={styles.teilType}>{taskLabel}</Text>
-                            </View>
+                          </View>
+                          <View style={styles.teilNamesCol}>
+                            <Text style={styles.teilNameEn}>{nameEn}</Text>
+                            {nameDe ? <Text style={styles.teilNameDe}>{nameDe}</Text> : null}
                           </View>
                           <View style={styles.teilCardRight}>
                             {!schreibenEnabled ? (
@@ -499,7 +499,9 @@ export default function TestsScreen() {
                     <Text style={styles.noContent}>No Sprechen content available for {targetLevel} yet.</Text>
                   ) : (
                     sprechenTeile.map((info: SprechenTeilInfo) => {
-                      const structLabel = SPRECHEN_STRUCTURE_LABELS[info.source_structure_type] ?? 'Sprechen';
+                      const msp = metaMap[info.source_structure_type];
+                      const nameEn = msp?.name_en ?? info.source_structure_type.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+                      const nameDe = msp?.name_de ?? '';
                       const estimatedMin = Math.max(1, Math.ceil((info.q_count * 60) / 60));
                       const isStarting = sprechenStarting === info.teil;
                       return (
@@ -510,14 +512,15 @@ export default function TestsScreen() {
                           style={[styles.teilCard, !sprechenEnabled && styles.teilCardDisabled]}
                           testID={`teil-card-Sprechen-${info.teil}`}
                         >
-                          <View style={styles.teilCardLeft}>
+                          <View style={styles.teilNumCol}>
+                            <Text style={styles.teilLabel}>TEIL</Text>
                             <View style={styles.teilNumberWrap}>
                               <Text style={styles.teilNumber}>{info.teil}</Text>
                             </View>
-                            <View style={styles.teilCardMeta}>
-                              <Text style={styles.teilTitle}>Teil {info.teil}</Text>
-                              <Text style={styles.teilType}>{structLabel}</Text>
-                            </View>
+                          </View>
+                          <View style={styles.teilNamesCol}>
+                            <Text style={styles.teilNameEn}>{nameEn}</Text>
+                            {nameDe ? <Text style={styles.teilNameDe}>{nameDe}</Text> : null}
                           </View>
                           <View style={styles.teilCardRight}>
                             {!sprechenEnabled ? (
@@ -574,10 +577,22 @@ export default function TestsScreen() {
                     )}
                   </View>
                   <View style={styles.modalHeaderText}>
-                    <Text style={styles.modalTitle}>
-                      {setup.teilInfo.section} · Teil {setup.teilInfo.teil}
-                    </Text>
-                    <Text style={styles.modalSubtitle}>{targetLevel} · {QUESTION_TYPE_LABELS[setup.teilInfo.question_type] ?? setup.teilInfo.question_type}</Text>
+                    <View style={styles.modalTitleRow}>
+                      <Text style={styles.modalTitle}>{setup.teilInfo.section}</Text>
+                      <View style={styles.modalLevelPill}>
+                        <Text style={styles.modalLevelPillText}>{targetLevel}</Text>
+                      </View>
+                    </View>
+                    <Text style={styles.modalTeilLine}>Teil {setup.teilInfo.teil}</Text>
+                    <View style={styles.modalBilingualRow}>
+                      <Text style={styles.modalBilingualEn}>{setupMeta?.name_en ?? ''}</Text>
+                      {setupMeta?.name_de ? (
+                        <>
+                          <Text style={styles.modalBilingualSep}> / </Text>
+                          <Text style={styles.modalBilingualDe}>{setupMeta.name_de}</Text>
+                        </>
+                      ) : null}
+                    </View>
                   </View>
                 </View>
 
@@ -658,6 +673,14 @@ export default function TestsScreen() {
                       )}
                     </Pressable>
                   ) : null}
+                  <Pressable
+                    accessibilityLabel="Cancel"
+                    onPress={closeSetup}
+                    style={styles.cancelButton}
+                    testID="cancel-setup-button"
+                  >
+                    <Text style={styles.cancelButtonText}>Cancel</Text>
+                  </Pressable>
                 </View>
               </>
             ) : null}
@@ -801,37 +824,50 @@ const styles = StyleSheet.create({
   teilCardDisabled: {
     opacity: 0.45,
   },
-  teilCardLeft: {
-    flexDirection: 'row',
+  teilNumCol: {
+    flexDirection: 'column',
     alignItems: 'center',
-    gap: 12,
-    flex: 1,
+    flexShrink: 0,
+  },
+  teilLabel: {
+    fontSize: 9,
+    fontWeight: '600' as const,
+    color: Colors.primary,
+    letterSpacing: 0.7,
+    textAlign: 'center' as const,
+    marginBottom: 3,
   },
   teilNumberWrap: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
+    width: 40,
+    height: 40,
+    borderRadius: 10,
     backgroundColor: Colors.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
   teilNumber: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '800' as const,
     color: Colors.primary,
   },
-  teilCardMeta: {
-    gap: 2,
+  teilNamesCol: {
+    flex: 1,
+    alignItems: 'flex-start',
+    justifyContent: 'center',
   },
-  teilTitle: {
-    fontSize: 15,
-    fontWeight: '700' as const,
-    color: Colors.primary,
-  },
-  teilType: {
-    fontSize: 12,
+  teilNameEn: {
+    fontSize: 14,
     fontWeight: '600' as const,
-    color: Colors.textMuted,
+    color: Colors.text,
+    textAlign: 'left' as const,
+  },
+  teilNameDe: {
+    fontSize: 12,
+    fontWeight: '400' as const,
+    color: Colors.textBody,
+    textAlign: 'left' as const,
+    fontStyle: 'italic' as const,
+    marginTop: 2,
   },
   teilCardRight: {
     alignItems: 'flex-end',
@@ -888,15 +924,54 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 2,
   },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: '800' as const,
-    color: Colors.primary,
+  modalTitleRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 8,
   },
-  modalSubtitle: {
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '800' as const,
+    color: Colors.text,
+  },
+  modalLevelPill: {
+    backgroundColor: Colors.primary,
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  modalLevelPillText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '600' as const,
+  },
+  modalTeilLine: {
     fontSize: 14,
     fontWeight: '600' as const,
+    color: Colors.textBody,
+    marginTop: 2,
+  },
+  modalBilingualRow: {
+    flexDirection: 'row' as const,
+    flexWrap: 'wrap' as const,
+    alignItems: 'baseline' as const,
+    marginTop: 2,
+  },
+  modalBilingualEn: {
+    fontSize: 13,
+    fontWeight: '600' as const,
+    color: Colors.text,
+  },
+  modalBilingualSep: {
+    fontSize: 13,
+    fontWeight: '400' as const,
     color: Colors.textMuted,
+  },
+  modalBilingualDe: {
+    fontSize: 13,
+    fontWeight: '400' as const,
+    color: Colors.textMuted,
+    fontStyle: 'italic' as const,
   },
   modalStats: {
     flexDirection: 'row',
@@ -1018,6 +1093,16 @@ const styles = StyleSheet.create({
     color: Colors.accent,
     fontSize: 15,
     fontWeight: '700' as const,
+  },
+  cancelButton: {
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    paddingVertical: 10,
+  },
+  cancelButtonText: {
+    fontSize: 14,
+    fontWeight: '400' as const,
+    color: Colors.textBody,
   },
   sectionIconSchreiben: {
     width: 32,

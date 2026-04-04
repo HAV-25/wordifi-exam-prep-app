@@ -1,14 +1,33 @@
 import { Stack, router, useLocalSearchParams } from 'expo-router';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ChevronRight, Share2 } from 'lucide-react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+const CTA_BUTTON_HEIGHT = 56;    // primary CTA / footer height
+const BOTTOM_CONTENT_BUFFER = 24; // breathing room below last content item
+import {
+  AccessibilityInfo,
+  Animated,
+  Easing,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import * as Haptics from 'expo-haptics';
 
 import { AudioPlayer } from '@/components/AudioPlayer';
+import ConfettiBurst, { type ConfettiBurstRef } from '@/components/ConfettiBurst';
 import { QuestionCard } from '@/components/QuestionCard';
 import { ScoreRing } from '@/components/ScoreRing';
+import ShareResultSheet from '@/components/ShareResultSheet';
 import { StimulusCard } from '@/components/StimulusCard';
 import Colors from '@/constants/colors';
 import { colors } from '@/theme';
+import { useQuestionMeta } from '@/lib/useQuestionTypeMeta';
+import { useAuth } from '@/providers/AuthProvider';
 import type { AppQuestion } from '@/types/database';
 
 function performanceLabel(score: number): { text: string; color: string } {
@@ -24,15 +43,30 @@ function scoreColor(score: number): string {
 }
 
 export default function ResultsScreen() {
-  const params = useLocalSearchParams<{ scorePct?: string; correctCount?: string; total?: string; level?: string; section?: string; teil?: string; questions?: string; answers?: string }>();
+  const insets = useSafeAreaInsets();
+  const { profile } = useAuth();
+  const params = useLocalSearchParams<{
+    scorePct?: string;
+    correctCount?: string;
+    total?: string;
+    level?: string;
+    section?: string;
+    teil?: string;
+    questions?: string;
+    answers?: string;
+  }>();
+
   const [expandedStimulusId, setExpandedStimulusId] = useState<string | null>(null);
   const [expandedExplanationIds, setExpandedExplanationIds] = useState<Set<string>>(new Set());
+  const [sheetVisible, setSheetVisible] = useState(false);
+
   const scorePct = Number(params.scorePct ?? '0');
   const correctCount = Number(params.correctCount ?? '0');
-  const _total = Number(params.total ?? '0');
+  const total = Number(params.total ?? '0');
   const level = params.level ?? 'A1';
   const section = params.section ?? 'Hören';
   const teil = params.teil ?? '1';
+
   const questions = useMemo<AppQuestion[]>(() => {
     try {
       return JSON.parse(params.questions ?? '[]') as AppQuestion[];
@@ -40,6 +74,7 @@ export default function ResultsScreen() {
       return [];
     }
   }, [params.questions]);
+
   const answers = useMemo<Record<string, string>>(() => {
     try {
       return JSON.parse(params.answers ?? '{}') as Record<string, string>;
@@ -47,6 +82,13 @@ export default function ResultsScreen() {
       return {};
     }
   }, [params.answers]);
+
+  // Derive Teil name and exam type
+  const structureType = questions[0]?.source_structure_type;
+  const teilMeta = useQuestionMeta(structureType);
+  const teilNameEn = teilMeta?.name_en ?? `Teil ${teil}`;
+  const teilNameDe = teilMeta?.name_de ?? '';
+  const examType = profile?.exam_type ?? 'German language';
 
   const xpAnim = useRef(new Animated.Value(0)).current;
   const perf = performanceLabel(scorePct);
@@ -70,10 +112,42 @@ export default function ResultsScreen() {
     outputRange: [0, correctCount || 1],
   });
 
+  // Confetti + share sheet
+  const confettiRef = useRef<ConfettiBurstRef>(null);
+  const shareButtonRef = useRef<View>(null);
+  const rootViewRef = useRef<View>(null);
+
+  const handleSharePress = useCallback(() => {
+    AccessibilityInfo.isReduceMotionEnabled()
+      .then((reduced) => {
+        if (!reduced) {
+          shareButtonRef.current?.measureInWindow((bx, by, bw, bh) => {
+            rootViewRef.current?.measureInWindow((rx, ry) => {
+              confettiRef.current?.burst(
+                bx - rx + bw / 2,
+                by - ry + bh / 2
+              );
+            });
+          });
+        }
+        setTimeout(() => setSheetVisible(true), reduced ? 0 : 600);
+      })
+      .catch(() => setSheetVisible(true));
+  }, []);
+
   return (
-    <View style={styles.screen}>
+    <View ref={rootViewRef} style={styles.screen}>
+      {/* Confetti overlay — non-interactive, above all content */}
+      <ConfettiBurst ref={confettiRef} />
+
       <Stack.Screen options={{ title: 'Results', headerBackVisible: false }} />
-      <ScrollView contentContainerStyle={styles.content}>
+
+      <ScrollView
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: insets.bottom + CTA_BUTTON_HEIGHT + BOTTOM_CONTENT_BUFFER },
+        ]}
+      >
         <View style={styles.heroCard}>
           <Text style={styles.heroMeta}>{section} · Teil {teil} · {level}</Text>
           <View style={styles.heroRow}>
@@ -145,7 +219,20 @@ export default function ResultsScreen() {
         </View>
       </ScrollView>
 
-      <View style={styles.footer}>
+      <View style={[styles.footer, { bottom: insets.bottom }]}>
+        {/* ── Share button (A1) ─────────────────────────── */}
+        <Pressable
+          ref={shareButtonRef}
+          accessibilityLabel="Share your result"
+          onPress={handleSharePress}
+          style={styles.shareButton}
+          testID="share-result-button"
+        >
+          <Share2 size={20} color={Colors.accent} />
+          <Text style={styles.shareButtonText}>Share your result</Text>
+          <ChevronRight size={16} color={Colors.textMuted} />
+        </Pressable>
+
         <Pressable accessibilityLabel="Practice again" onPress={() => router.replace({ pathname: '/practice', params: { level, section, teil } })} style={styles.primaryButton} testID="practice-again-button">
           <Text style={styles.primaryButtonText}>Practice Again</Text>
         </Pressable>
@@ -154,6 +241,20 @@ export default function ResultsScreen() {
           <Pressable accessibilityLabel="Go home" onPress={() => router.replace('/')} style={styles.secondaryButton} testID="home-button"><Text style={styles.secondaryButtonText}>Home</Text></Pressable>
         </View>
       </View>
+
+      {/* ── Share preview bottom sheet (B) ──────────────── */}
+      <ShareResultSheet
+        visible={sheetVisible}
+        onClose={() => setSheetVisible(false)}
+        section={section}
+        level={level}
+        teilNameEn={teilNameEn}
+        teilNameDe={teilNameDe}
+        score={correctCount}
+        total={total}
+        scorePct={scorePct}
+        examType={examType}
+      />
     </View>
   );
 }
@@ -194,7 +295,26 @@ const styles = StyleSheet.create({
   correctAnswerText: { color: Colors.accent, fontWeight: '700' as const },
   showPassageButton: { minHeight: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.surfaceMuted },
   showPassageText: { color: Colors.primary, fontWeight: '700' as const },
-  footer: { position: 'absolute', left: 0, right: 0, bottom: 0, padding: 20, gap: 10, backgroundColor: Colors.background },
+  footer: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 24, paddingTop: 16, paddingBottom: 16, gap: 10, backgroundColor: Colors.background },
+
+  // ── Share button (A1) ──────────────────────────────────────
+  shareButton: {
+    height: 56,
+    borderRadius: 16,
+    backgroundColor: Colors.primaryDeep,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    gap: 12,
+  },
+  shareButtonText: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '800',
+    color: Colors.white,
+    fontFamily: 'Outfit_800ExtraBold',
+  },
+
   primaryButton: { minHeight: 54, borderRadius: 27, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.primary },
   primaryButtonText: { color: Colors.surface, fontWeight: '800' as const, fontSize: 16 },
   footerRow: { flexDirection: 'row', gap: 10 },

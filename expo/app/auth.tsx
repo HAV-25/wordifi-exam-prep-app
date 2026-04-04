@@ -20,6 +20,8 @@ import {
 import Colors from '@/constants/colors';
 import { colors } from '@/theme';
 import { resetPassword, signInWithEmail, signInWithGoogle, signUpWithEmail } from '@/lib/authHelpers';
+import { saveOnboardingAnswers } from '@/lib/profileHelpers';
+import { onboardingStore } from '@/app/onboarding_launch/_store';
 
 function getFriendlyError(errorMessage: string, isSignUp: boolean): string {
   const normalized = errorMessage.toLowerCase();
@@ -79,8 +81,11 @@ export default function AuthScreen() {
         await signInWithEmail(email.trim(), password);
         router.replace('/');
       } else {
-        await signUpWithEmail(email.trim(), password);
-        router.replace('/onboarding');
+        const data = await signUpWithEmail(email.trim(), password);
+        if (data?.user?.id) {
+          await saveOnboardingAnswers(data.user.id, onboardingStore).catch(() => {});
+        }
+        router.replace('/');
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';

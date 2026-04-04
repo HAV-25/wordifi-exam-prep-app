@@ -2,6 +2,10 @@ import { Audio } from 'expo-av';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { AlertCircle, Mic, MicOff, PhoneOff, RefreshCw, Star, Timer } from 'lucide-react-native';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+const CTA_BUTTON_HEIGHT = 56;    // primary CTA / footer height
+const BOTTOM_CONTENT_BUFFER = 24; // breathing room below last content item
 import {
   ActivityIndicator,
   Alert,
@@ -48,6 +52,7 @@ type ScreenState =
   | 'error';
 
 export default function SprechenRealtimeScreen() {
+  const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ level?: string; teil?: string }>();
   const { user, session, profile } = useAuth();
   const _userId = user?.id ?? '';
@@ -490,7 +495,7 @@ export default function SprechenRealtimeScreen() {
             headerShown: true,
           }}
         />
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + CTA_BUTTON_HEIGHT + BOTTOM_CONTENT_BUFFER }]} showsVerticalScrollIndicator={false}>
           <View style={styles.instructionHeader}>
             <View style={styles.sectionPill}>
               <Mic color={colors.white} size={12} />
@@ -526,7 +531,7 @@ export default function SprechenRealtimeScreen() {
         </ScrollView>
 
         {!isMonologue ? (
-          <View style={styles.footer}>
+          <View style={[styles.footer, { bottom: insets.bottom }]}>
             <CTAButton
               label="Gespräch beginnen"
               onPress={handleStartConversation}
@@ -691,7 +696,7 @@ export default function SprechenRealtimeScreen() {
     return (
       <View style={styles.screen}>
         <Stack.Screen options={{ title: 'Ergebnis', headerShown: true, headerBackVisible: false }} />
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + CTA_BUTTON_HEIGHT + BOTTOM_CONTENT_BUFFER }]} showsVerticalScrollIndicator={false}>
           <View style={[styles.resultsHero, shadows.card]}>
             <View style={styles.resultsIconWrap}>
               <Mic color={colors.white} size={24} />
@@ -765,7 +770,7 @@ export default function SprechenRealtimeScreen() {
           </Text>
         </ScrollView>
 
-        <View style={styles.footer}>
+        <View style={[styles.footer, { bottom: insets.bottom }]}>
           <CTAButton
             label="Zur Übersicht"
             onPress={() => router.replace('/(tabs)/tests')}

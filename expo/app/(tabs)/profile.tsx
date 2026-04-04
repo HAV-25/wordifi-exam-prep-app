@@ -1,772 +1,860 @@
-import DateTimePicker from '@react-native-community/datetimepicker';
+import * as Clipboard from 'expo-clipboard';
 import { router } from 'expo-router';
-import { AlertTriangle, Award, Calendar, CalendarDays, ChevronRight, GraduationCap, Headphones, BookOpen, LogOut, Mail, Minus, Plus, Trophy, TrendingUp, User, X } from 'lucide-react-native';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import {
+  CheckCircle2,
+  ChevronRight,
+  Clock,
+  Copy,
+  CreditCard,
+  Flame,
+  Gift,
+  Info,
+  LogOut,
+  Share2 as ShareIcon,
+  Star,
+  TrendingUp,
+  Trophy,
+} from 'lucide-react-native';
+import React, { useCallback, useMemo } from 'react';
+import {
+  Pressable,
+  ScrollView,
+  Share,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useQuery } from '@tanstack/react-query';
 
-import { EmptyState } from '@/components/EmptyState';
-import { LevelBadge } from '@/components/LevelBadge';
-import { ScoreRing } from '@/components/ScoreRing';
-import { StreakBadge } from '@/components/StreakBadge';
 import Colors from '@/constants/colors';
-import { colors } from '@/theme';
-import { formatXp, getBadgeTier, getNextBadgeTier } from '@/lib/badgeHelpers';
-import { updateExamDate, updateStudyPlan, fetchUncompletedTeileCount, updatePlayerName, fetchRecentIncorrect } from '@/lib/profileHelpers';
-import type { RecentIncorrectAnswer } from '@/lib/profileHelpers';
+import { colors, spacing, radius } from '@/theme';
+import { supabase } from '@/lib/supabaseClient';
+import { useHomeData } from '@/lib/useHomeData';
 import { useAuth } from '@/providers/AuthProvider';
-import type { StudyPlanJson } from '@/types/database';
 
-const DEFAULT_PLAN: StudyPlanJson = {
-  weekly_goal_sessions: 3,
-  focus_section: 'Both',
-  mock_test_dates: [],
+// ─── Constants ───────────────────────────────────────────────────────────────
+const PAID_TIERS = new Set([
+  'monthly',
+  'quarterly',
+  'paid_early',
+  'winback_monthly',
+  'winback_quarterly',
+]);
+const FREE_TIERS = new Set(['free', 'free_trial']);
+
+const TIER_DISPLAY_FALLBACK: Record<string, string> = {
+  free:              'Free',
+  free_trial:        'Free Trial',
+  monthly:           'Pro Monthly',
+  quarterly:         'Pro Quarterly',
+  paid_early:        'Early Adopter',
+  winback_monthly:   'Pro Monthly',
+  winback_quarterly: 'Pro Quarterly',
 };
 
-const FOCUS_OPTIONS: Array<{ key: StudyPlanJson['focus_section']; label: string }> = [
-  { key: 'Hören', label: 'Hören' },
-  { key: 'Lesen', label: 'Lesen' },
-  { key: 'Both', label: 'Both' },
-];
+const UPGRADE_SUBTITLE: Record<string, string> = {
+  free:       'Unlock all sections, levels and mock tests',
+  free_trial: 'Your trial is active — lock in Pro before it ends',
+};
 
-function getDaysUntilExam(examDate: string): number {
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+function formatLong(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+}
+
+function formatShort(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+  });
+}
+
+function formatMonthYear(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleDateString('en-GB', {
+    month: 'short',
+    year: 'numeric',
+  });
+}
+
+function daysUntil(iso: string | null | undefined): number | null {
+  if (!iso) return null;
   const now = new Date();
   now.setHours(0, 0, 0, 0);
-  const exam = new Date(examDate);
-  exam.setHours(0, 0, 0, 0);
-  return Math.ceil((exam.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  const d = new Date(iso);
+  d.setHours(0, 0, 0, 0);
+  const diff = Math.ceil((d.getTime() - now.getTime()) / 86_400_000);
+  return diff;
 }
 
-function formatDate(dateStr: string): string {
-  const d = new Date(dateStr);
-  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-}
+function extractPlanHighlights(json: unknown): string[] {
+  if (!json || typeof json !== 'object') return [];
+  const obj = json as Record<string, unknown>;
+  const out: string[] = [];
 
-export default function ProfileScreen() {
-  const { profile, user, signOut, isSigningOut, refreshProfile } = useAuth();
-
-
-  const [showDatePicker, setShowDatePicker] = useState<boolean>(false);
-  const [showMockDatePicker, setShowMockDatePicker] = useState<boolean>(false);
-  const [localPlan, setLocalPlan] = useState<StudyPlanJson>(DEFAULT_PLAN);
-  const [showNameModal, setShowNameModal] = useState<boolean>(false);
-  const [nameInput, setNameInput] = useState<string>('');
-  const [nameError, setNameError] = useState<string>('');
-  const [isSavingName, setIsSavingName] = useState<boolean>(false);
-  const nameModalFade = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    if (profile?.study_plan_json) {
-      setLocalPlan(profile.study_plan_json);
-    }
-  }, [profile?.study_plan_json]);
-
-  const examDateMutation = useMutation({
-    mutationFn: async (date: string) => {
-      if (!user) throw new Error('Not authenticated');
-      return updateExamDate(user.id, date);
-    },
-    onSuccess: () => {
-      void refreshProfile();
-    },
-  });
-
-  const studyPlanMutation = useMutation({
-    mutationFn: async (plan: StudyPlanJson) => {
-      if (!user) throw new Error('Not authenticated');
-      return updateStudyPlan(user.id, plan);
-    },
-    onSuccess: () => {
-      void refreshProfile();
-    },
-  });
-
-  const daysLeft = useMemo(() => {
-    if (!profile?.exam_date) return null;
-    return getDaysUntilExam(profile.exam_date);
-  }, [profile?.exam_date]);
-
-  const showPromptCard = daysLeft !== null && daysLeft > 0 && daysLeft < 30;
-
-  const uncompletedTeileQuery = useQuery({
-    queryKey: ['uncompleted-teile', user?.id, profile?.target_level],
-    enabled: showPromptCard && Boolean(user?.id) && Boolean(profile?.target_level),
-    queryFn: async () => {
-      if (!user || !profile?.target_level) return 0;
-      return fetchUncompletedTeileCount(user.id, profile.target_level);
-    },
-  });
-
-  const handleExamDateChange = useCallback((_event: unknown, selectedDate?: Date) => {
-    if (Platform.OS === 'android') {
-      setShowDatePicker(false);
-    }
-    if (selectedDate) {
-      const dateStr = selectedDate.toISOString().split('T')[0];
-      examDateMutation.mutate(dateStr);
-      if (Platform.OS === 'ios') {
-        setShowDatePicker(false);
-      }
-    }
-  }, [examDateMutation]);
-
-  const handleMockDateChange = useCallback((_event: unknown, selectedDate?: Date) => {
-    if (Platform.OS === 'android') {
-      setShowMockDatePicker(false);
-    }
-    if (selectedDate) {
-      const dateStr = selectedDate.toISOString().split('T')[0];
-      const updated = {
-        ...localPlan,
-        mock_test_dates: [...localPlan.mock_test_dates, dateStr].sort(),
-      };
-      setLocalPlan(updated);
-      studyPlanMutation.mutate(updated);
-      if (Platform.OS === 'ios') {
-        setShowMockDatePicker(false);
-      }
-    }
-  }, [localPlan, studyPlanMutation]);
-
-  const handleRemoveMockDate = useCallback((dateToRemove: string) => {
-    const updated = {
-      ...localPlan,
-      mock_test_dates: localPlan.mock_test_dates.filter(d => d !== dateToRemove),
-    };
-    setLocalPlan(updated);
-    studyPlanMutation.mutate(updated);
-  }, [localPlan, studyPlanMutation]);
-
-  const handleWeeklyGoalChange = useCallback((delta: number) => {
-    const newVal = Math.max(1, Math.min(7, localPlan.weekly_goal_sessions + delta));
-    const updated = { ...localPlan, weekly_goal_sessions: newVal };
-    setLocalPlan(updated);
-    studyPlanMutation.mutate(updated);
-  }, [localPlan, studyPlanMutation]);
-
-  const handleFocusSectionChange = useCallback((section: StudyPlanJson['focus_section']) => {
-    const updated = { ...localPlan, focus_section: section };
-    setLocalPlan(updated);
-    studyPlanMutation.mutate(updated);
-  }, [localPlan, studyPlanMutation]);
-
-  const openNameModal = useCallback(() => {
-    setNameInput('');
-    setNameError('');
-    setShowNameModal(true);
-    Animated.timing(nameModalFade, { toValue: 1, duration: 250, useNativeDriver: true }).start();
-  }, [nameModalFade]);
-
-  const closeNameModal = useCallback(() => {
-    Animated.timing(nameModalFade, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => {
-      setShowNameModal(false);
-    });
-  }, [nameModalFade]);
-
-  const handleSaveName = useCallback(async () => {
-    if (!user) return;
-    const trimmed = nameInput.trim().slice(0, 20);
-    if (trimmed.length < 3) {
-      setNameError('Name must be at least 3 characters');
-      return;
-    }
-    if (!/^[a-zA-Z0-9]+$/.test(trimmed)) {
-      setNameError('Letters and numbers only');
-      return;
-    }
-    setIsSavingName(true);
-    try {
-      await updatePlayerName(user.id, trimmed);
-      await refreshProfile();
-      closeNameModal();
-    } catch (e) {
-      console.log('Set player name error', e);
-      setNameError('Could not save name. Try again.');
-    } finally {
-      setIsSavingName(false);
-    }
-  }, [user, nameInput, refreshProfile, closeNameModal]);
-
-  const mistakesQuery = useQuery({
-    queryKey: ['recent-incorrect', user?.id],
-    enabled: Boolean(user?.id),
-    queryFn: async () => {
-      if (!user) return [] as RecentIncorrectAnswer[];
-      return fetchRecentIncorrect(user.id);
-    },
-  });
-
-  const handleSignOut = async () => {
-    try {
-      await signOut();
-      router.replace('/auth');
-    } catch (error) {
-      console.log('ProfileScreen signOut error', error);
-      Alert.alert('Wordifi', 'Something went wrong. Please check your connection.');
-    }
-  };
-
-  if (!profile) {
-    return (
-      <SafeAreaView style={styles.emptyWrap}>
-        <EmptyState title="Set up your profile to start practising." description="Complete setup to unlock tailored listening and reading sessions." actionLabel="Complete Setup" onActionPress={() => router.push('/onboarding')} testID="profile-empty-state" />
-      </SafeAreaView>
-    );
+  if (typeof obj.weekly_goal_sessions === 'number') {
+    out.push(`Practice ${obj.weekly_goal_sessions} session${obj.weekly_goal_sessions !== 1 ? 's' : ''} per week`);
   }
+  if (typeof obj.focus_section === 'string') {
+    out.push(`Focus section: ${obj.focus_section}`);
+  }
+  if (Array.isArray(obj.mock_test_dates) && obj.mock_test_dates.length > 0) {
+    out.push(`Mock test: ${formatShort(obj.mock_test_dates[0] as string)}`);
+  }
+  // Pick up any other top-level string values we haven't used
+  for (const [k, v] of Object.entries(obj)) {
+    if (out.length >= 3) break;
+    if (typeof v === 'string' && v.trim() && !['focus_section'].includes(k)) {
+      out.push(v.trim());
+    }
+  }
+  return out.slice(0, 3);
+}
 
-  const badgeTier = getBadgeTier(profile.xp_total);
-  const nextBadgeTier = getNextBadgeTier(profile.xp_total);
-
+// ─── Skeleton block ───────────────────────────────────────────────────────────
+function SkeletonRow({ height = 18, width = '60%', marginBottom = 8 }: {
+  height?: number; width?: number | `${number}%`; marginBottom?: number
+}) {
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Profile</Text>
-          <Pressable accessibilityLabel="Change level" onPress={() => router.push('/onboarding')} style={styles.inlineButton} testID="change-level-button">
-            <Text style={styles.inlineButtonText}>Change Level</Text>
-          </Pressable>
-        </View>
-
-        <View style={styles.heroCard}>
-          <View style={styles.heroLeft}>
-            {profile.player_name ? (
-              <View style={styles.playerNameRow}>
-                <View style={styles.avatarCircle}>
-                  <Text style={styles.avatarInitial}>{profile.player_name.charAt(0).toUpperCase()}</Text>
-                </View>
-                <Text style={styles.playerNameText}>{profile.player_name}</Text>
-              </View>
-            ) : null}
-            <Text style={styles.email}>{user?.email ?? 'wordifi@user.com'}</Text>
-            {(() => {
-              const provider = user?.app_metadata?.provider ?? 'email';
-              const isGoogle = provider === 'google';
-              return (
-                <View style={[styles.providerPill, isGoogle ? styles.providerPillGoogle : styles.providerPillEmail]}>
-                  {isGoogle ? (
-                    <View style={styles.providerGoogleIcon}>
-                      <Text style={styles.providerGoogleIconText}>G</Text>
-                    </View>
-                  ) : (
-                    <Mail color={Colors.primary} size={13} />
-                  )}
-                  <Text style={[styles.providerPillText, isGoogle ? styles.providerPillTextGoogle : null]}>
-                    {isGoogle ? 'Google' : 'Email'}
-                  </Text>
-                </View>
-              );
-            })()}
-            <LevelBadge level={profile.target_level ?? 'A1'} />
-            <Text style={styles.meta}>Target exam: {profile.exam_type?.toUpperCase() ?? 'TELC'} {profile.target_level ?? 'A1'}{profile.exam_date ? ` · ${profile.exam_date}` : ''}</Text>
-          </View>
-          <ScoreRing label="Readiness" score={profile.preparedness_score ?? 0} size={92} />
-        </View>
-
-        <View style={styles.row}>
-          <StreakBadge count={profile.streak_count ?? 0} />
-          <View style={styles.xpBadge}><Text style={styles.xpText}>⭐ {formatXp(profile.xp_total)} XP</Text></View>
-          <View style={[styles.tierBadge, { backgroundColor: badgeTier.color }]}>
-            <Text style={styles.tierBadgeText}>{badgeTier.label}</Text>
-          </View>
-        </View>
-
-        <View style={styles.insightCard}>
-          <View style={styles.insightHeader}><TrendingUp color={Colors.primary} size={18} /><Text style={styles.insightTitle}>Progress insights</Text></View>
-          {nextBadgeTier ? (
-            <Text style={styles.insightBody}>
-              {nextBadgeTier.minXp - profile.xp_total} XP to <Text style={{ fontWeight: '800' as const, color: nextBadgeTier.color }}>{nextBadgeTier.label}</Text> badge
-            </Text>
-          ) : (
-            <Text style={styles.insightBody}>You&apos;ve reached the highest badge tier! Keep practising to stay sharp.</Text>
-          )}
-          {nextBadgeTier ? (
-            <View style={styles.progressTrack}>
-              <View style={[styles.progressFill, { width: `${Math.min(100, (profile.xp_total / nextBadgeTier.minXp) * 100)}%`, backgroundColor: nextBadgeTier.color }]} />
-            </View>
-          ) : (
-            <View style={styles.progressTrack}>
-              <View style={[styles.progressFill, { width: '100%' }]} />
-            </View>
-          )}
-        </View>
-
-        <View style={styles.listCard}>
-          <View style={styles.infoRow}><Award color={Colors.primary} size={18} /><Text style={styles.infoText}>Preparedness score: {Math.round(profile.preparedness_score ?? 0)} / 100</Text></View>
-          <View style={styles.infoRow}><GraduationCap color={Colors.primary} size={18} /><Text style={styles.infoText}>Target level: {profile.target_level ?? 'A1'}</Text></View>
-          <View style={styles.infoRow}><CalendarDays color={Colors.primary} size={18} /><Text style={styles.infoText}>Exam date: {profile.exam_date ?? 'Not set yet'}</Text></View>
-        </View>
-
-        {/* My Plan Section */}
-        <View style={styles.planSection}>
-          <Text style={styles.planSectionTitle}>My Plan</Text>
-
-          {/* Exam Date */}
-          <View style={styles.planCard}>
-            <View style={styles.planCardHeader}>
-              <Calendar color={Colors.accent} size={20} />
-              <Text style={styles.planCardTitle}>Exam Date</Text>
-            </View>
-
-            {profile.exam_date ? (
-              <View style={styles.examDateSet}>
-                <View style={styles.examCountdownWrap}>
-                  <Text style={[
-                    styles.examCountdownNumber,
-                    daysLeft !== null && daysLeft <= 7 && daysLeft > 0 ? styles.examCountdownUrgent : null,
-                    daysLeft !== null && daysLeft <= 0 ? styles.examCountdownPast : null,
-                  ]}>
-                    {daysLeft !== null && daysLeft > 0 ? `${daysLeft} days to your exam` : daysLeft === 0 ? 'Exam is today!' : 'Exam date has passed'}
-                  </Text>
-                  <Text style={styles.examDateMuted}>{formatDate(profile.exam_date)}</Text>
-                </View>
-                <Pressable
-                  style={styles.changeDateButton}
-                  onPress={() => setShowDatePicker(true)}
-                  testID="change-exam-date"
-                >
-                  <Text style={styles.changeDateText}>Change</Text>
-                </Pressable>
-              </View>
-            ) : (
-              <Pressable
-                style={styles.setExamDateRow}
-                onPress={() => setShowDatePicker(true)}
-                testID="set-exam-date"
-              >
-                <Text style={styles.setExamDateText}>Set your exam date</Text>
-                <ChevronRight color={Colors.textMuted} size={18} />
-              </Pressable>
-            )}
-
-            {showDatePicker && (
-              <View style={styles.datePickerWrap}>
-                <DateTimePicker
-                  value={profile.exam_date ? new Date(profile.exam_date) : new Date()}
-                  mode="date"
-                  display={Platform.OS === 'ios' ? 'inline' : 'default'}
-                  minimumDate={new Date()}
-                  onChange={handleExamDateChange}
-                  testID="exam-date-picker"
-                />
-                {Platform.OS === 'ios' && (
-                  <Pressable style={styles.doneButton} onPress={() => setShowDatePicker(false)}>
-                    <Text style={styles.doneButtonText}>Done</Text>
-                  </Pressable>
-                )}
-              </View>
-            )}
-
-            {examDateMutation.isPending && (
-              <ActivityIndicator size="small" color={Colors.accent} style={styles.inlineLoader} />
-            )}
-          </View>
-
-          {/* Study Plan */}
-          <View style={styles.planCard}>
-            <View style={styles.planCardHeader}>
-              <GraduationCap color={Colors.accent} size={20} />
-              <Text style={styles.planCardTitle}>Study Plan</Text>
-            </View>
-
-            {/* Weekly Goal Stepper */}
-            <View style={styles.planRow}>
-              <Text style={styles.planRowLabel}>Weekly sessions goal</Text>
-              <View style={styles.stepper}>
-                <Pressable
-                  style={[styles.stepperBtn, localPlan.weekly_goal_sessions <= 1 && styles.stepperBtnDisabled]}
-                  onPress={() => handleWeeklyGoalChange(-1)}
-                  disabled={localPlan.weekly_goal_sessions <= 1}
-                  testID="weekly-goal-minus"
-                >
-                  <Minus color={localPlan.weekly_goal_sessions <= 1 ? Colors.border : Colors.primary} size={16} />
-                </Pressable>
-                <Text style={styles.stepperValue}>{localPlan.weekly_goal_sessions}</Text>
-                <Pressable
-                  style={[styles.stepperBtn, localPlan.weekly_goal_sessions >= 7 && styles.stepperBtnDisabled]}
-                  onPress={() => handleWeeklyGoalChange(1)}
-                  disabled={localPlan.weekly_goal_sessions >= 7}
-                  testID="weekly-goal-plus"
-                >
-                  <Plus color={localPlan.weekly_goal_sessions >= 7 ? Colors.border : Colors.primary} size={16} />
-                </Pressable>
-              </View>
-            </View>
-
-            {/* Focus Section */}
-            <View style={styles.planRow}>
-              <Text style={styles.planRowLabel}>Focus section</Text>
-              <View style={styles.segmentedControl}>
-                {FOCUS_OPTIONS.map((opt) => (
-                  <Pressable
-                    key={opt.key}
-                    style={[
-                      styles.segmentItem,
-                      localPlan.focus_section === opt.key && styles.segmentItemActive,
-                    ]}
-                    onPress={() => handleFocusSectionChange(opt.key)}
-                    testID={`focus-${opt.key}`}
-                  >
-                    {opt.key === 'Hören' && <Headphones color={localPlan.focus_section === opt.key ? Colors.surface : Colors.textMuted} size={13} />}
-                    {opt.key === 'Lesen' && <BookOpen color={localPlan.focus_section === opt.key ? Colors.surface : Colors.textMuted} size={13} />}
-                    <Text style={[
-                      styles.segmentText,
-                      localPlan.focus_section === opt.key && styles.segmentTextActive,
-                    ]}>
-                      {opt.label}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-            </View>
-
-            {/* Mock Test Dates */}
-            <View style={styles.mockDatesSection}>
-              <View style={styles.planRow}>
-                <Text style={styles.planRowLabel}>Planned mock tests</Text>
-                <Pressable
-                  style={styles.addDateBtn}
-                  onPress={() => setShowMockDatePicker(true)}
-                  testID="add-mock-date"
-                >
-                  <Plus color={Colors.accent} size={14} />
-                  <Text style={styles.addDateText}>Add</Text>
-                </Pressable>
-              </View>
-
-              {localPlan.mock_test_dates.length > 0 ? (
-                <View style={styles.chipRow}>
-                  {localPlan.mock_test_dates.map((dateStr) => (
-                    <View key={dateStr} style={styles.dateChip}>
-                      <Text style={styles.dateChipText}>{formatDate(dateStr)}</Text>
-                      <Pressable
-                        onPress={() => handleRemoveMockDate(dateStr)}
-                        hitSlop={8}
-                        testID={`remove-mock-${dateStr}`}
-                      >
-                        <X color={Colors.textMuted} size={14} />
-                      </Pressable>
-                    </View>
-                  ))}
-                </View>
-              ) : (
-                <Text style={styles.noMockDates}>No mock tests planned yet</Text>
-              )}
-
-              {showMockDatePicker && (
-                <View style={styles.datePickerWrap}>
-                  <DateTimePicker
-                    value={new Date()}
-                    mode="date"
-                    display={Platform.OS === 'ios' ? 'inline' : 'default'}
-                    minimumDate={new Date()}
-                    onChange={handleMockDateChange}
-                    testID="mock-date-picker"
-                  />
-                  {Platform.OS === 'ios' && (
-                    <Pressable style={styles.doneButton} onPress={() => setShowMockDatePicker(false)}>
-                      <Text style={styles.doneButtonText}>Done</Text>
-                    </Pressable>
-                  )}
-                </View>
-              )}
-            </View>
-
-            {studyPlanMutation.isPending && (
-              <ActivityIndicator size="small" color={Colors.accent} style={styles.inlineLoader} />
-            )}
-          </View>
-
-          {/* Prompt Card */}
-          {showPromptCard && (
-            <View style={styles.promptCard}>
-              <View style={styles.promptIconRow}>
-                <AlertTriangle color="#D97706" size={20} />
-                <Text style={styles.promptTitle}>Exam Approaching</Text>
-              </View>
-              <Text style={styles.promptBody}>
-                You have <Text style={styles.promptBold}>{daysLeft} days</Text> left.{' '}
-                {uncompletedTeileQuery.data != null && uncompletedTeileQuery.data > 0
-                  ? `We recommend completing ${uncompletedTeileQuery.data} more sectional test${uncompletedTeileQuery.data === 1 ? '' : 's'} before your exam.`
-                  : 'Keep practising to stay sharp!'}
-              </Text>
-              <Pressable
-                style={styles.promptCta}
-                onPress={() => router.push('/(tabs)/tests')}
-                testID="prompt-sectional-cta"
-              >
-                <Text style={styles.promptCtaText}>Start a Sectional Test</Text>
-              </Pressable>
-            </View>
-          )}
-        </View>
-
-        <Pressable
-          style={styles.leaderboardCard}
-          onPress={() => router.push('/leaderboard')}
-          testID="open-leaderboard"
-        >
-          <View style={styles.leaderboardLeft}>
-            <View style={styles.leaderboardIconWrap}>
-              <Trophy color="#D4A017" size={20} />
-            </View>
-            <View style={styles.leaderboardTextWrap}>
-              <Text style={styles.leaderboardTitle}>Leaderboard</Text>
-              <Text style={styles.leaderboardSub}>See how you rank against other {profile.target_level ?? 'B1'} learners</Text>
-            </View>
-          </View>
-          <ChevronRight color={Colors.textMuted} size={18} />
-        </Pressable>
-
-        {!profile.player_name ? (
-          <View style={styles.setNameCard}>
-            <User color={Colors.accent} size={20} />
-            <View style={styles.setNameTextWrap}>
-              <Text style={styles.setNameTitle}>Set your learner name</Text>
-              <Text style={styles.setNameBody}>Choose a name to appear on the leaderboard</Text>
-            </View>
-            <Pressable
-              style={styles.setNameCta}
-              onPress={openNameModal}
-              testID="set-player-name-cta"
-            >
-              <Text style={styles.setNameCtaText}>Set Name</Text>
-            </Pressable>
-          </View>
-        ) : null}
-
-        <Pressable
-          style={styles.reviewMistakesCard}
-          onPress={() => router.push('/review-mistakes' as any)}
-          disabled={!mistakesQuery.data || mistakesQuery.data.length === 0}
-          testID="review-mistakes-button"
-        >
-          <View style={styles.reviewMistakesLeft}>
-            <View style={styles.reviewMistakesIcon}>
-              <Text style={styles.reviewMistakesEmoji}>📚</Text>
-            </View>
-            <View style={styles.reviewMistakesTextWrap}>
-              <Text style={styles.reviewMistakesTitle}>Review Mistakes</Text>
-              <Text style={styles.reviewMistakesSub}>
-                {mistakesQuery.isLoading
-                  ? 'Loading...'
-                  : !mistakesQuery.data || mistakesQuery.data.length === 0
-                    ? 'No mistakes yet — keep going! 🎯'
-                    : `${mistakesQuery.data.length} question${mistakesQuery.data.length === 1 ? '' : 's'} to review`}
-              </Text>
-            </View>
-          </View>
-          <ChevronRight color={Colors.textMuted} size={18} />
-        </Pressable>
-
-        <Pressable accessibilityLabel="Sign out" disabled={isSigningOut} onPress={handleSignOut} style={styles.signOutButton} testID="sign-out-button">
-          {isSigningOut ? <ActivityIndicator color={Colors.surface} /> : <><LogOut color={Colors.surface} size={18} /><Text style={styles.signOutText}>Sign Out</Text></>}
-        </Pressable>
-      </ScrollView>
-      <Modal visible={showNameModal} transparent animationType="none" onRequestClose={closeNameModal}>
-        <Animated.View style={[styles.nameModalOverlay, { opacity: nameModalFade }]}>
-          <Pressable style={styles.nameModalBackdrop} onPress={closeNameModal} />
-          <View style={styles.nameModalCard}>
-            <Text style={styles.nameModalHeading}>Choose your learner name</Text>
-            <Text style={styles.nameModalSub}>Max 20 characters, letters and numbers only</Text>
-            <View style={styles.nameModalInputShell}>
-              <TextInput
-                style={styles.nameModalInput}
-                placeholder="e.g. FlinkeFeder"
-                placeholderTextColor={Colors.textMuted}
-                value={nameInput}
-                onChangeText={(t) => { setNameInput(t.slice(0, 20)); setNameError(''); }}
-                maxLength={20}
-                autoCapitalize="none"
-                autoCorrect={false}
-                testID="profile-name-input"
-              />
-              <Text style={styles.nameModalCharCount}>{nameInput.length}/20</Text>
-            </View>
-            {nameError ? <Text style={styles.nameModalError}>{nameError}</Text> : null}
-            <View style={styles.nameModalActions}>
-              <Pressable style={styles.nameModalCancel} onPress={closeNameModal}>
-                <Text style={styles.nameModalCancelText}>Cancel</Text>
-              </Pressable>
-              <Pressable
-                style={[styles.nameModalSave, isSavingName ? styles.nameModalSaveDisabled : null]}
-                onPress={handleSaveName}
-                disabled={isSavingName}
-                testID="profile-save-name"
-              >
-                {isSavingName ? (
-                  <ActivityIndicator color="#fff" size="small" />
-                ) : (
-                  <Text style={styles.nameModalSaveText}>Save</Text>
-                )}
-              </Pressable>
-            </View>
-          </View>
-        </Animated.View>
-      </Modal>
-    </SafeAreaView>
+    <View
+      style={{
+        height,
+        width: width as number | `${number}%`,
+        borderRadius: 6,
+        backgroundColor: Colors.surfaceMuted,
+        marginBottom,
+      }}
+    />
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: Colors.background },
-  emptyWrap: { flex: 1, backgroundColor: Colors.background, padding: 20, justifyContent: 'center' },
-  content: { padding: 20, gap: 16, paddingBottom: 40 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  title: { fontSize: 30, fontWeight: '800' as const, color: Colors.primary },
-  inlineButton: { minHeight: 40, paddingHorizontal: 12, justifyContent: 'center' },
-  inlineButtonText: { color: Colors.primary, fontWeight: '700' as const },
-  heroCard: { backgroundColor: Colors.surface, borderRadius: 24, borderWidth: 1, borderColor: Colors.border, padding: 18, flexDirection: 'row', justifyContent: 'space-between', gap: 16 },
-  heroLeft: { flex: 1, gap: 10 },
-  email: { fontSize: 16, fontWeight: '700' as const, color: Colors.primary },
-  meta: { fontSize: 14, color: Colors.textMuted },
-  row: { flexDirection: 'row', gap: 10 },
-  xpBadge: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border, justifyContent: 'center' },
-  xpText: { color: Colors.primary, fontWeight: '700' as const },
-  tierBadge: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999 },
-  tierBadgeText: { fontSize: 13, fontWeight: '800' as const, color: '#1a1a1a' },
-  insightCard: { backgroundColor: Colors.primary, borderRadius: 24, padding: 18, gap: 12 },
-  insightHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  insightTitle: { color: Colors.surface, fontWeight: '800' as const, fontSize: 17 },
-  insightBody: { color: 'rgba(255,255,255,0.82)', lineHeight: 22 },
-  progressTrack: { height: 10, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.18)', overflow: 'hidden' as const },
-  progressFill: { height: '100%', borderRadius: 999, backgroundColor: Colors.accent },
-  listCard: { backgroundColor: Colors.surface, borderRadius: 24, borderWidth: 1, borderColor: Colors.border, padding: 18, gap: 14 },
-  infoRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  infoText: { color: Colors.text, fontSize: 15, fontWeight: '600' as const },
-  signOutButton: { minHeight: 52, borderRadius: 26, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8 },
-  signOutText: { color: Colors.surface, fontWeight: '800' as const, fontSize: 16 },
+// ─── Sub-components ───────────────────────────────────────────────────────────
+function InfoRow({
+  label,
+  children,
+  showDivider = true,
+}: {
+  label: string;
+  children: React.ReactNode;
+  showDivider?: boolean;
+}) {
+  return (
+    <>
+      <View style={styles.infoRow}>
+        <Text style={styles.infoLabel}>{label}</Text>
+        <View style={styles.infoRight}>{children}</View>
+      </View>
+      {showDivider && <View style={styles.rowDivider} />}
+    </>
+  );
+}
 
-  providerPill: {
+function ActionRow({
+  icon,
+  label,
+  right,
+  onPress,
+  showDivider = true,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  right?: React.ReactNode;
+  onPress?: () => void;
+  showDivider?: boolean;
+}) {
+  return (
+    <>
+      <Pressable style={styles.actionRow} onPress={onPress} accessibilityRole="button">
+        <View style={styles.actionIcon}>{icon}</View>
+        <Text style={styles.actionLabel}>{label}</Text>
+        <View style={styles.actionRight}>
+          {right}
+          <ChevronRight size={16} color={Colors.textMuted} />
+        </View>
+      </Pressable>
+      {showDivider && <View style={styles.rowDivider} />}
+    </>
+  );
+}
+
+// ─── Screen ───────────────────────────────────────────────────────────────────
+export default function ProfileScreen() {
+  const insets = useSafeAreaInsets();
+  const { profile, user, signOut, isLoading } = useAuth();
+  const { leaderboardPercentile } = useHomeData();
+
+  // tier_config display names (graceful fallback if table missing / schema differs)
+  const tierConfigQuery = useQuery({
+    queryKey: ['tier-config'],
+    queryFn: async (): Promise<Record<string, string>> => {
+      const { data, error } = await (supabase.from('tier_config' as never) as any)
+        .select('tier_name, display_name');
+      if (error || !data) return {};
+      return Object.fromEntries(
+        (data as Array<{ tier_name: string; display_name: string }>).map((r) => [
+          r.tier_name,
+          r.display_name,
+        ])
+      );
+    },
+    staleTime: Infinity,
+  });
+
+  const tierDisplayName = useCallback(
+    (tier: string) =>
+      tierConfigQuery.data?.[tier] ?? TIER_DISPLAY_FALLBACK[tier] ?? tier,
+    [tierConfigQuery.data]
+  );
+
+  // Derived values
+  const tier = profile?.subscription_tier ?? 'free';
+  const showUpgradeCard = FREE_TIERS.has(tier);
+  const isPaid = PAID_TIERS.has(tier);
+  const trialExpiresAt = (profile as Record<string, unknown> | null)
+    ?.trial_expires_at as string | null ?? null;
+  const trialActive = profile?.trial_active ?? false;
+
+  const avatarLetter = useMemo(() => {
+    const name = profile?.player_name?.trim();
+    if (name) return name[0]!.toUpperCase();
+    const email = user?.email?.trim();
+    if (email) return email[0]!.toUpperCase();
+    return '?';
+  }, [profile?.player_name, user?.email]);
+
+  const examDays = daysUntil(profile?.exam_date);
+  const planHighlights = useMemo(
+    () => extractPlanHighlights(profile?.study_plan_json),
+    [profile?.study_plan_json]
+  );
+
+  const leaderboardLabel = leaderboardPercentile != null
+    ? `Top ${leaderboardPercentile}%`
+    : '—';
+
+  const handleCopyEmail = useCallback(async () => {
+    if (user?.email) await Clipboard.setStringAsync(user.email);
+  }, [user?.email]);
+
+  const handleReferFriend = useCallback(async () => {
+    const code = profile?.referral_code;
+    if (!code) return;
+    await Share.share({
+      message: `Join me on Wordifi and use my referral code: ${code}\nDownload: wordifi.app`,
+    });
+  }, [profile?.referral_code]);
+
+  const handleSignOut = useCallback(async () => {
+    await signOut();
+  }, [signOut]);
+
+  const navigateUpgrade = useCallback(() => {
+    router.push('/subscription' as never);
+  }, []);
+
+  return (
+    <View style={[styles.screen, { paddingTop: insets.top }]}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: insets.bottom + 32 },
+        ]}
+      >
+        {/* ── Header ──────────────────────────────────────────── */}
+        <View style={styles.header}>
+          {/* Sign-out */}
+          <Pressable
+            onPress={handleSignOut}
+            style={styles.signOutBtn}
+            accessibilityLabel="Sign out"
+          >
+            <LogOut size={20} color={Colors.textMuted} />
+          </Pressable>
+
+          {/* Avatar */}
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>{avatarLetter}</Text>
+          </View>
+
+          {/* Name */}
+          {isLoading ? (
+            <SkeletonRow width={120} height={22} marginBottom={6} />
+          ) : (
+            <Text style={styles.playerName}>
+              {profile?.player_name?.trim() || user?.email?.split('@')[0] || 'You'}
+            </Text>
+          )}
+
+          {/* Exam type · Level */}
+          {isLoading ? (
+            <SkeletonRow width={80} height={14} marginBottom={0} />
+          ) : (
+            <Text style={styles.headerSub}>
+              {[profile?.exam_type?.toUpperCase(), profile?.target_level]
+                .filter(Boolean)
+                .join(' · ') || '—'}
+            </Text>
+          )}
+        </View>
+
+        {/* ── Card 1 — General Profile Information ────────────── */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>PROFILE</Text>
+
+          {isLoading ? (
+            <>
+              <SkeletonRow width="80%" />
+              <SkeletonRow width="60%" />
+              <SkeletonRow width="70%" />
+            </>
+          ) : (
+            <>
+              {/* Email row */}
+              <InfoRow label="Email">
+                <Text style={styles.infoValue} numberOfLines={1}>
+                  {user?.email ?? '—'}
+                </Text>
+                <Pressable onPress={handleCopyEmail} style={styles.iconBtn} accessibilityLabel="Copy email">
+                  <Copy size={16} color={Colors.textMuted} />
+                </Pressable>
+              </InfoRow>
+
+              {/* Level row */}
+              <InfoRow label="Level">
+                <View style={styles.levelPill}>
+                  <Text style={styles.levelPillText}>{profile?.target_level ?? '—'}</Text>
+                </View>
+              </InfoRow>
+
+              {/* Exam date row */}
+              <InfoRow label="Target exam" showDivider={false}>
+                <Text style={styles.infoValue}>{formatLong(profile?.exam_date)}</Text>
+                {examDays !== null && examDays > 0 ? (
+                  <View style={styles.daysBadge}>
+                    <Text style={styles.daysBadgeText}>{examDays} days</Text>
+                  </View>
+                ) : examDays !== null && examDays <= 0 ? (
+                  <Text style={[styles.infoValue, { color: Colors.accent }]}>Completed</Text>
+                ) : null}
+              </InfoRow>
+            </>
+          )}
+
+          {/* Divider before readiness */}
+          <View style={styles.sectionDivider} />
+
+          {/* Readiness score */}
+          <Text style={styles.cardLabel}>EXAM READINESS</Text>
+          {isLoading ? (
+            <SkeletonRow width={100} height={40} />
+          ) : (
+            <>
+              <View style={styles.readinessRow}>
+                <Text style={styles.readinessNumber}>
+                  {Math.round(profile?.preparedness_score ?? 0)}
+                </Text>
+                <Text style={styles.readinessPct}>%</Text>
+              </View>
+              <View style={styles.progressTrack}>
+                <View
+                  style={[
+                    styles.progressFill,
+                    { width: `${Math.min(profile?.preparedness_score ?? 0, 100)}%` },
+                  ]}
+                />
+              </View>
+            </>
+          )}
+
+          {/* Gamification icons row */}
+          <View style={styles.gamRow}>
+            <View style={styles.gamItem}>
+              <Flame size={20} color={colors.flagRed} />
+              <Text style={styles.gamValue}>
+                {isLoading ? '—' : (profile?.streak_count ?? 0)}
+              </Text>
+            </View>
+            <View style={styles.gamItem}>
+              <Star size={20} color={colors.flagGold} />
+              <Text style={styles.gamValue}>
+                {isLoading ? '—' : (profile?.xp_total ?? 0)}
+              </Text>
+            </View>
+            <View style={styles.gamItem}>
+              <Trophy size={20} color={Colors.primary} />
+              <Text style={styles.gamValue}>{leaderboardLabel}</Text>
+            </View>
+            <View style={styles.gamItem}>
+              <TrendingUp size={20} color={Colors.accent} />
+              <Text style={styles.gamValue}>—</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* ── Card 2 — Upgrade Alert (conditional) ────────────── */}
+        {showUpgradeCard && (
+          <Pressable style={styles.upgradeCard} onPress={navigateUpgrade} accessibilityRole="button">
+            <View style={styles.upgradeLeft}>
+              <Text style={styles.upgradeTitle}>Upgrade to Pro</Text>
+              <Text style={styles.upgradeSubtitle}>
+                {UPGRADE_SUBTITLE[tier] ?? UPGRADE_SUBTITLE.free}
+              </Text>
+              {trialActive && trialExpiresAt ? (
+                <View style={styles.trialRow}>
+                  <Clock size={12} color={colors.flagGold} />
+                  <Text style={styles.trialText}>
+                    Trial ends {formatShort(trialExpiresAt)}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+            <View style={styles.upgradeArrow}>
+              <ChevronRight size={20} color={Colors.white} />
+            </View>
+          </Pressable>
+        )}
+
+        {/* ── Card 3 — Preparation Plan & Subscription ─────────── */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>YOUR PLAN</Text>
+
+          {/* Section A — Plan highlights */}
+          {isLoading ? (
+            <>
+              <SkeletonRow width="75%" />
+              <SkeletonRow width="65%" />
+            </>
+          ) : planHighlights.length > 0 ? (
+            planHighlights.map((line, i) => (
+              <View key={i} style={styles.planRow}>
+                <CheckCircle2 size={16} color={Colors.accent} style={styles.planIcon} />
+                <Text style={styles.planText}>{line}</Text>
+              </View>
+            ))
+          ) : (
+            <View style={styles.planRow}>
+              <Info size={16} color={Colors.textMuted} style={styles.planIcon} />
+              <Text style={[styles.planText, styles.planTextMuted]}>
+                Complete onboarding to generate your plan
+              </Text>
+            </View>
+          )}
+
+          <View style={styles.sectionDivider} />
+
+          {/* Section B — Subscription rows */}
+          <Text style={styles.cardLabel}>SUBSCRIPTION</Text>
+
+          {isLoading ? (
+            <>
+              <SkeletonRow width="60%" />
+              <SkeletonRow width="50%" />
+            </>
+          ) : (
+            <>
+              {/* Plan row */}
+              <InfoRow label="Plan">
+                <Text style={styles.infoValue}>{tierDisplayName(tier)}</Text>
+                <TierBadge tier={tier} isPaid={isPaid} />
+              </InfoRow>
+
+              {/* Renewal row */}
+              {profile?.subscription_valid_until ? (
+                <InfoRow label="Renews">
+                  <Text style={styles.infoValue}>
+                    {formatLong(profile.subscription_valid_until)}
+                  </Text>
+                </InfoRow>
+              ) : null}
+
+              {/* Member since */}
+              <InfoRow label="Member since" showDivider={false}>
+                <Text style={styles.infoValue}>{formatMonthYear(profile?.created_at)}</Text>
+              </InfoRow>
+            </>
+          )}
+
+          <View style={styles.sectionDivider} />
+
+          {/* Section C — Actions */}
+          <ActionRow
+            icon={<CreditCard size={18} color={Colors.primary} />}
+            label="View subscription options"
+            onPress={navigateUpgrade}
+          />
+          <ActionRow
+            icon={<Gift size={18} color={Colors.accent} />}
+            label="Refer a friend"
+            right={
+              profile?.referral_code ? (
+                <View style={styles.refCodePill}>
+                  <Text style={styles.refCodeText}>{profile.referral_code}</Text>
+                </View>
+              ) : null
+            }
+            onPress={handleReferFriend}
+            showDivider={false}
+          />
+        </View>
+      </ScrollView>
+    </View>
+  );
+}
+
+// ─── Tier badge ───────────────────────────────────────────────────────────────
+function TierBadge({ tier, isPaid }: { tier: string; isPaid: boolean }) {
+  let bg: string = Colors.background;
+  let textColor: string = Colors.textMuted;
+  let label = 'Free';
+
+  if (isPaid) {
+    bg = '#E8F5E9';
+    textColor = '#2E7D32';
+    label = 'Active';
+  } else if (tier === 'free_trial') {
+    bg = '#FFF8E1';
+    textColor = '#F57F17';
+    label = 'Trial';
+  }
+
+  return (
+    <View style={[styles.tierBadge, { backgroundColor: bg }]}>
+      <Text style={[styles.tierBadgeText, { color: textColor }]}>{label}</Text>
+    </View>
+  );
+}
+
+// ─── Styles ───────────────────────────────────────────────────────────────────
+const CARD_RADIUS = 24;
+const CARD_PADDING = spacing.xxl;  // 24px
+const CARD_MARGIN_H = spacing.xxl; // 24px
+const CARD_MARGIN_B = spacing.lg;  // 16px
+
+const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: Colors.background,
+  },
+  scrollContent: {
+    paddingTop: 0,
+  },
+
+  // ── Header ─────────────────────────────────────────────────────────────────
+  header: {
+    alignItems: 'center',
+    paddingHorizontal: CARD_MARGIN_H,
+    paddingTop: spacing.xxxl,  // 32px
+    paddingBottom: spacing.lg, // 16px
+  },
+  signOutBtn: {
+    position: 'absolute',
+    top: spacing.xxxl,
+    right: CARD_MARGIN_H,
+    padding: spacing.sm,
+  },
+  avatar: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  avatarText: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: Colors.white,
+    fontFamily: 'Outfit_800ExtraBold',
+  },
+  playerName: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: Colors.primaryDeep,
+    fontFamily: 'Outfit_800ExtraBold',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  headerSub: {
+    fontSize: 14,
+    fontWeight: '400',
+    color: Colors.textMuted,
+    fontFamily: 'NunitoSans_400Regular',
+    textAlign: 'center',
+  },
+
+  // ── Card shell ─────────────────────────────────────────────────────────────
+  card: {
+    backgroundColor: Colors.white,
+    borderRadius: CARD_RADIUS,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    padding: CARD_PADDING,
+    marginHorizontal: CARD_MARGIN_H,
+    marginBottom: CARD_MARGIN_B,
+  },
+  cardTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: Colors.textMuted,
+    fontFamily: 'NunitoSans_600SemiBold',
+    letterSpacing: 0.8,
+    marginBottom: 16,
+  },
+  cardLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: Colors.textMuted,
+    fontFamily: 'NunitoSans_600SemiBold',
+    letterSpacing: 0.8,
+    marginBottom: 12,
+  },
+
+  // ── Info rows ──────────────────────────────────────────────────────────────
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    gap: 8,
+  },
+  infoLabel: {
+    fontSize: 13,
+    fontWeight: '400',
+    color: Colors.textMuted,
+    fontFamily: 'NunitoSans_400Regular',
+    flex: 1,
+  },
+  infoRight: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    alignSelf: 'flex-start' as const,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    flexShrink: 1,
+  },
+  infoValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.primaryDeep,
+    fontFamily: 'NunitoSans_600SemiBold',
+    textAlign: 'right',
+    flexShrink: 1,
+  },
+  iconBtn: {
+    padding: 2,
+  },
+  rowDivider: {
+    height: 0.5,
+    backgroundColor: Colors.border,
+  },
+  sectionDivider: {
+    height: 1,
+    backgroundColor: Colors.border,
+    marginVertical: 16,
+  },
+
+  // ── Level pill ─────────────────────────────────────────────────────────────
+  levelPill: {
+    backgroundColor: Colors.primary,
     borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 2,
   },
-  providerPillGoogle: {
-    backgroundColor: '#E8F0FE',
+  levelPillText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: Colors.white,
+    fontFamily: 'Outfit_800ExtraBold',
   },
-  providerPillEmail: {
-    backgroundColor: Colors.surfaceMuted,
+
+  // ── Days badge ─────────────────────────────────────────────────────────────
+  daysBadge: {
+    backgroundColor: Colors.background,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
   },
-  providerGoogleIcon: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: '#4285F4',
+  daysBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: Colors.primary,
+    fontFamily: 'NunitoSans_600SemiBold',
+  },
+
+  // ── Readiness ──────────────────────────────────────────────────────────────
+  readinessRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 2,
+    marginBottom: 10,
+  },
+  readinessNumber: {
+    fontSize: 40,
+    fontWeight: '800',
+    color: Colors.primaryDeep,
+    fontFamily: 'Outfit_800ExtraBold',
+    lineHeight: 46,
+  },
+  readinessPct: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: Colors.accent,
+    fontFamily: 'Outfit_800ExtraBold',
+  },
+  progressTrack: {
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: Colors.border,
+    overflow: 'hidden',
+    marginBottom: 16,
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 3,
+    backgroundColor: Colors.primary,
+  },
+
+  // ── Gamification row ───────────────────────────────────────────────────────
+  gamRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+  },
+  gamItem: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  gamValue: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: Colors.primaryDeep,
+    fontFamily: 'NunitoSans_600SemiBold',
+  },
+
+  // ── Upgrade card ───────────────────────────────────────────────────────────
+  upgradeCard: {
+    backgroundColor: Colors.primary,
+    borderRadius: CARD_RADIUS,
+    padding: CARD_PADDING,
+    marginHorizontal: CARD_MARGIN_H,
+    marginBottom: CARD_MARGIN_B,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  upgradeLeft: {
+    flex: 1,
+    gap: 4,
+  },
+  upgradeTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: Colors.white,
+    fontFamily: 'Outfit_800ExtraBold',
+  },
+  upgradeSubtitle: {
+    fontSize: 13,
+    fontWeight: '400',
+    color: 'rgba(255,255,255,0.75)',
+    fontFamily: 'NunitoSans_400Regular',
+  },
+  trialRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 4,
+  },
+  trialText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.flagGold,
+    fontFamily: 'NunitoSans_600SemiBold',
+  },
+  upgradeArrow: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.15)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  providerGoogleIconText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: '800' as const,
+
+  // ── Plan highlights ────────────────────────────────────────────────────────
+  planRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    marginBottom: 10,
   },
-  providerPillText: {
+  planIcon: {
+    marginTop: 1,
+  } as object,
+  planText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '400',
+    color: Colors.primaryDeep,
+    fontFamily: 'NunitoSans_400Regular',
+    lineHeight: 20,
+  },
+  planTextMuted: {
+    color: Colors.textMuted,
+    fontStyle: 'italic',
+  },
+
+  // ── Tier badge ─────────────────────────────────────────────────────────────
+  tierBadge: {
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  tierBadgeText: {
     fontSize: 12,
-    fontWeight: '600' as const,
+    fontWeight: '600',
+    fontFamily: 'NunitoSans_600SemiBold',
+  },
+
+  // ── Action rows ────────────────────────────────────────────────────────────
+  actionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    gap: 12,
+  },
+  actionIcon: {
+    width: 24,
+    alignItems: 'center',
+  },
+  actionLabel: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.primaryDeep,
+    fontFamily: 'NunitoSans_600SemiBold',
+  },
+  actionRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+
+  // ── Referral code pill ─────────────────────────────────────────────────────
+  refCodePill: {
+    backgroundColor: Colors.background,
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  refCodeText: {
+    fontSize: 12,
+    fontWeight: '600',
     color: Colors.primary,
+    fontFamily: 'NunitoSans_600SemiBold',
   },
-  providerPillTextGoogle: {
-    color: '#1A73E8',
-  },
-
-  playerNameRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 2 },
-  avatarCircle: { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.accent, alignItems: 'center', justifyContent: 'center' },
-  avatarInitial: { color: colors.white, fontSize: 16, fontWeight: '800' as const },
-  playerNameText: { fontSize: 18, fontWeight: '800' as const, color: Colors.primary },
-
-  leaderboardCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: Colors.surface, borderRadius: 20, borderWidth: 1, borderColor: Colors.border, padding: 16 },
-  leaderboardLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
-  leaderboardIconWrap: { width: 42, height: 42, borderRadius: 14, backgroundColor: '#FFF8E1', alignItems: 'center', justifyContent: 'center' },
-  leaderboardTextWrap: { flex: 1, gap: 2 },
-  leaderboardTitle: { fontSize: 16, fontWeight: '700' as const, color: Colors.primary },
-  leaderboardSub: { fontSize: 13, color: Colors.textMuted, lineHeight: 18 },
-
-  setNameCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: Colors.accentSoft, borderRadius: 16, padding: 14, borderWidth: 1, borderColor: Colors.accent },
-  setNameTextWrap: { flex: 1, gap: 2 },
-  setNameTitle: { fontSize: 14, fontWeight: '700' as const, color: Colors.primary },
-  setNameBody: { fontSize: 12, color: Colors.textMuted },
-  setNameCta: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, backgroundColor: Colors.accent },
-  setNameCtaText: { color: colors.white, fontWeight: '700' as const, fontSize: 13 },
-
-  nameModalOverlay: { flex: 1, backgroundColor: 'rgba(9,23,40,0.7)', justifyContent: 'center', alignItems: 'center', padding: 24 },
-  nameModalBackdrop: { ...StyleSheet.absoluteFillObject },
-  nameModalCard: { width: '100%', maxWidth: 360, backgroundColor: Colors.surface, borderRadius: 24, padding: 24, gap: 12, zIndex: 1 },
-  nameModalHeading: { fontSize: 20, fontWeight: '800' as const, color: Colors.primary, textAlign: 'center' as const },
-  nameModalSub: { fontSize: 13, color: Colors.textMuted, textAlign: 'center' as const, marginTop: -4 },
-  nameModalInputShell: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.background, borderRadius: 14, borderWidth: 1.5, borderColor: Colors.border, paddingHorizontal: 14 },
-  nameModalInput: { flex: 1, fontSize: 16, fontWeight: '600' as const, color: Colors.primary, paddingVertical: 14 },
-  nameModalCharCount: { fontSize: 12, color: Colors.textMuted },
-  nameModalError: { fontSize: 13, color: Colors.danger, fontWeight: '600' as const },
-  nameModalActions: { flexDirection: 'row', gap: 10, marginTop: 4 },
-  nameModalCancel: { flex: 1, minHeight: 48, borderRadius: 14, borderWidth: 1.5, borderColor: Colors.border, alignItems: 'center', justifyContent: 'center' },
-  nameModalCancelText: { color: Colors.textMuted, fontWeight: '700' as const, fontSize: 15 },
-  nameModalSave: { flex: 1, minHeight: 48, borderRadius: 14, backgroundColor: Colors.accent, alignItems: 'center', justifyContent: 'center' },
-  nameModalSaveDisabled: { opacity: 0.5 },
-  nameModalSaveText: { color: colors.white, fontWeight: '800' as const, fontSize: 15 },
-
-  planSection: { gap: 12 },
-  planSectionTitle: { fontSize: 22, fontWeight: '800' as const, color: Colors.primary, marginBottom: 2 },
-  planCard: { backgroundColor: Colors.surface, borderRadius: 20, borderWidth: 1, borderColor: Colors.border, padding: 16, gap: 14 },
-  planCardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  planCardTitle: { fontSize: 16, fontWeight: '700' as const, color: Colors.primary },
-
-  examDateSet: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  examCountdownWrap: { flex: 1, gap: 2 },
-  examCountdownNumber: { fontSize: 18, fontWeight: '800' as const, color: Colors.primary },
-  examCountdownUrgent: { color: Colors.danger },
-  examCountdownPast: { color: Colors.textMuted },
-  examDateMuted: { fontSize: 13, color: Colors.textMuted },
-  changeDateButton: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12, backgroundColor: Colors.primarySoft },
-  changeDateText: { fontSize: 13, fontWeight: '700' as const, color: Colors.primary },
-
-  setExamDateRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 6 },
-  setExamDateText: { fontSize: 15, color: Colors.textMuted, fontWeight: '500' as const },
-
-  datePickerWrap: { marginTop: 4, alignItems: 'center' },
-  doneButton: { marginTop: 8, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 12, backgroundColor: Colors.accent },
-  doneButtonText: { color: Colors.surface, fontWeight: '700' as const, fontSize: 14 },
-  inlineLoader: { marginTop: 4 },
-
-  planRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  planRowLabel: { fontSize: 14, fontWeight: '600' as const, color: Colors.text },
-
-  stepper: { flexDirection: 'row', alignItems: 'center', gap: 0, backgroundColor: Colors.background, borderRadius: 12, overflow: 'hidden' as const, borderWidth: 1, borderColor: Colors.border },
-  stepperBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  stepperBtnDisabled: { opacity: 0.4 },
-  stepperValue: { width: 32, textAlign: 'center' as const, fontSize: 16, fontWeight: '800' as const, color: Colors.primary },
-
-  segmentedControl: { flexDirection: 'row', backgroundColor: Colors.background, borderRadius: 10, overflow: 'hidden' as const, borderWidth: 1, borderColor: Colors.border },
-  segmentItem: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 8 },
-  segmentItemActive: { backgroundColor: Colors.primary, borderRadius: 8 },
-  segmentText: { fontSize: 13, fontWeight: '600' as const, color: Colors.textMuted },
-  segmentTextActive: { color: Colors.surface },
-
-  mockDatesSection: { gap: 10 },
-  addDateBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, backgroundColor: Colors.accentSoft },
-  addDateText: { fontSize: 13, fontWeight: '700' as const, color: Colors.accent },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  dateChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10, backgroundColor: Colors.background, borderWidth: 1, borderColor: Colors.border },
-  dateChipText: { fontSize: 13, fontWeight: '600' as const, color: Colors.text },
-  noMockDates: { fontSize: 13, color: Colors.textMuted, fontStyle: 'italic' as const },
-
-  promptCard: { backgroundColor: '#FFF7ED', borderRadius: 18, borderWidth: 1, borderColor: '#FBBF24', padding: 16, gap: 10 },
-  promptIconRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  promptTitle: { fontSize: 15, fontWeight: '700' as const, color: '#92400E' },
-  promptBody: { fontSize: 14, color: '#78350F', lineHeight: 21 },
-  promptBold: { fontWeight: '800' as const },
-  promptCta: { alignSelf: 'flex-start', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, backgroundColor: '#D97706', marginTop: 2 },
-  promptCtaText: { color: colors.white, fontWeight: '700' as const, fontSize: 14 },
-
-  reviewMistakesCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: Colors.surface, borderRadius: 20, borderWidth: 1, borderColor: Colors.border, padding: 16 },
-  reviewMistakesLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
-  reviewMistakesIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#F0F4FF', alignItems: 'center', justifyContent: 'center' },
-  reviewMistakesEmoji: { fontSize: 20 },
-  reviewMistakesTextWrap: { flex: 1, gap: 2 },
-  reviewMistakesTitle: { fontSize: 15, fontWeight: '700' as const, color: Colors.primary },
-  reviewMistakesSub: { fontSize: 13, color: Colors.textMuted, lineHeight: 18 },
 });

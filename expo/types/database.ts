@@ -98,6 +98,13 @@ export type UserProfile = {
   player_name: string | null;
   created_at: string | null;
   updated_at: string | null;
+  // Onboarding preferences
+  onboarding_cert: string | null;
+  onboarding_readiness: string | null;
+  onboarding_hardest: string | null;
+  onboarding_daily_minutes: number | null;
+  onboarding_learner_style: string | null;
+  onboarding_completed_at: string | null;
 };
 
 export type LeaderboardEntry = {

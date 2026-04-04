@@ -2,6 +2,7 @@ import type { User } from '@supabase/supabase-js';
 
 import { supabase } from '@/lib/supabaseClient';
 import type { ExamType, Level, StudyPlanJson, UserProfile } from '@/types/database';
+import type { OnboardingAnswers } from '@/app/onboarding_launch/_store';
 
 export type OnboardingPayload = {
   targetLevel: Level;
@@ -285,6 +286,29 @@ export async function fetchRecentIncorrect(userId: string): Promise<RecentIncorr
   } catch (err) {
     console.log('fetchRecentIncorrect unexpected error', err);
     return [];
+  }
+}
+
+export async function saveOnboardingAnswers(
+  userId: string,
+  answers: OnboardingAnswers
+): Promise<void> {
+  const { error } = await supabase
+    .from('user_profiles')
+    .update({
+      onboarding_cert: answers.cert,
+      onboarding_readiness: answers.readiness,
+      onboarding_hardest: answers.hardest,
+      onboarding_daily_minutes: answers.dailyMinutes,
+      onboarding_learner_style: answers.learnerStyle,
+      onboarding_completed_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    } as never)
+    .eq('id', userId);
+
+  if (error) {
+    console.log('saveOnboardingAnswers error', error);
+    throw error;
   }
 }
 

@@ -154,6 +154,19 @@ export default function SplashOnboarding() {
           </LinearGradient>
         </Pressable>
 
+        {/* Returning user link */}
+        <Pressable
+          onPress={() => router.push('/auth')}
+          accessibilityRole="button"
+          accessibilityLabel="Sign in"
+          style={styles.signInLink}
+        >
+          <Text style={styles.signInText}>
+            Already a user?{' '}
+            <Text style={styles.signInLinkText}>Jump straight in</Text>
+          </Text>
+        </Pressable>
+
         <SafeAreaView edges={['bottom']} />
       </Animated.View>
     </View>
@@ -184,7 +197,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   certRow: {
-    fontFamily: 'BeVietnamPro_500Medium',
+    fontFamily: 'NunitoSans_400Regular',
     fontSize: 13,
     letterSpacing: 2,
     color: 'rgba(255,255,255,0.7)',
@@ -210,13 +223,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   chipValue: {
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    fontFamily: 'Outfit_800ExtraBold',
     fontSize: 18,
     color: colors.onSurface,
     lineHeight: 22,
   },
   chipLabel: {
-    fontFamily: 'BeVietnamPro_500Medium',
+    fontFamily: 'NunitoSans_400Regular',
     fontSize: 10,
     letterSpacing: 1.2,
     color: colors.onSurfaceVariant,
@@ -231,14 +244,14 @@ const styles = StyleSheet.create({
 
   // Text
   headline: {
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    fontFamily: 'Outfit_800ExtraBold',
     fontSize: 34,
     lineHeight: 42,
     color: colors.onSurface,
     marginBottom: 10,
   },
   body: {
-    fontFamily: 'BeVietnamPro_400Regular',
+    fontFamily: 'NunitoSans_400Regular',
     fontSize: 15,
     lineHeight: 22,
     color: colors.onSurfaceVariant,
@@ -266,9 +279,23 @@ const styles = StyleSheet.create({
     borderRadius: 24,
   },
   ctaText: {
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    fontFamily: 'Outfit_800ExtraBold',
     fontSize: 16,
     color: colors.onPrimary,
     letterSpacing: 0.3,
+  },
+  signInLink: {
+    alignItems: 'center',
+    paddingVertical: 14,
+  },
+  signInText: {
+    fontFamily: 'NunitoSans_400Regular',
+    fontSize: 14,
+    color: colors.onSurfaceVariant,
+  },
+  signInLinkText: {
+    fontFamily: 'NunitoSans_700Bold',
+    color: colors.primary,
+    textDecorationLine: 'underline',
   },
 });

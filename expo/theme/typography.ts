@@ -1,36 +1,40 @@
 /**
  * WORDIFI — Typography System
- * Source of truth: Google Stitch project 17418085725444489838
+ * Master source: Wordifi Brand Brief (Wordifi_Stitch_Doc1_Base_Brief.docx)
  *
  * CRITICAL RULES — NON-NEGOTIABLE:
  * 1. SENTENCE CASE everywhere. "Start your journey" not "Start Your Journey".
  * 2. wordmark is always lowercase: "wordifi"
  * 3. Never ALL CAPS except category chip labels (10–11px, intentional).
- * 4. Two typefaces only: Plus Jakarta Sans (display/headlines) + Be Vietnam Pro (body/labels).
+ * 4. Two typefaces only: Outfit (headlines/CTAs) + Nunito Sans (body/labels).
+ * 5. NEVER use more than three text sizes on a single screen.
  *
  * Font setup:
  *   Loaded in expo/app/_layout.tsx via useFonts()
- *   Packages: @expo-google-fonts/plus-jakarta-sans @expo-google-fonts/be-vietnam-pro
+ *   Packages: @expo-google-fonts/outfit @expo-google-fonts/nunito-sans
  */
 
 export const fontFamily = {
-  display:     'PlusJakartaSans_800ExtraBold', // Headlines, CTAs, scores, wordmark
-  displaySemi: 'PlusJakartaSans_600SemiBold',  // Titles, sub-headers
-  bodyRegular: 'BeVietnamPro_400Regular',       // Body copy, explanations
-  bodyMedium:  'BeVietnamPro_500Medium',        // Option text, sub-labels
-  bodyBold:    'BeVietnamPro_700Bold',          // Labels, micro-copy (ALL CAPS)
+  display:      'Outfit_800ExtraBold',      // Headlines, CTAs, scores, wordmark
+  displaySemi:  'Outfit_800ExtraBold',      // Outfit has one display weight; same as display
+  bodyRegular:  'NunitoSans_400Regular',    // Body copy, option labels, explanatory text
+  bodyMedium:   'NunitoSans_400Regular',    // Alias — Nunito Sans has no 500; mapped to 400
+  bodySemiBold: 'NunitoSans_600SemiBold',   // Sub-headlines, card titles, emphasis
+  bodyBold:     'NunitoSans_700Bold',       // Labels, micro-copy (ALL CAPS permitted here only)
 } as const;
 
 /**
  * Type scale — all sizes in px (React Native points)
- * Use fontFamily.display / displaySemi for displayXl–displaySm
- * Use fontFamily.bodyRegular / bodyMedium / bodyBold for body and labels
+ * Use fontFamily.display for displayXl–displaySm
+ * Use fontFamily.bodyRegular / bodySemiBold / bodyBold for body and labels
+ *
+ * RULE: never use more than 3 of these sizes on a single screen.
  */
 export const fontSize = {
-  displayXl:  36,  // Hero headlines on Splash
-  displayLg:  28,  // Section headlines
+  displayXl:  40,  // Score reveal, splash heroes
+  displayLg:  28,  // Primary screen headline (h1)
   displayMd:  22,  // Screen titles
-  displaySm:  18,  // Card titles, question text
+  displaySm:  20,  // Section titles, card headers (h2)
   bodyLg:     16,  // Primary body copy, CTA labels, option text
   bodyMd:     14,  // Secondary body, sub-labels
   bodySm:     13,  // Tertiary text, captions
@@ -40,10 +44,10 @@ export const fontSize = {
 } as const;
 
 export const fontWeight = {
-  display: '800',  // Plus Jakarta Sans ExtraBold
-  semi:    '600',  // Plus Jakarta Sans SemiBold
-  bold:    '700',  // Be Vietnam Pro Bold (labels)
-  medium:  '500',
+  display: '800',  // Outfit ExtraBold
+  semi:    '600',  // Nunito Sans SemiBold
+  bold:    '700',  // Nunito Sans Bold
+  medium:  '500',  // Semantic alias — maps to Regular in Nunito Sans
   regular: '400',
 } as const;
 
@@ -61,8 +65,8 @@ export const letterSpacing = {
 } as const;
 
 /**
- * Predefined text style compositions — use these directly in components
- * to ensure consistency. Never compose text styles ad-hoc.
+ * Predefined text style compositions — use these directly in components.
+ * Never compose text styles ad-hoc.
  */
 export const textStyles = {
   heroHeadline: {
@@ -74,15 +78,28 @@ export const textStyles = {
   },
   screenTitle: {
     fontFamily:    fontFamily.display,
+    fontSize:      fontSize.displayLg,
+    fontWeight:    fontWeight.display,
+    lineHeight:    fontSize.displayLg * lineHeight.tight,
+    letterSpacing: letterSpacing.tight,
+  },
+  sectionTitle: {
+    fontFamily:    fontFamily.display,
     fontSize:      fontSize.displayMd,
     fontWeight:    fontWeight.display,
     lineHeight:    fontSize.displayMd * lineHeight.tight,
     letterSpacing: letterSpacing.tight,
   },
-  questionText: {
-    fontFamily:  fontFamily.bodyMedium,
+  cardTitle: {
+    fontFamily:  fontFamily.bodySemiBold,
     fontSize:    fontSize.displaySm,
-    fontWeight:  fontWeight.medium,
+    fontWeight:  fontWeight.semi,
+    lineHeight:  fontSize.displaySm * lineHeight.normal,
+  },
+  questionText: {
+    fontFamily:  fontFamily.bodySemiBold,
+    fontSize:    fontSize.displaySm,
+    fontWeight:  fontWeight.semi,
     lineHeight:  fontSize.displaySm * lineHeight.normal,
   },
   ctaLabel: {
@@ -91,9 +108,9 @@ export const textStyles = {
     fontWeight: fontWeight.display,
   },
   optionText: {
-    fontFamily: fontFamily.bodyMedium,
+    fontFamily: fontFamily.bodyRegular,
     fontSize:   fontSize.bodyLg,
-    fontWeight: fontWeight.medium,
+    fontWeight: fontWeight.regular,
     lineHeight: fontSize.bodyLg * lineHeight.normal,
   },
   bodyText: {
@@ -103,9 +120,9 @@ export const textStyles = {
     lineHeight: fontSize.bodyMd * lineHeight.relaxed,
   },
   label: {
-    fontFamily:    fontFamily.bodyMedium,
+    fontFamily:    fontFamily.bodyRegular,
     fontSize:      fontSize.label,
-    fontWeight:    fontWeight.medium,
+    fontWeight:    fontWeight.regular,
     letterSpacing: letterSpacing.normal,
   },
   chipLabel: {
@@ -118,7 +135,7 @@ export const textStyles = {
   },
   scoreDisplay: {
     fontFamily:    fontFamily.display,
-    fontSize:      34,
+    fontSize:      64,
     fontWeight:    fontWeight.display,
     letterSpacing: letterSpacing.tight,
   },

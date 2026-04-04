@@ -1,16 +1,33 @@
 import { Stack, router, useLocalSearchParams } from 'expo-router';
-import { Share } from 'lucide-react-native';
+import { ChevronRight, Share2 } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, Platform, Pressable, ScrollView, Share as RNShare, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+const CTA_BUTTON_HEIGHT = 56;    // primary CTA / footer height
+const BOTTOM_CONTENT_BUFFER = 24; // breathing room below last content item
+import {
+  AccessibilityInfo,
+  Animated,
+  Easing,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import * as Haptics from 'expo-haptics';
 
 import { AudioPlayer } from '@/components/AudioPlayer';
+import ConfettiBurst, { type ConfettiBurstRef } from '@/components/ConfettiBurst';
 import { QuestionCard } from '@/components/QuestionCard';
 import { ScoreRing } from '@/components/ScoreRing';
+import ShareResultSheet from '@/components/ShareResultSheet';
 import { StimulusCard } from '@/components/StimulusCard';
 import Colors from '@/constants/colors';
 import { colors } from '@/theme';
 import { updatePreparednessScore } from '@/lib/streamHelpers';
+import { useQuestionMeta } from '@/lib/useQuestionTypeMeta';
 import { useAuth } from '@/providers/AuthProvider';
 import type { AppQuestion } from '@/types/database';
 
@@ -53,7 +70,8 @@ function AnimatedXpText({ value, style }: { value: Animated.AnimatedInterpolatio
 }
 
 export default function SectionalResultsScreen() {
-  const { user } = useAuth();
+  const insets = useSafeAreaInsets();
+  const { user, profile } = useAuth();
   const userId = user?.id ?? '';
   const hasUpdatedPreparedness = useRef<boolean>(false);
 
@@ -82,10 +100,11 @@ export default function SectionalResultsScreen() {
 
   const [expandedStimulusId, setExpandedStimulusId] = useState<string | null>(null);
   const [expandedExplanationId, setExpandedExplanationId] = useState<string | null>(null);
+  const [sheetVisible, setSheetVisible] = useState(false);
 
   const scorePct = Number(params.scorePct ?? '0');
   const correctCount = Number(params.correctCount ?? '0');
-  const _total = Number(params.total ?? '0');
+  const total = Number(params.total ?? '0');
   const level = params.level ?? 'A1';
   const section = params.section ?? 'Hören';
   const teil = params.teil ?? '1';
@@ -107,6 +126,13 @@ export default function SectionalResultsScreen() {
       return {};
     }
   }, [params.answers]);
+
+  // Derive Teil name from the meta cache using the first question's structure_type
+  const structureType = questions[0]?.source_structure_type;
+  const teilMeta = useQuestionMeta(structureType);
+  const teilNameEn = teilMeta?.name_en ?? `Teil ${teil}`;
+  const teilNameDe = teilMeta?.name_de ?? '';
+  const examType = profile?.exam_type ?? 'German language';
 
   const xpAnim = useRef(new Animated.Value(0)).current;
   const perf = performanceLabel(scorePct);
@@ -130,43 +156,50 @@ export default function SectionalResultsScreen() {
     outputRange: [0, correctCount || 1],
   });
 
-  const handleShare = useCallback(async () => {
-    const message = `Wordifi — ${section} · Teil ${teil} · ${level}\nScore: ${Math.round(scorePct)}%\n${perf.text}`;
-    try {
-      if (Platform.OS === 'web') {
-        if (navigator.share) {
-          await navigator.share({ text: message });
+  // Confetti + share sheet
+  const confettiRef = useRef<ConfettiBurstRef>(null);
+  const shareButtonRef = useRef<View>(null);
+  const rootViewRef = useRef<View>(null);
+
+  const handleSharePress = useCallback(() => {
+    AccessibilityInfo.isReduceMotionEnabled()
+      .then((reduced) => {
+        if (!reduced) {
+          shareButtonRef.current?.measureInWindow((bx, by, bw, bh) => {
+            rootViewRef.current?.measureInWindow((rx, ry) => {
+              confettiRef.current?.burst(
+                bx - rx + bw / 2,
+                by - ry + bh / 2
+              );
+            });
+          });
         }
-      } else {
-        await RNShare.share({ message });
-      }
-    } catch (err) {
-      console.log('SectionalResults share error', err);
-    }
-  }, [section, teil, level, scorePct, perf.text]);
+        setTimeout(() => setSheetVisible(true), reduced ? 0 : 600);
+      })
+      .catch(() => setSheetVisible(true));
+  }, []);
 
   const retestDate = useMemo(() => retestDateString(), []);
 
   return (
-    <View style={styles.screen}>
+    <View ref={rootViewRef} style={styles.screen}>
+      {/* Confetti overlay — non-interactive, above all content */}
+      <ConfettiBurst ref={confettiRef} />
+
       <Stack.Screen
         options={{
           title: 'Results',
           headerBackVisible: false,
-          headerRight: () => (
-            <Pressable
-              accessibilityLabel="Share result"
-              onPress={handleShare}
-              style={styles.shareBtn}
-              testID="share-result-button"
-            >
-              <Share color={Colors.primary} size={20} />
-            </Pressable>
-          ),
         }}
       />
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: insets.bottom + CTA_BUTTON_HEIGHT + BOTTOM_CONTENT_BUFFER },
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.heroCard}>
           <Text style={styles.heroMeta}>
             {section} · Teil {teil} · {level}
@@ -265,10 +298,14 @@ export default function SectionalResultsScreen() {
                     ) : null}
                   </View>
                 ) : null}
-                {(question.explanation_en ?? question.explanation_de ?? null) != null ? (
+                {(question.explanation_de?.trim() || question.explanation_en?.trim()) ? (
                   <>
                     <Pressable
-                      onPress={() => setExpandedExplanationId((v) => v === question.id ? null : question.id)}
+                      onPress={() =>
+                        setExpandedExplanationId((v) =>
+                          v === question.id ? null : question.id
+                        )
+                      }
                       style={styles.explanationToggle}
                       testID={`explanation-toggle-${question.id}`}
                     >
@@ -280,9 +317,21 @@ export default function SectionalResultsScreen() {
                     </Pressable>
                     {expandedExplanationId === question.id ? (
                       <View style={styles.explanationBox}>
-                        <Text style={styles.explanationBoxText}>
-                          {question.explanation_en ?? question.explanation_de}
-                        </Text>
+                        {question.explanation_de?.trim() ? (
+                          <>
+                            <Text style={styles.explanationLangLabel}>Erklärung:</Text>
+                            <Text style={styles.explanationBoxText}>{question.explanation_de.trim()}</Text>
+                          </>
+                        ) : null}
+                        {question.explanation_de?.trim() && question.explanation_en?.trim() ? (
+                          <View style={styles.explanationDivider} />
+                        ) : null}
+                        {question.explanation_en?.trim() ? (
+                          <>
+                            <Text style={styles.explanationLangLabel}>Explanation:</Text>
+                            <Text style={styles.explanationBoxText}>{question.explanation_en.trim()}</Text>
+                          </>
+                        ) : null}
                       </View>
                     ) : null}
                   </>
@@ -293,7 +342,20 @@ export default function SectionalResultsScreen() {
         </View>
       </ScrollView>
 
-      <View style={styles.footer}>
+      <View style={[styles.footer, { bottom: insets.bottom }]}>
+        {/* ── Share button (A1) ─────────────────────────── */}
+        <Pressable
+          ref={shareButtonRef}
+          accessibilityLabel="Share your result"
+          onPress={handleSharePress}
+          style={styles.shareButton}
+          testID="sectional-share-button"
+        >
+          <Share2 size={20} color={Colors.accent} />
+          <Text style={styles.shareButtonText}>Share your result</Text>
+          <ChevronRight size={16} color={Colors.textMuted} style={styles.shareChevron} />
+        </Pressable>
+
         <Pressable
           accessibilityLabel="Back to tests"
           onPress={() => router.replace('/(tabs)/tests')}
@@ -302,25 +364,29 @@ export default function SectionalResultsScreen() {
         >
           <Text style={styles.primaryButtonText}>Back to Tests</Text>
         </Pressable>
-        <View style={styles.footerRow}>
-          <Pressable
-            accessibilityLabel="Go home"
-            onPress={() => router.replace('/')}
-            style={styles.secondaryButton}
-            testID="sectional-home-button"
-          >
-            <Text style={styles.secondaryButtonText}>Home</Text>
-          </Pressable>
-          <Pressable
-            accessibilityLabel="Share result"
-            onPress={handleShare}
-            style={styles.secondaryButton}
-            testID="sectional-share-button"
-          >
-            <Text style={styles.secondaryButtonText}>Share Result</Text>
-          </Pressable>
-        </View>
+        <Pressable
+          accessibilityLabel="Go home"
+          onPress={() => router.replace('/')}
+          style={styles.secondaryButton}
+          testID="sectional-home-button"
+        >
+          <Text style={styles.secondaryButtonText}>Home</Text>
+        </Pressable>
       </View>
+
+      {/* ── Share preview bottom sheet (B) ──────────────── */}
+      <ShareResultSheet
+        visible={sheetVisible}
+        onClose={() => setSheetVisible(false)}
+        section={section}
+        level={level}
+        teilNameEn={teilNameEn}
+        teilNameDe={teilNameDe}
+        score={correctCount}
+        total={total}
+        scorePct={scorePct}
+        examType={examType}
+      />
     </View>
   );
 }
@@ -329,12 +395,6 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: Colors.background,
-  },
-  shareBtn: {
-    minHeight: 40,
-    minWidth: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   content: {
     padding: 20,
@@ -450,10 +510,34 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    padding: 20,
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    paddingBottom: 16,
     gap: 10,
     backgroundColor: Colors.background,
   },
+
+  // ── Share button (A1) ──────────────────────────────────────
+  shareButton: {
+    height: 56,
+    borderRadius: 16,
+    backgroundColor: Colors.primaryDeep,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    gap: 12,
+  },
+  shareButtonText: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '800',
+    color: Colors.white,
+    fontFamily: 'Outfit_800ExtraBold',
+  },
+  shareChevron: {
+    marginLeft: 'auto',
+  } as object,
+
   primaryButton: {
     minHeight: 54,
     borderRadius: 27,
@@ -466,12 +550,7 @@ const styles = StyleSheet.create({
     fontWeight: '800' as const,
     fontSize: 16,
   },
-  footerRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
   secondaryButton: {
-    flex: 1,
     minHeight: 48,
     borderRadius: 24,
     alignItems: 'center',
@@ -498,10 +577,23 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 12,
     marginTop: 8,
+    gap: 4,
+  },
+  explanationLangLabel: {
+    fontSize: 11,
+    fontWeight: '700' as const,
+    color: Colors.primary,
+    letterSpacing: 0.3,
+    textTransform: 'uppercase' as const,
   },
   explanationBoxText: {
     fontSize: 13,
     lineHeight: 20,
     color: Colors.text,
+  },
+  explanationDivider: {
+    height: 1,
+    backgroundColor: Colors.border,
+    marginVertical: 6,
   },
 });

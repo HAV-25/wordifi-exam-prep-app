@@ -1,1046 +1,801 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import * as Haptics from 'expo-haptics';
+import { Dimensions } from 'react-native';
 import { useRouter } from 'expo-router';
-import { ChevronUp, Headphones, BookOpenText } from 'lucide-react-native';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
-  Animated,
-  Dimensions,
-  Easing,
-  PanResponder,
-  Platform,
+  Award,
+  Bell,
+  ChevronRight,
+  ClipboardList,
+  Flame,
+  Hash,
+  Headphones,
+  BookOpenText,
+  Mic,
+  PenLine,
+  Star,
+  Trophy,
+  TrendingUp,
+  X,
+  Zap,
+} from 'lucide-react-native';
+import React, { useMemo, useState } from 'react';
+import {
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { CelebrationOverlay } from '@/components/CelebrationOverlay';
-import { HomeDashboard } from '@/components/HomeDashboard';
 import { PaywallModal } from '@/components/PaywallModal';
 import { PreparednessBottomSheet } from '@/components/PreparednessBottomSheet';
-import { ReportModal } from '@/components/ReportModal';
-import { StreamCard } from '@/components/StreamCard';
-import { TrialBanner } from '@/components/TrialBanner';
-import Colors from '@/constants/colors';
-import { colors } from '@/theme';
-import { didCrossBadgeThreshold, formatXp, getBadgeTier } from '@/lib/badgeHelpers';
-import {
-  checkAndAwardBadges,
-  createStreamSession,
-  fetchSectionAccuracy,
-  fetchStreamQuestions,
-  updatePreparednessScore,
-  updateXpAndStreak,
-  writeStreamAnswer,
-  type BadgeType,
-} from '@/lib/streamHelpers';
+import { formatXp, getBadgeTier } from '@/lib/badgeHelpers';
+import { useHomeData, type RecentSession, type SectionHistoryItem } from '@/lib/useHomeData';
 import { useAccess } from '@/providers/AccessProvider';
 import { useAuth } from '@/providers/AuthProvider';
-import type { AppQuestion } from '@/types/database';
+import {
+  colors,
+  componentSizes,
+  fontFamily,
+  fontSize,
+  radius,
+  shadows,
+  spacing,
+} from '@/theme';
 
-const SCREEN_HEIGHT = Dimensions.get('window').height;
-const SWIPE_THRESHOLD = SCREEN_HEIGHT * 0.15;
-const SWIPE_VELOCITY = 800;
-const SWIPE_HINT_KEY = 'wordifi_total_answered';
-const SESSION_SIZE = 20;
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+const TAB_BAR_HEIGHT = componentSizes.tabBarHeight;
+const BOTTOM_CONTENT_BUFFER = componentSizes.contentBuffer;
 
-type AnswerRecord = {
-  questionId: string;
-  selectedAnswer: string;
-  isCorrect: boolean;
+const UPGRADEABLE_TIERS = new Set(['free', 'free_trial', 'pro']);
+
+// ─── Readiness subtext ────────────────────────────────────────────────────────
+function readinessSubtext(score: number): string {
+  if (score <= 30) return "Keep going — you're just getting started";
+  if (score <= 60) return 'Solid progress. Push through to the next level.';
+  if (score <= 85) return "You're in great shape. Keep the streak alive.";
+  return 'Exam ready. Stay sharp.';
+}
+
+// ─── Tier nudge config ────────────────────────────────────────────────────────
+type TierConfig = {
+  containerBg: string;
+  pillBg: string;
+  pillTextColor: string;
+  pillLabel: string;
+  nextTier: string | null;
 };
 
-function SessionProgressBar({ answered, total }: { answered: number; total: number }) {
-  const progressAnim = useRef(new Animated.Value(0)).current;
+function getTierConfig(percentile: number | null): TierConfig | null {
+  if (percentile === null) return null;
+  if (percentile <= 10) {
+    return {
+      containerBg: 'rgba(245,196,0,0.15)',
+      pillBg: '#F5C400',
+      pillTextColor: colors.darkNavy,
+      pillLabel: 'Gold',
+      nextTier: null,
+    };
+  }
+  if (percentile <= 25) {
+    return {
+      containerBg: 'rgba(156,163,175,0.15)',
+      pillBg: '#9CA3AF',
+      pillTextColor: colors.darkNavy,
+      pillLabel: 'Silver',
+      nextTier: 'Gold',
+    };
+  }
+  if (percentile <= 50) {
+    return {
+      containerBg: 'rgba(205,127,50,0.15)',
+      pillBg: '#CD7F32',
+      pillTextColor: colors.white,
+      pillLabel: 'Bronze',
+      nextTier: 'Silver',
+    };
+  }
+  return {
+    containerBg: 'rgba(205,127,50,0.15)',
+    pillBg: '#CD7F32',
+    pillTextColor: colors.white,
+    pillLabel: 'Bronze',
+    nextTier: 'Bronze',
+  };
+}
 
-  useEffect(() => {
-    if (answered > 0 && total > 0) {
-      Animated.timing(progressAnim, {
-        toValue: answered / total,
-        duration: 400,
-        useNativeDriver: false,
-      }).start();
-    }
-  }, [answered, total, progressAnim]);
+// ─── Section icon (lucide) ────────────────────────────────────────────────────
+function SectionIcon({ section, size = 14 }: { section: string; size?: number }) {
+  const c = colors.primaryBlue;
+  if (section === 'Hören') return <Headphones color={c} size={size} />;
+  if (section === 'Schreiben') return <PenLine color={c} size={size} />;
+  if (section === 'Sprechen') return <Mic color={c} size={size} />;
+  return <BookOpenText color={c} size={size} />;
+}
 
-  if (answered === 0) return null;
+// ─── Recent session row ───────────────────────────────────────────────────────
+function formatSessionDate(iso: string): string {
+  const date = new Date(iso);
+  const now = new Date();
+  const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
+  if (diffDays === 0) return 'Today';
+  if (diffDays === 1) return 'Yesterday';
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+}
 
+function sessionTypeLabel(t: string): string {
+  if (t === 'stream') return 'Practice';
+  if (t === 'sectional') return 'Sectional';
+  if (t === 'mock') return 'Mock';
+  return t;
+}
+
+function RecentSessionRow({ session }: { session: RecentSession }) {
+  const score = Math.round(session.score_pct);
+  const scoreColor = score >= 70 ? colors.green : score >= 40 ? colors.amber : colors.red;
   return (
-    <View style={progressStyles.wrapper}>
-      <View style={progressStyles.container}>
-        <Animated.View
-          style={[
-            progressStyles.fill,
-            {
-              width: progressAnim.interpolate({
-                inputRange: [0, 1],
-                outputRange: ['0%', '100%'],
-              }),
-            },
-          ]}
-        />
+    <View style={recentStyles.row}>
+      <View style={recentStyles.iconWrap}>
+        <SectionIcon section={session.section} size={13} />
       </View>
-      <Text style={progressStyles.counter}>{answered} / {total}</Text>
+      <View style={recentStyles.info}>
+        <Text style={recentStyles.label}>{sessionTypeLabel(session.session_type)} · {session.section}</Text>
+        <Text style={recentStyles.date}>{formatSessionDate(session.completed_at)}</Text>
+      </View>
+      <View style={[recentStyles.scorePill, { backgroundColor: scoreColor + '22' }]}>
+        <Text style={[recentStyles.scoreText, { color: scoreColor }]}>{score}%</Text>
+      </View>
     </View>
   );
 }
 
-const progressStyles = StyleSheet.create({
-  wrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    gap: 10,
-    paddingVertical: 6,
-    backgroundColor: Colors.primaryDeep,
+const recentStyles = StyleSheet.create({
+  row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 9 },
+  iconWrap: {
+    width: 28, height: 28, borderRadius: 8,
+    backgroundColor: '#EEF4FF',
+    alignItems: 'center', justifyContent: 'center',
   },
-  container: {
-    flex: 1,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    overflow: 'hidden',
-    shadowColor: Colors.primaryDeep,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 2,
-    elevation: 1,
+  info: { flex: 1, gap: 2 },
+  label: { fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.bodySm, color: colors.darkNavy },
+  date: { fontFamily: fontFamily.bodyRegular, fontSize: fontSize.label, color: colors.mutedGray },
+  scorePill: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: radius.pill },
+  scoreText: { fontFamily: fontFamily.display, fontSize: fontSize.label },
+});
+
+// ─── Section history row ──────────────────────────────────────────────────────
+function SectionHistoryRow({ item, onPress }: { item: SectionHistoryItem; onPress: () => void }) {
+  const rightLabel = item.progressPct > 0 ? `${Math.round(item.progressPct)}%` : '—';
+  return (
+    <Pressable style={histStyles.row} onPress={onPress}>
+      <View style={histStyles.iconWrap}>
+        <SectionIcon section={item.section} size={14} />
+      </View>
+      <View style={histStyles.body}>
+        <Text style={histStyles.name}>{item.section}</Text>
+        <View style={histStyles.barTrack}>
+          <View style={[histStyles.barFill, { width: `${Math.min(item.progressPct, 100)}%` as any }]} />
+        </View>
+      </View>
+      <Text style={histStyles.count}>{rightLabel}</Text>
+    </Pressable>
+  );
+}
+
+const histStyles = StyleSheet.create({
+  row: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingVertical: 10, paddingHorizontal: 16, gap: 10,
   },
-  fill: {
-    height: '100%',
-    borderRadius: 4,
-    backgroundColor: colors.blue,
-    shadowColor: colors.blue,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.4,
-    shadowRadius: 4,
-    elevation: 2,
+  iconWrap: {
+    width: 28, height: 28, borderRadius: 8,
+    backgroundColor: '#EEF4FF',
+    alignItems: 'center', justifyContent: 'center',
+    flexShrink: 0,
   },
-  counter: {
-    color: 'rgba(255,255,255,0.85)',
-    fontSize: 12,
-    fontWeight: '700' as const,
-    minWidth: 40,
-    textAlign: 'right' as const,
+  body: { flex: 1, gap: 4 },
+  name: { fontFamily: fontFamily.bodySemiBold, fontSize: 13, color: colors.darkNavy },
+  barTrack: {
+    height: 4, borderRadius: 2,
+    backgroundColor: colors.cardBorder, overflow: 'hidden',
+  },
+  barFill: { height: '100%', borderRadius: 2, backgroundColor: colors.primaryBlue },
+  count: {
+    fontFamily: fontFamily.bodyRegular, fontSize: 10,
+    color: colors.mutedGray, textAlign: 'right', flexShrink: 0, minWidth: 28,
   },
 });
 
-export default function TestStreamScreen() {
-  const { profile, user, refreshProfile } = useAuth();
-  const { access, isStreamLimited, decrementStreamRemaining, incrementDailyStreamCount } = useAccess();
-  const queryClient = useQueryClient();
+// ─── Home screen ──────────────────────────────────────────────────────────────
+export default function HomeScreen() {
   const router = useRouter();
-  const userId = user?.id ?? '';
-  const targetLevel = profile?.target_level ?? 'A1';
-  const [showPaywall, setShowPaywall] = useState<boolean>(false);
-  const [showDashboard, setShowDashboard] = useState<boolean>(true);
+  const insets = useSafeAreaInsets();
+  const { access } = useAccess();
+  const { profile, user } = useAuth();
+  const data = useHomeData();
 
-  const [currentIndex, setCurrentIndex] = useState<number>(0);
-  const [answeredMap, setAnsweredMap] = useState<Record<string, string>>({});
-  const [audioUnlockedMap, setAudioUnlockedMap] = useState<Record<string, boolean>>({});
-  const [localPreparedness, setLocalPreparedness] = useState<number>(profile?.preparedness_score ?? 0);
-  const [localXp, setLocalXp] = useState<number>(profile?.xp_total ?? 0);
-  const [localStreak, setLocalStreak] = useState<number>(profile?.streak_count ?? 0);
-  const [isRecycledBanner, setIsRecycledBanner] = useState<boolean>(false);
-  const [celebrationBadge, setCelebrationBadge] = useState<BadgeType | null>(null);
-  const [streakToast, setStreakToast] = useState<string | null>(null);
-  const [showBottomSheet, setShowBottomSheet] = useState<boolean>(false);
-  const [reportQuestionId, setReportQuestionId] = useState<string | null>(null);
-  const [totalAnswered, setTotalAnswered] = useState<number>(0);
-  const [showSwipeHint, setShowSwipeHint] = useState<boolean>(false);
-  const [horenPct, setHorenPct] = useState<number>(50);
-  const [lesenPct, setLesenPct] = useState<number>(50);
-  const [previousIndex, setPreviousIndex] = useState<number | null>(null);
-  const [sessionAnsweredCount, setSessionAnsweredCount] = useState<number>(0);
-  const [correctStreak, setCorrectStreak] = useState<number>(0);
-  const [comboToast, setComboToast] = useState<string | null>(null);
-  const [midSessionShown, setMidSessionShown] = useState<boolean>(false);
-  const [firstCorrectToday, setFirstCorrectToday] = useState<boolean>(false);
-  const [xpBurstVisible, setXpBurstVisible] = useState<boolean>(false);
-  const [xpBurstValue, setXpBurstValue] = useState<number>(0);
-  const xpBurstOpacity = useRef(new Animated.Value(0)).current;
-  const xpBurstTranslateY = useRef(new Animated.Value(0)).current;
-  const xpBurstScale = useRef(new Animated.Value(0.8)).current;
+  const [showBottomSheet, setShowBottomSheet] = useState(false);
+  const [showPaywall, setShowPaywall] = useState(false);
+  const [marketingDismissed, setMarketingDismissed] = useState(false);
 
-  const blockAnswersRef = useRef<AnswerRecord[]>([]);
-  const blockStartTimeRef = useRef<number>(Date.now());
-  const sessionIdRef = useRef<string>('');
-  const answeredCountRef = useRef<number>(0);
-  const hasUpdatedStreakRef = useRef<boolean>(false);
-  const isAnimatingRef = useRef<boolean>(false);
+  const formattedXp = useMemo(() => formatXp(data.xp), [data.xp]);
+  const initial = (user?.email ?? '?').charAt(0).toUpperCase();
 
-  const translateY = useRef(new Animated.Value(0)).current;
-  const streakToastAnim = useRef(new Animated.Value(-80)).current;
-  const swipeHintPulse = useRef(new Animated.Value(1)).current;
-  const gaugeScaleAnim = useRef(new Animated.Value(1)).current;
-  const comboToastAnim = useRef(new Animated.Value(0)).current;
+  const showUpgradeBanner =
+    UPGRADEABLE_TIERS.has(data.subscriptionTier) || access.trial_hours_remaining !== null;
 
-  const XP_PER_LEVEL: Record<string, number> = useMemo(() => ({
-    A1: 5,
-    A2: 10,
-    B1: 15,
-  }), []);
+  const tierConfig = getTierConfig(data.leaderboardPercentile);
+  const rankLabel =
+    data.leaderboardPercentile !== null ? `Top ${data.leaderboardPercentile}%` : '—';
 
-  const triggerXpBurst = useCallback((level: string) => {
-    const xpVal = XP_PER_LEVEL[level] ?? 5;
-    setXpBurstValue(xpVal);
-    setXpBurstVisible(true);
-    xpBurstOpacity.setValue(0);
-    xpBurstTranslateY.setValue(0);
-    xpBurstScale.setValue(0.8);
-
-    Animated.parallel([
-      Animated.timing(xpBurstOpacity, { toValue: 1, duration: 150, useNativeDriver: true }),
-      Animated.timing(xpBurstScale, { toValue: 1, duration: 150, useNativeDriver: true }),
-    ]).start(() => {
-      Animated.parallel([
-        Animated.timing(xpBurstTranslateY, { toValue: -30, duration: 450, useNativeDriver: true }),
-        Animated.timing(xpBurstOpacity, { toValue: 0, duration: 450, delay: 150, useNativeDriver: true }),
-      ]).start(() => {
-        setXpBurstVisible(false);
-      });
-    });
-  }, [XP_PER_LEVEL, xpBurstOpacity, xpBurstTranslateY, xpBurstScale]);
-
-  useEffect(() => {
-    if (profile) {
-      setLocalPreparedness(profile.preparedness_score ?? 0);
-      setLocalXp(profile.xp_total ?? 0);
-      setLocalStreak(profile.streak_count ?? 0);
-    }
-  }, [profile]);
-
-  useEffect(() => {
-    AsyncStorage.getItem(SWIPE_HINT_KEY).then((val) => {
-      const count = val ? parseInt(val, 10) : 0;
-      setTotalAnswered(isNaN(count) ? 0 : count);
-    }).catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    if (userId) {
-      fetchSectionAccuracy(userId).then((acc) => {
-        setHorenPct(Math.round(acc.horenAccuracy * 100));
-        setLesenPct(Math.round(acc.lesenAccuracy * 100));
-      }).catch(() => {});
-    }
-  }, [userId]);
-
-  const questionsQuery = useQuery({
-    queryKey: ['stream-questions', targetLevel, userId],
-    enabled: Boolean(userId) && Boolean(targetLevel),
-    queryFn: async (): Promise<AppQuestion[]> => {
-      console.log('TestStream fetching questions for', targetLevel);
-      const result = await fetchStreamQuestions({ userId, targetLevel, limit: SESSION_SIZE });
-      if (result.isRecycled) {
-        setIsRecycledBanner(true);
-      }
-      return result.questions;
-    },
-    staleTime: 0,
-  });
-
-  const questions = useMemo(() => questionsQuery.data ?? [], [questionsQuery.data]);
-  const currentQuestion = previousIndex !== null ? questions[previousIndex] ?? null : questions[currentIndex] ?? null;
-  const isReviewMode = previousIndex !== null;
-
-  const ensureSession = useCallback(async () => {
-    if (!sessionIdRef.current || sessionIdRef.current === 'placeholder-session') {
-      const id = await createStreamSession({
-        userId,
-        level: targetLevel,
-        questionsTotal: 0,
-        questionsCorrect: 0,
-        timeTakenSeconds: 0,
-      });
-      sessionIdRef.current = id;
-      blockStartTimeRef.current = Date.now();
-    }
-  }, [userId, targetLevel]);
-
-  const fetchMoreQuestions = useCallback(async () => {
-    console.log('TestStream prefetching more questions');
-    try {
-      const result = await fetchStreamQuestions({ userId, targetLevel, limit: SESSION_SIZE });
-      if (result.isRecycled) {
-        setIsRecycledBanner(true);
-      }
-      queryClient.setQueryData<AppQuestion[]>(
-        ['stream-questions', targetLevel, userId],
-        (old) => [...(old ?? []), ...result.questions]
-      );
-    } catch (err) {
-      console.log('TestStream prefetch error', err);
-    }
-  }, [userId, targetLevel, queryClient]);
-
-  const writeBlockSession = useCallback(async () => {
-    const answers = blockAnswersRef.current;
-    if (answers.length === 0) return;
-    const correct = answers.filter((a) => a.isCorrect).length;
-    const timeTaken = Math.round((Date.now() - blockStartTimeRef.current) / 1000);
-    try {
-      await createStreamSession({
-        userId,
-        level: targetLevel,
-        questionsTotal: answers.length,
-        questionsCorrect: correct,
-        timeTakenSeconds: timeTaken,
-      });
-    } catch (err) {
-      console.log('TestStream writeBlockSession error', err);
-    }
-    blockAnswersRef.current = [];
-    blockStartTimeRef.current = Date.now();
-  }, [userId, targetLevel]);
-
-  const showStreakToastBanner = useCallback(
-    (message: string) => {
-      setStreakToast(message);
-      Animated.sequence([
-        Animated.timing(streakToastAnim, { toValue: 0, duration: 250, useNativeDriver: true }),
-        Animated.delay(2500),
-        Animated.timing(streakToastAnim, { toValue: -80, duration: 300, useNativeDriver: true }),
-      ]).start(() => setStreakToast(null));
-    },
-    [streakToastAnim]
-  );
-
-  const showComboToastBanner = useCallback(
-    (message: string) => {
-      setComboToast(message);
-      Animated.sequence([
-        Animated.timing(comboToastAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
-        Animated.delay(1500),
-        Animated.timing(comboToastAnim, { toValue: 0, duration: 200, useNativeDriver: true }),
-      ]).start(() => setComboToast(null));
-    },
-    [comboToastAnim]
-  );
-
-  const checkMilestones = useCallback(
-    (streak: number, xp: number) => {
-      if ([7, 30, 60, 100].includes(streak)) {
-        showStreakToastBanner(`🔥 ${streak}-day streak!`);
-      } else if (xp > 0 && xp % 100 === 0) {
-        showStreakToastBanner(`⭐ ${xp} XP total`);
-      }
-    },
-    [showStreakToastBanner]
-  );
-
-  const animateGaugePulse = useCallback(() => {
-    Animated.sequence([
-      Animated.timing(gaugeScaleAnim, { toValue: 1.12, duration: 200, useNativeDriver: true }),
-      Animated.timing(gaugeScaleAnim, { toValue: 1, duration: 400, useNativeDriver: true }),
-    ]).start();
-  }, [gaugeScaleAnim]);
-
-  const handleAnswer = useCallback(
-    async (questionId: string, selectedKey: string, isCorrect: boolean) => {
-      setAnsweredMap((prev) => ({ ...prev, [questionId]: selectedKey }));
-      answeredCountRef.current += 1;
-      const newSessionCount = answeredCountRef.current;
-      setSessionAnsweredCount(newSessionCount);
-
-      decrementStreamRemaining();
-      incrementDailyStreamCount().catch(() => {});
-
-      const newTotal = totalAnswered + 1;
-      setTotalAnswered(newTotal);
-      AsyncStorage.setItem(SWIPE_HINT_KEY, String(newTotal)).catch(() => {});
-
-      if (newTotal <= 10) {
-        setShowSwipeHint(true);
-      }
-
-      if (isCorrect) {
-        triggerXpBurst(targetLevel);
-        const newStrk = correctStreak + 1;
-        setCorrectStreak(newStrk);
-
-        if (newStrk === 1 && !firstCorrectToday && newSessionCount === 1) {
-          setFirstCorrectToday(true);
-          showComboToastBanner('First correct today! ✦');
-        } else if (newStrk === 3) {
-          showComboToastBanner('3 in a row! 🔥');
-        } else if (newStrk === 5) {
-          showComboToastBanner('5 in a row! ⚡');
-        }
-      } else {
-        setCorrectStreak(0);
-      }
-
-      if (newSessionCount === Math.ceil(SESSION_SIZE / 2) && !midSessionShown && answeredCountRef.current === Math.ceil(SESSION_SIZE / 2)) {
-        setMidSessionShown(true);
-        showStreakToastBanner('Halfway there — you\'re doing great 🔥');
-      }
-
-      if (newSessionCount === 10) {
-        showComboToastBanner('10 questions done! 💪');
-      }
-
-      if (Platform.OS !== 'web') {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-      }
-
-      await ensureSession();
-
-      writeStreamAnswer({
-        userId,
-        sessionId: sessionIdRef.current,
-        questionId,
-        selectedAnswer: selectedKey,
-        isCorrect,
-      }).catch((err) => console.log('TestStream writeAnswer error', err));
-
-      updatePreparednessScore(userId, 1).then((newScore) => {
-        setLocalPreparedness(newScore);
-      }).catch((err) => console.log('TestStream updatePreparedness error', err));
-      animateGaugePulse();
-
-      if (isCorrect && profile) {
-        const oldXp = localXp;
-        const { newXp, newStreak } = await updateXpAndStreak(userId, {
-          ...profile,
-          xp_total: localXp,
-          streak_count: localStreak,
-          last_active_date: profile.last_active_date,
-        });
-        setLocalXp(newXp);
-
-        const crossedBadge = didCrossBadgeThreshold(oldXp, newXp);
-        if (crossedBadge) {
-          showStreakToastBanner(`🏅 You reached ${crossedBadge.label}!`);
-        }
-
-        if (newStreak !== localStreak) {
-          setLocalStreak(newStreak);
-          if (!hasUpdatedStreakRef.current) {
-            hasUpdatedStreakRef.current = true;
-            checkMilestones(newStreak, newXp);
-          }
-        }
-      }
-
-      blockAnswersRef.current.push({ questionId, selectedAnswer: selectedKey, isCorrect });
-
-      if (answeredCountRef.current % 5 === 0) {
-        writeBlockSession().catch(() => {});
-        const badge = await checkAndAwardBadges(userId, targetLevel, localXp);
-        if (badge) setCelebrationBadge(badge);
-        refreshProfile().catch(() => {});
-      }
-
-      const remaining = questions.length - (currentIndex + 1);
-      if (remaining <= 5) {
-        fetchMoreQuestions().catch(() => {});
-      }
-    },
-    [
-      userId, localXp, localStreak, profile, totalAnswered,
-      correctStreak, firstCorrectToday, midSessionShown,
-      ensureSession, writeBlockSession, targetLevel, questions.length,
-      currentIndex, fetchMoreQuestions, refreshProfile, checkMilestones, animateGaugePulse,
-      showStreakToastBanner, showComboToastBanner, decrementStreamRemaining, incrementDailyStreamCount, triggerXpBurst,
-    ]
-  );
-
-  const handleAudioPlayed = useCallback((questionId: string) => {
-    setAudioUnlockedMap((prev) => ({ ...prev, [questionId]: true }));
-  }, []);
-
-  const advanceToNext = useCallback(() => {
-    if (isAnimatingRef.current) return;
-    if (currentIndex >= questions.length - 1) return;
-
-    if (isStreamLimited) {
-      setShowPaywall(true);
-      return;
-    }
-
-    isAnimatingRef.current = true;
-    setPreviousIndex(null);
-    setShowSwipeHint(false);
-
-    Animated.timing(translateY, {
-      toValue: -SCREEN_HEIGHT,
-      duration: 280,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
-    }).start(() => {
-      setCurrentIndex((prev) => prev + 1);
-      translateY.setValue(0);
-      isAnimatingRef.current = false;
-    });
-  }, [currentIndex, questions.length, translateY, isStreamLimited]);
-
-  const goToPrevious = useCallback(() => {
-    if (isAnimatingRef.current) return;
-    if (currentIndex <= 0) return;
-
-    isAnimatingRef.current = true;
-    setPreviousIndex(currentIndex - 1);
-
-    Animated.timing(translateY, {
-      toValue: SCREEN_HEIGHT,
-      duration: 280,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
-    }).start(() => {
-      translateY.setValue(0);
-      isAnimatingRef.current = false;
-    });
-  }, [currentIndex, translateY]);
-
-  const returnFromReview = useCallback(() => {
-    if (isAnimatingRef.current) return;
-    isAnimatingRef.current = true;
-
-    Animated.timing(translateY, {
-      toValue: -SCREEN_HEIGHT,
-      duration: 280,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
-    }).start(() => {
-      setPreviousIndex(null);
-      translateY.setValue(0);
-      isAnimatingRef.current = false;
-    });
-  }, [translateY]);
-
-  const bounceCard = useCallback(() => {
-    Animated.sequence([
-      Animated.timing(translateY, { toValue: -16, duration: 80, useNativeDriver: true }),
-      Animated.spring(translateY, { toValue: 0, friction: 6, useNativeDriver: true }),
-    ]).start();
-  }, [translateY]);
-
-  const panResponder = useMemo(
-    () =>
-      PanResponder.create({
-        onMoveShouldSetPanResponder: (_, g) => {
-          return Math.abs(g.dy) > 12 && Math.abs(g.dy) > Math.abs(g.dx) * 1.5;
-        },
-        onPanResponderMove: (_, g) => {
-          if (isAnimatingRef.current) return;
-          translateY.setValue(g.dy * 0.6);
-        },
-        onPanResponderRelease: (_, g) => {
-          if (isAnimatingRef.current) return;
-          const activeQ = isReviewMode
-            ? questions[previousIndex ?? 0]
-            : questions[currentIndex];
-          const questionAnswered = activeQ ? Boolean(answeredMap[activeQ.id]) : false;
-
-          if (g.dy < -SWIPE_THRESHOLD || g.vy < -SWIPE_VELOCITY / 1000) {
-            if (isReviewMode) {
-              returnFromReview();
-            } else if (questionAnswered) {
-              advanceToNext();
-            } else {
-              bounceCard();
-            }
-          } else if (g.dy > SWIPE_THRESHOLD || g.vy > SWIPE_VELOCITY / 1000) {
-            if (isReviewMode) {
-              Animated.spring(translateY, { toValue: 0, friction: 8, useNativeDriver: true }).start();
-            } else if (currentIndex > 0 && !isReviewMode) {
-              goToPrevious();
-            } else {
-              Animated.spring(translateY, { toValue: 0, friction: 8, useNativeDriver: true }).start();
-            }
-          } else {
-            Animated.spring(translateY, { toValue: 0, friction: 8, useNativeDriver: true }).start();
-          }
-        },
-      }),
-    [translateY, currentIndex, answeredMap, questions, isReviewMode, previousIndex, advanceToNext, goToPrevious, returnFromReview, bounceCard]
-  );
-
-  useEffect(() => {
-    if (showSwipeHint && totalAnswered <= 10) {
-      const timeout = setTimeout(() => {
-        Animated.sequence([
-          Animated.timing(swipeHintPulse, { toValue: 0.5, duration: 400, useNativeDriver: true }),
-          Animated.timing(swipeHintPulse, { toValue: 1, duration: 400, useNativeDriver: true }),
-        ]).start();
-      }, 3000);
-      return () => clearTimeout(timeout);
-    }
-  }, [showSwipeHint, totalAnswered, swipeHintPulse]);
-
-  const isCurrentAnswered = currentQuestion ? Boolean(answeredMap[currentQuestion.id]) : false;
-
-  const gaugeColor = useMemo(() => {
-    if (localPreparedness < 40) return colors.red;
-    if (localPreparedness < 70) return colors.amber;
-    return colors.green;
-  }, [localPreparedness]);
-
-  const badgeTier = useMemo(() => getBadgeTier(localXp), [localXp]);
-  const formattedXp = useMemo(() => formatXp(localXp), [localXp]);
-
-  const handleReportPress = useCallback((qId: string) => {
-    setReportQuestionId(qId);
-  }, []);
-
-  const isFirstLaunch = useMemo(() => {
-    return Object.keys(answeredMap).length === 0 && totalAnswered === 0 && questions.length > 0;
-  }, [answeredMap, totalAnswered, questions.length]);
-
-  const handleStartPractice = useCallback(() => {
-    setShowDashboard(false);
-  }, []);
-
-  if (showDashboard) {
-    return (
-      <SafeAreaView style={styles.safeArea}>
-        {access.trial_hours_remaining !== null ? (
-          <TrialBanner
-            hoursRemaining={access.trial_hours_remaining}
-            onUpgrade={() => setShowPaywall(true)}
-          />
-        ) : null}
-        <HomeDashboard onStartPractice={handleStartPractice} />
-        <PaywallModal
-          visible={showPaywall}
-          variant="stream_limit"
-          onUpgrade={() => setShowPaywall(false)}
-          onDismiss={() => setShowPaywall(false)}
-        />
-      </SafeAreaView>
-    );
-  }
-
-  if (questionsQuery.isLoading) {
-    return (
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.loadingWrap}>
-          <ActivityIndicator color={Colors.accent} size="large" />
-          <Text style={styles.loadingText}>Loading questions...</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  if (questions.length === 0) {
-    return (
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.statusBar}>
-          <View style={styles.statusLeft}>
-            <Text style={styles.statusIcon}>📊</Text>
-            <Text style={styles.statusLabelText}>No questions</Text>
-          </View>
-          <Animated.View style={[styles.gaugePill, { backgroundColor: gaugeColor, transform: [{ scale: gaugeScaleAnim }] }]}>
-            <Text style={styles.gaugeText}>{targetLevel} · {Math.round(localPreparedness)}%</Text>
-          </Animated.View>
-        </View>
-        <View style={styles.emptyWrap}>
-          <Text style={styles.emptyEmoji}>🏆</Text>
-          <Text style={styles.emptyTitle}>You've completed all available questions!</Text>
-          <Text style={styles.emptyDesc}>Come back tomorrow or try a Sectional Test for deeper practice.</Text>
-          <View style={styles.emptyCtas}>
-            <Pressable
-              style={styles.ctaPrimary}
-              onPress={() => router.push('/tests' as never)}
-              testID="empty-sectional-cta"
-            >
-              <Text style={styles.ctaPrimaryText}>Try Sectional Test</Text>
-            </Pressable>
-            <Pressable style={styles.ctaSecondary} testID="empty-tomorrow-cta">
-              <Text style={styles.ctaSecondaryText}>Come back tomorrow</Text>
-            </Pressable>
-          </View>
-        </View>
-      </SafeAreaView>
-    );
-  }
+  const scoreInt = Math.round(data.preparedness);
+  const progressWidth = `${Math.min(scoreInt, 100)}%`;
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      {access.trial_hours_remaining !== null ? (
-        <TrialBanner
-          hoursRemaining={access.trial_hours_remaining}
-          onUpgrade={() => setShowPaywall(true)}
-        />
-      ) : null}
-      <View style={styles.statusBar}>
-        <View style={styles.statusLeft}>
-          {currentQuestion ? (
-            <>
-              {currentQuestion.section === 'Hören' ? (
-                <Headphones color="rgba(255,255,255,0.8)" size={14} />
-              ) : (
-                <BookOpenText color="rgba(255,255,255,0.8)" size={14} />
-              )}
-              <Text style={styles.statusLabelText}>
-                {currentQuestion.section} · Teil {currentQuestion.teil}
-              </Text>
-            </>
-          ) : null}
-        </View>
-        <Pressable onPress={() => setShowBottomSheet(true)} testID="gauge-pill">
-          <Animated.View style={[styles.gaugePill, { backgroundColor: gaugeColor, transform: [{ scale: gaugeScaleAnim }] }]}>
-            <Text style={styles.gaugeText}>{targetLevel} · {Math.round(localPreparedness)}%</Text>
-          </Animated.View>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+
+      {/* FIX 2: Upgrade CTA alert bar */}
+      {showUpgradeBanner ? (
+        <Pressable style={styles.alertBar} onPress={() => setShowPaywall(true)}>
+          <Text style={styles.alertBarText}>
+            Upgrade to Pro — unlock all levels and sections →
+          </Text>
         </Pressable>
-      </View>
-
-      <SessionProgressBar answered={sessionAnsweredCount} total={SESSION_SIZE} />
-
-      {isRecycledBanner ? (
-        <View style={styles.recycledBanner}>
-          <Text style={styles.recycledText}>You've seen all questions this month! 🏆 Starting a new cycle.</Text>
-          <Pressable onPress={() => setIsRecycledBanner(false)} hitSlop={8}>
-            <Text style={styles.recycledClose}>✕</Text>
-          </Pressable>
-        </View>
       ) : null}
 
-      {isFirstLaunch && currentQuestion ? (
-        <View style={styles.welcomeBanner}>
-          <Text style={styles.welcomeText}>
-            Your first {targetLevel} question. Swipe up when you're ready.
+      {/* Exam countdown (only if no upgrade banner) */}
+      {!showUpgradeBanner && data.daysToExam !== null && data.daysToExam <= 30 ? (
+        <View style={styles.examBar}>
+          <Text style={styles.examBarText}>
+            📅 {data.daysToExam} days until your exam — stay consistent
           </Text>
         </View>
       ) : null}
 
-      {isReviewMode ? (
-        <View style={styles.reviewBanner}>
-          <Text style={styles.reviewText}>← Review · Read only</Text>
+      {/* Campaign marketing banner */}
+      {data.campaignActive && !marketingDismissed ? (
+        <View style={styles.marketingBanner}>
+          <View style={styles.marketingBody}>
+            <Text style={styles.marketingTitle}>Your exam is closer than you think</Text>
+            <Text style={styles.marketingSub}>
+              Practice daily — even 5 minutes builds lasting confidence.
+            </Text>
+          </View>
+          <Pressable
+            style={styles.marketingDismiss}
+            onPress={() => setMarketingDismissed(true)}
+            hitSlop={8}
+          >
+            <X color={colors.mutedGray} size={18} />
+          </Pressable>
         </View>
       ) : null}
 
-      <View style={styles.cardContainer} {...panResponder.panHandlers}>
-        {currentQuestion ? (
-          <Animated.View style={[styles.animatedCard, { transform: [{ translateY }] }]}>
-            <StreamCard
-              question={currentQuestion}
-              onAnswer={handleAnswer}
-              isAnswered={Boolean(answeredMap[currentQuestion.id])}
-              selectedAnswer={answeredMap[currentQuestion.id] ?? null}
-              audioUnlocked={audioUnlockedMap[currentQuestion.id] ?? false}
-              onAudioPlayed={() => handleAudioPlayed(currentQuestion.id)}
-              onReportPress={handleReportPress}
-              reviewMode={isReviewMode}
-            />
-          </Animated.View>
-        ) : null}
-      </View>
-
-      {isCurrentAnswered && !isReviewMode && totalAnswered <= 10 ? (
-        <Animated.View style={[styles.swipeHint, { opacity: swipeHintPulse }]}>
-          <ChevronUp color={Colors.textMuted} size={18} />
-          <Text style={styles.swipeHintText}>Swipe up</Text>
-        </Animated.View>
-      ) : null}
-
-      <View style={styles.progressRow}>
-        <View style={styles.statsRow}>
-          <Text style={styles.statText}>🔥 {localStreak}</Text>
-          <View style={styles.xpRow}>
-            <Text style={styles.statText}>⭐ {formattedXp} XP</Text>
-            <View style={[styles.badgePill, { backgroundColor: badgeTier.color }]}>
-              <Text style={styles.badgePillText}>{badgeTier.label}</Text>
-            </View>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[
+          styles.scroll,
+          { paddingBottom: insets.bottom + TAB_BAR_HEIGHT + BOTTOM_CONTENT_BUFFER },
+        ]}
+      >
+        {/* ── Header ── */}
+        <View style={styles.header}>
+          <Pressable
+            style={styles.avatar}
+            onPress={() => router.push('/(tabs)/profile' as never)}
+            testID="home-profile-avatar"
+            hitSlop={8}
+          >
+            <Text style={styles.avatarInitial}>{initial}</Text>
+          </Pressable>
+          <Text style={styles.wordmark}>wordifi</Text>
+          <View style={styles.bell}>
+            <Bell color={colors.midGray} size={16} strokeWidth={1.8} />
           </View>
         </View>
-      </View>
 
-      {comboToast ? (
-        <Animated.View style={[styles.comboPill, { opacity: comboToastAnim, transform: [{ scale: comboToastAnim.interpolate({ inputRange: [0, 1], outputRange: [0.8, 1] }) }] }]}>
-          <Text style={styles.comboPillText}>{comboToast}</Text>
-        </Animated.View>
-      ) : null}
-
-      {xpBurstVisible ? (
-        <Animated.View
-          pointerEvents="none"
-          style={[styles.xpBurst, { opacity: xpBurstOpacity, transform: [{ translateY: xpBurstTranslateY }, { scale: xpBurstScale }] }]}
+        {/* ── HERO GAMIFICATION CARD ── */}
+        <Pressable
+          style={styles.heroCard}
+          onPress={() => setShowBottomSheet(true)}
+          testID="home-hero-card"
         >
-          <Text style={styles.xpBurstText}>+{xpBurstValue} XP</Text>
-        </Animated.View>
-      ) : null}
+          {/* Row 1: Level + exam type | Exam countdown */}
+          <View style={styles.heroRow1}>
+            <View style={styles.levelRow}>
+              <View style={styles.levelPill}>
+                <Text style={styles.levelText}>{data.targetLevel}</Text>
+                <Text style={styles.examTypeText}>{data.examType}</Text>
+              </View>
+            </View>
+            {data.daysToExam !== null ? (
+              <View style={styles.examBadge}>
+                <Text style={styles.examBadgeText}>{data.daysToExam} days to exam</Text>
+              </View>
+            ) : null}
+          </View>
 
-      {celebrationBadge ? (
-        <CelebrationOverlay
-          badgeType={celebrationBadge}
-          level={targetLevel}
-          onDismiss={() => setCelebrationBadge(null)}
-        />
-      ) : null}
+          {/* Row 2: Readiness number */}
+          <Text style={styles.readinessLabel}>EXAM READINESS</Text>
+          <View style={styles.scoreRow}>
+            <Text style={styles.scoreInt}>{scoreInt}</Text>
+            <Text style={styles.scorePct}>%</Text>
+          </View>
+          <Text style={styles.scoreSub}>{readinessSubtext(scoreInt)}</Text>
 
-      {streakToast ? (
-        <Animated.View style={[styles.toast, { transform: [{ translateY: streakToastAnim }] }]}>
-          <Text style={styles.toastText}>{streakToast}</Text>
-        </Animated.View>
-      ) : null}
+          {/* Row 3: Progress bar */}
+          <View style={styles.progressTrack}>
+            <View style={[styles.progressFill, { width: progressWidth as any }]} />
+          </View>
+
+          {/* Row 4: 4 stat chips */}
+          <View style={styles.statsRow}>
+            <View style={styles.statChip}>
+              <Flame color={colors.accentTeal} size={14} />
+              <Text style={styles.statVal}>{data.streak}</Text>
+              <Text style={styles.statLbl}>Streak</Text>
+            </View>
+            <View style={styles.chipDivider} />
+            <View style={styles.statChip}>
+              <Star color={colors.accentTeal} size={14} />
+              <Text style={styles.statVal}>{formattedXp}</Text>
+              <Text style={styles.statLbl}>XP</Text>
+            </View>
+            <View style={styles.chipDivider} />
+            <View style={styles.statChip}>
+              <Award color={colors.accentTeal} size={14} />
+              <Text style={styles.statVal}>{rankLabel}</Text>
+              <Text style={styles.statLbl}>Rank</Text>
+            </View>
+            <View style={styles.chipDivider} />
+            <View style={styles.statChip}>
+              <TrendingUp color={colors.accentTeal} size={14} />
+              <Text style={styles.statVal}>—</Text>
+              <Text style={styles.statLbl}>7-day</Text>
+            </View>
+          </View>
+
+          {/* Row 5: Tier nudge */}
+          {data.isLoading && tierConfig === null ? (
+            <View style={styles.tierSkeleton} />
+          ) : tierConfig ? (
+            <View style={[styles.tierRow, { backgroundColor: tierConfig.containerBg }]}>
+              <View style={[styles.tierPill, { backgroundColor: tierConfig.pillBg }]}>
+                <Text style={[styles.tierPillText, { color: tierConfig.pillTextColor }]}>
+                  {tierConfig.pillLabel}
+                </Text>
+              </View>
+              {tierConfig.nextTier ? (
+                <Text style={styles.tierNudgeText}>
+                  A few tests to reach{' '}
+                  <Text style={styles.tierNextName}>{tierConfig.nextTier}</Text>
+                </Text>
+              ) : (
+                <Text style={styles.tierNudgeText}>You're in the top tier</Text>
+              )}
+            </View>
+          ) : null}
+        </Pressable>
+
+        {/* ── Activity grid ── */}
+        <Text style={styles.sectionHead}>Activity</Text>
+        <View style={styles.activityGrid}>
+          <View style={styles.actCard}>
+            <Zap color={colors.primaryBlue} size={20} />
+            <Text style={styles.actNum}>{data.activityCounts.streamAnswered}</Text>
+            <Text style={styles.actLbl}>Stream</Text>
+          </View>
+
+          <Pressable
+            style={styles.actCard}
+            onPress={() => router.push('/(tabs)/tests' as never)}
+          >
+            <ClipboardList color={colors.primaryBlue} size={20} />
+            <Text style={styles.actNum}>{data.activityCounts.sectionalTests}</Text>
+            <Text style={styles.actLbl}>Sectional</Text>
+          </Pressable>
+
+          <Pressable
+            style={styles.actCard}
+            onPress={() => router.push('/(tabs)/mock' as never)}
+          >
+            <Trophy color={colors.primaryBlue} size={20} />
+            <Text style={styles.actNum}>{data.activityCounts.mockTests}</Text>
+            <Text style={styles.actLbl}>Complete Test</Text>
+          </Pressable>
+
+          <View style={styles.actCard}>
+            <Hash color={colors.primaryBlue} size={20} />
+            <Text style={styles.actNum}>{data.activityCounts.totalAnswered}</Text>
+            <Text style={styles.actLbl}>Total Questions</Text>
+          </View>
+        </View>
+
+        {/* ── History by section ── */}
+        <Text style={styles.sectionHead}>History by section</Text>
+        <View style={styles.histContainer}>
+          {data.sectionHistory.map((item, idx) => (
+            <React.Fragment key={item.section}>
+              <SectionHistoryRow
+                item={item}
+                onPress={() => router.push('/(tabs)/tests' as never)}
+              />
+              {idx < data.sectionHistory.length - 1 ? (
+                <View style={styles.histDivider} />
+              ) : null}
+            </React.Fragment>
+          ))}
+        </View>
+
+        {/* ── Recent sessions ── */}
+        {data.recentSessions.length > 0 ? (
+          <>
+            <Text style={styles.sectionHead}>Recent sessions</Text>
+            <View style={styles.recentContainer}>
+              {data.recentSessions.map((session, idx) => (
+                <React.Fragment key={session.id}>
+                  <RecentSessionRow session={session} />
+                  {idx < data.recentSessions.length - 1 ? (
+                    <View style={styles.histDivider} />
+                  ) : null}
+                </React.Fragment>
+              ))}
+            </View>
+          </>
+        ) : null}
+      </ScrollView>
 
       <PreparednessBottomSheet
         visible={showBottomSheet}
         onClose={() => setShowBottomSheet(false)}
-        level={targetLevel}
-        overallScore={localPreparedness}
-        horenPct={horenPct}
-        lesenPct={lesenPct}
-        streak={localStreak}
+        level={data.targetLevel}
+        overallScore={data.preparedness}
+        horenPct={data.horenAccuracy}
+        lesenPct={data.lesenAccuracy}
+        streak={data.streak}
         lastActiveDate={profile?.last_active_date ?? null}
-      />
-
-      <ReportModal
-        visible={Boolean(reportQuestionId)}
-        questionId={reportQuestionId ?? ''}
-        userId={userId}
-        onClose={() => setReportQuestionId(null)}
       />
 
       <PaywallModal
         visible={showPaywall}
         variant="stream_limit"
-        onUpgrade={() => {
-          setShowPaywall(false);
-        }}
+        onUpgrade={() => setShowPaywall(false)}
         onDismiss={() => setShowPaywall(false)}
       />
     </SafeAreaView>
   );
 }
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: colors.bodyBackground,
   },
-  statusBar: {
-    height: 52,
+
+  // Alert + exam bars
+  alertBar: {
+    backgroundColor: colors.primaryBlue,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  alertBarText: {
+    fontFamily: fontFamily.bodySemiBold,
+    fontSize: 12,
+    color: colors.white,
+    textAlign: 'center',
+  },
+  examBar: {
+    backgroundColor: colors.surfaceContainerLow,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  examBarText: {
+    fontFamily: fontFamily.bodySemiBold,
+    fontSize: 12,
+    color: colors.midGray,
+    textAlign: 'center',
+  },
+
+  // Marketing banner
+  marketingBanner: {
+    backgroundColor: colors.darkNavy,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingVertical: 20,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  marketingBody: { flex: 1, gap: 4 },
+  marketingTitle: {
+    fontFamily: fontFamily.display,
+    fontSize: 18,
+    color: colors.white,
+  },
+  marketingSub: {
+    fontFamily: fontFamily.bodyRegular,
+    fontSize: 13,
+    color: colors.mutedGray,
+    lineHeight: 18,
+  },
+  marketingDismiss: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
+
+  // Scroll container
+  scroll: {
+    gap: 0,
+    paddingTop: 0,
+  },
+
+  // ── Header ──
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    backgroundColor: Colors.primaryDeep,
+    paddingVertical: 12,
+    backgroundColor: colors.bodyBackground,
   },
-  statusLeft: {
+  avatar: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: colors.primaryBlue,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarInitial: {
+    fontFamily: fontFamily.display,
+    fontSize: 13,
+    color: colors.white,
+  },
+  wordmark: {
+    fontFamily: fontFamily.display,
+    fontSize: 20,
+    color: colors.darkNavy,
+    letterSpacing: -0.5,
+  },
+  bell: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#f1f3f8',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // ── Hero card ──
+  heroCard: {
+    backgroundColor: colors.darkNavy,
+    marginHorizontal: 12,
+    borderRadius: 20,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 16,
+    gap: 0,
+  },
+
+  // Row 1
+  heroRow1: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  levelRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
   },
-  statusIcon: {
-    fontSize: 14,
-  },
-  statusLabelText: {
-    fontSize: 12,
-    fontWeight: '600' as const,
-    color: 'rgba(255,255,255,0.7)',
-  },
-  gaugePill: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 99,
-  },
-  gaugeText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '700' as const,
-  },
-  loadingWrap: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-  },
-  loadingText: {
-    color: Colors.textMuted,
-    fontSize: 15,
-    fontWeight: '600' as const,
-  },
-  emptyWrap: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 32,
-    gap: 12,
-  },
-  emptyEmoji: {
-    fontSize: 48,
-  },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: '700' as const,
-    color: Colors.text,
-    textAlign: 'center',
-  },
-  emptyDesc: {
-    fontSize: 14,
-    color: Colors.textMuted,
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-  emptyCtas: {
-    gap: 10,
-    width: '100%',
-    marginTop: 16,
-  },
-  ctaPrimary: {
-    backgroundColor: Colors.accent,
-    paddingVertical: 14,
-    borderRadius: 14,
-    alignItems: 'center',
-  },
-  ctaPrimaryText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '700' as const,
-  },
-  ctaSecondary: {
-    backgroundColor: Colors.surfaceMuted,
-    paddingVertical: 14,
-    borderRadius: 14,
-    alignItems: 'center',
-  },
-  ctaSecondaryText: {
-    color: Colors.text,
-    fontSize: 15,
-    fontWeight: '600' as const,
-  },
-  recycledBanner: {
+  levelPill: {
+    backgroundColor: colors.primaryBlue,
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFF3E0',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    gap: 10,
+    gap: 6,
   },
-  recycledText: {
-    flex: 1,
-    color: '#E65100',
-    fontSize: 13,
-    fontWeight: '600' as const,
-    lineHeight: 18,
+  levelText: {
+    fontFamily: fontFamily.display,
+    fontSize: 11,
+    color: colors.white,
   },
-  recycledClose: {
-    color: '#E65100',
-    fontWeight: '700' as const,
-    fontSize: 16,
+  examTypeText: {
+    fontFamily: fontFamily.bodyRegular,
+    fontSize: 10,
+    color: 'rgba(255,255,255,0.6)',
   },
-  welcomeBanner: {
-    backgroundColor: Colors.primarySoft,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+  examBadge: {
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
   },
-  welcomeText: {
-    color: Colors.primary,
-    fontSize: 13,
-    fontWeight: '600' as const,
-    textAlign: 'center',
+  examBadgeText: {
+    fontFamily: fontFamily.bodyRegular,
+    fontSize: 11,
+    color: colors.mutedGray,
   },
-  reviewBanner: {
-    backgroundColor: Colors.surfaceMuted,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+
+  // Row 2: readiness score
+  readinessLabel: {
+    fontFamily: fontFamily.bodyBold,
+    fontSize: 11,
+    color: colors.mutedGray,
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    marginBottom: 4,
   },
-  reviewText: {
-    color: Colors.textMuted,
+  scoreRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 4,
+    marginBottom: 4,
+  },
+  scoreInt: {
+    fontFamily: fontFamily.display,
+    fontSize: 64,
+    color: colors.white,
+    lineHeight: 64,
+    letterSpacing: -2,
+  },
+  scorePct: {
+    fontFamily: fontFamily.display,
+    fontSize: 28,
+    color: colors.accentTeal,
+    lineHeight: 40,
+  },
+  scoreSub: {
+    fontFamily: fontFamily.bodyRegular,
     fontSize: 12,
-    fontWeight: '600' as const,
-    textAlign: 'center',
+    color: colors.mutedGray,
+    marginBottom: 14,
   },
-  cardContainer: {
-    flex: 1,
+
+  // Row 3: progress bar
+  progressTrack: {
+    height: 4,
+    borderRadius: 4,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    marginBottom: 16,
     overflow: 'hidden',
   },
-  animatedCard: {
-    flex: 1,
+  progressFill: {
+    height: '100%',
+    borderRadius: 4,
+    backgroundColor: colors.primaryBlue,
   },
-  swipeHint: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    paddingVertical: 6,
-  },
-  swipeHintText: {
-    color: Colors.textMuted,
-    fontSize: 12,
-    fontWeight: '600' as const,
-  },
-  progressRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: Colors.background,
-  },
+
+  // Row 4: 4 stat chips
   statsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.08)',
+    paddingTop: 12,
+    marginBottom: 12,
   },
-  statText: {
-    color: Colors.textMuted,
-    fontSize: 12,
-    fontWeight: '700' as const,
+  statChip: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 2,
   },
-  xpRow: {
+  statVal: {
+    fontFamily: fontFamily.display,
+    fontSize: 16,
+    color: colors.white,
+  },
+  statLbl: {
+    fontFamily: fontFamily.bodyRegular,
+    fontSize: 10,
+    color: colors.mutedGray,
+  },
+  chipDivider: {
+    width: 1,
+    height: 28,
+    backgroundColor: 'rgba(255,255,255,0.10)',
+  },
+
+  // Row 5: tier nudge
+  tierSkeleton: {
+    height: 34,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  tierRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  tierPill: {
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  tierPillText: {
+    fontFamily: fontFamily.bodyBold,
+    fontSize: 10,
+  },
+  tierNudgeText: {
+    fontFamily: fontFamily.bodyRegular,
+    fontSize: 11,
+    color: colors.mutedGray,
+    flexShrink: 1,
+  },
+  tierNextName: {
+    fontFamily: fontFamily.bodySemiBold,
+    fontSize: 11,
+    color: colors.accentTeal,
+  },
+
+  // ── Section header ──
+  sectionHead: {
+    fontFamily: fontFamily.bodySemiBold,
+    fontSize: 13,
+    color: colors.midGray,
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 8,
+  },
+
+  // ── Activity grid ──
+  activityGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: 12,
+    gap: 8,
+  },
+  actCard: {
+    width: '47.5%',
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 14,
     gap: 6,
   },
-  badgePill: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 99,
+  actNum: {
+    fontFamily: fontFamily.display,
+    fontSize: 26,
+    color: colors.darkNavy,
+    lineHeight: 28,
   },
-  badgePillText: {
-    fontSize: 10,
-    fontWeight: '800' as const,
-    color: colors.text,
+  actLbl: {
+    fontFamily: fontFamily.bodyRegular,
+    fontSize: 11,
+    color: colors.mutedGray,
   },
-  comboPill: {
-    position: 'absolute',
-    top: 110,
-    alignSelf: 'center',
-    backgroundColor: colors.amber,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 99,
-    zIndex: 200,
-  },
-  comboPillText: {
-    color: colors.navy,
-    fontSize: 13,
-    fontWeight: '800' as const,
-  },
-  toast: {
-    position: 'absolute',
-    top: 0,
-    left: 16,
-    right: 16,
-    backgroundColor: Colors.primaryDeep,
+
+  // ── History by section ──
+  histContainer: {
+    backgroundColor: colors.white,
+    marginHorizontal: 12,
     borderRadius: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    alignItems: 'center',
-    zIndex: 300,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    overflow: 'hidden',
   },
-  toastText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '700' as const,
+  histDivider: {
+    height: 0.5,
+    backgroundColor: colors.cardBorder,
+    marginLeft: 54, // indent past icon
   },
-  xpBurst: {
-    position: 'absolute',
-    top: '45%' as unknown as number,
-    alignSelf: 'center',
-    zIndex: 250,
-  },
-  xpBurstText: {
-    color: colors.green,
-    fontSize: 18,
-    fontWeight: '800' as const,
+
+  // ── Recent sessions ──
+  recentContainer: {
+    backgroundColor: colors.white,
+    marginHorizontal: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    overflow: 'hidden',
+    paddingHorizontal: 4,
   },
 });

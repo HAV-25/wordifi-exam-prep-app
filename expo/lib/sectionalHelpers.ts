@@ -6,6 +6,7 @@ export type TeilInfo = {
   section: string;
   teil: number;
   question_type: string;
+  structure_type: string;
   q_count: number;
   estimated_minutes: number;
 };
@@ -19,6 +20,7 @@ type TeilRow = {
   section: string;
   teil: number;
   question_type: string;
+  source_structure_type: string;
 };
 
 type SessionRetestRow = {
@@ -31,7 +33,7 @@ export async function fetchAvailableTeile(level: string): Promise<TeilInfo[]> {
 
   const { data, error } = await supabase
     .from('app_questions')
-    .select('section, teil, question_type')
+    .select('section, teil, question_type, source_structure_type')
     .eq('level', level)
     .eq('is_active', true);
 
@@ -45,10 +47,10 @@ export async function fetchAvailableTeile(level: string): Promise<TeilInfo[]> {
   }
 
   const rows = data as unknown as TeilRow[];
-  const grouped = new Map<string, { section: string; teil: number; question_type: string; count: number }>();
+  const grouped = new Map<string, { section: string; teil: number; question_type: string; structure_type: string; count: number }>();
 
   for (const row of rows) {
-    const key = `${row.section}__${row.teil}__${row.question_type}`;
+    const key = `${row.section}__${row.teil}__${row.source_structure_type}`;
     const existing = grouped.get(key);
     if (existing) {
       existing.count += 1;
@@ -57,6 +59,7 @@ export async function fetchAvailableTeile(level: string): Promise<TeilInfo[]> {
         section: row.section,
         teil: row.teil,
         question_type: row.question_type,
+        structure_type: row.source_structure_type,
         count: 1,
       });
     }
@@ -70,6 +73,7 @@ export async function fetchAvailableTeile(level: string): Promise<TeilInfo[]> {
       section: entry.section,
       teil: entry.teil,
       question_type: entry.question_type,
+      structure_type: entry.structure_type,
       q_count: displayCount,
       estimated_minutes: Math.max(1, Math.round((displayCount * 45) / 60)),
     });

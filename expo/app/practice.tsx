@@ -1,7 +1,12 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
+import { BookOpenText, CheckCircle, HelpCircle, Headphones, ThumbsDown, ThumbsUp, X, XCircle } from 'lucide-react-native';
 import React, { useMemo, useRef, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+const TAB_BAR_HEIGHT = 64;       // rendered bottom tab bar height
+const BOTTOM_CONTENT_BUFFER = 24; // breathing room below last content item
+import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { EmptyState } from '@/components/EmptyState';
@@ -11,10 +16,13 @@ import { StimulusCard } from '@/components/StimulusCard';
 import Colors from '@/constants/colors';
 import { submitCompletedSession } from '@/lib/sessionHelpers';
 import { supabase } from '@/lib/supabaseClient';
+import { useQuestionMeta } from '@/lib/useQuestionTypeMeta';
 import { useAuth } from '@/providers/AuthProvider';
+import { colors } from '@/theme';
 import type { AppQuestion } from '@/types/database';
 
 export default function PracticeScreen() {
+  const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ level?: string; section?: string; teil?: string; examType?: string }>();
   const { user, profile, refreshProfile } = useAuth();
   const level = params.level ?? profile?.target_level ?? 'A1';
@@ -23,6 +31,7 @@ export default function PracticeScreen() {
   const examType = params.examType ?? profile?.exam_type ?? 'telc';
   const [currentIndex, setCurrentIndex] = useState<number>(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [showTooltip, setShowTooltip] = useState(false);
   const sessionStartTimeRef = useRef<number>(Date.now());
 
   const questionsQuery = useQuery({
@@ -83,6 +92,7 @@ export default function PracticeScreen() {
 
   const questions = questionsQuery.data ?? [];
   const currentQuestion = questions[currentIndex] ?? null;
+  const meta = useQuestionMeta(currentQuestion?.source_structure_type);
   const progress = useMemo<number>(() => {
     if (questions.length === 0) {
       return 0;
@@ -118,6 +128,85 @@ export default function PracticeScreen() {
     if (!currentQuestion) {
       return null;
     }
+
+    const category = meta?.question_category;
+
+    // True/False
+    if (category === 'true_false') {
+      const dbOptions = currentQuestion.options.length > 0
+        ? currentQuestion.options
+        : [{ key: 'a', text: 'Richtig' }, { key: 'b', text: 'Falsch' }];
+      return dbOptions.map((option, index) => {
+        const normalizedValue = option.key.toLowerCase();
+        const isSelected = selectedAnswer === normalizedValue;
+        const leading = index === 0
+          ? <CheckCircle color={colors.answerCorrect} size={24} />
+          : <XCircle color={colors.answerIncorrect} size={24} />;
+        const label = index === 0 ? 'Richtig' : 'Falsch';
+        return (
+          <OptionButton
+            key={`${currentQuestion.id}-${option.key}`}
+            label={label}
+            leadingNode={leading}
+            selected={isSelected}
+            onPress={() => setAnswers((value) => ({ ...value, [currentQuestion.id]: normalizedValue }))}
+            testID={`option-${option.key}`}
+          />
+        );
+      });
+    }
+
+    // Yes/No
+    if (category === 'yes_no') {
+      const dbOptions = currentQuestion.options.length > 0
+        ? currentQuestion.options
+        : [{ key: 'a', text: 'Ja' }, { key: 'b', text: 'Nein' }];
+      return dbOptions.map((option, index) => {
+        const normalizedValue = option.key.toLowerCase();
+        const isSelected = selectedAnswer === normalizedValue;
+        const leading = index === 0
+          ? <ThumbsUp color={colors.answerCorrect} size={24} />
+          : <ThumbsDown color={colors.answerIncorrect} size={24} />;
+        const label = index === 0 ? 'Ja' : 'Nein';
+        return (
+          <OptionButton
+            key={`${currentQuestion.id}-${option.key}`}
+            label={label}
+            leadingNode={leading}
+            selected={isSelected}
+            onPress={() => setAnswers((value) => ({ ...value, [currentQuestion.id]: normalizedValue }))}
+            testID={`option-${option.key}`}
+          />
+        );
+      });
+    }
+
+    // Speaker Match (Hören + matching)
+    if (category === 'matching' && section === 'Hören') {
+      const LETTERS = ['a', 'b', 'c', 'd', 'e', 'f'];
+      return currentQuestion.options.map((option, index) => {
+        const normalizedValue = option.key.toLowerCase();
+        const isSelected = selectedAnswer === normalizedValue;
+        const letter = (LETTERS[index] ?? String(index + 1)).toUpperCase();
+        const badge = (
+          <View style={styles.speakerBadge}>
+            <Text style={styles.speakerBadgeText}>{letter}</Text>
+          </View>
+        );
+        return (
+          <OptionButton
+            key={`${currentQuestion.id}-${option.key}`}
+            label={option.text}
+            leadingNode={badge}
+            selected={isSelected}
+            onPress={() => setAnswers((value) => ({ ...value, [currentQuestion.id]: normalizedValue }))}
+            testID={`option-${option.key}`}
+          />
+        );
+      });
+    }
+
+    // Default
     return currentQuestion.options.map((option) => {
       const normalizedValue = option.key.toLowerCase();
       const isSelected = selectedAnswer === normalizedValue;
@@ -148,7 +237,24 @@ export default function PracticeScreen() {
       />
       <View style={styles.headerCard}>
         <View style={styles.progressTrack}><View style={[styles.progressFill, { width: `${progress}%` }]} /></View>
-        <View style={styles.headerRow}><Text style={styles.counter}>Question {Math.min(currentIndex + 1, Math.max(questions.length, 1))} of {Math.max(questions.length, 1)}</Text><Text style={styles.meta}>{section} · Teil {teil} · {level}</Text></View>
+        <View style={styles.headerRow}>
+          <Text style={styles.counter}>Question {Math.min(currentIndex + 1, Math.max(questions.length, 1))} of {Math.max(questions.length, 1)}</Text>
+          <View style={styles.metaZone}>
+            <Pressable style={styles.helpBtn} onPress={() => setShowTooltip(true)}>
+              <HelpCircle size={20} color={Colors.textMuted} />
+            </Pressable>
+            <View style={[styles.sectionPill, section === 'Hören' ? styles.horenPill : styles.lesenPill]}>
+              {section === 'Hören'
+                ? <Headphones color="#fff" size={11} />
+                : <BookOpenText color="#fff" size={11} />}
+              <Text style={styles.sectionPillText}>{section}</Text>
+            </View>
+            <View style={styles.metaTextBlock}>
+              <Text style={styles.metaLevelTeil}>{level} · Teil {teil}</Text>
+              <Text style={styles.metaTypeName}>{meta?.name_en ?? ''}</Text>
+            </View>
+          </View>
+        </View>
       </View>
 
       {questionsQuery.isLoading ? (
@@ -158,7 +264,7 @@ export default function PracticeScreen() {
           <EmptyState title="This Teil has no questions yet. We're adding content soon." description="Try another Teil or check back soon." actionLabel="Go Back" onActionPress={() => router.back()} testID="practice-empty-state" />
         </View>
       ) : currentQuestion ? (
-        <ScrollView contentContainerStyle={styles.content}>
+        <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + TAB_BAR_HEIGHT + BOTTOM_CONTENT_BUFFER }]}>
           {section === 'Hören' && currentQuestion.audio_url ? <AudioPlayer audioUrl={currentQuestion.audio_url} /> : null}
           {section === 'Lesen' && currentQuestion.stimulus_text ? <StimulusCard text={currentQuestion.stimulus_text} type={currentQuestion.stimulus_type} /> : null}
           <QuestionCard title={currentQuestion.question_text} subtitle={currentQuestion.question_type.replace('_', ' ')}>
@@ -168,12 +274,26 @@ export default function PracticeScreen() {
       ) : null}
 
       {questions.length > 0 && currentQuestion ? (
-        <View style={styles.footer}>
+        <View style={[styles.footer, { bottom: insets.bottom }]}>
           <Pressable accessibilityLabel={currentIndex === questions.length - 1 ? 'Submit test' : 'Next question'} disabled={!selectedAnswer || submitMutation.isPending} onPress={handleNext} style={[styles.nextButton, !selectedAnswer ? styles.nextButtonDisabled : null]} testID="next-question-button">
             <Text style={styles.nextButtonText}>{currentIndex === questions.length - 1 ? 'Submit Test' : 'Next'}</Text>
           </Pressable>
         </View>
       ) : null}
+
+      <Modal transparent animationType="fade" visible={showTooltip} onRequestClose={() => setShowTooltip(false)}>
+        <Pressable style={styles.tooltipScrim} onPress={() => setShowTooltip(false)}>
+          <Pressable style={styles.tooltipCard} onPress={() => {}}>
+            <View style={styles.tooltipTitleRow}>
+              <Text style={styles.tooltipTitle}>{meta?.name_en ?? ''}</Text>
+              <Pressable onPress={() => setShowTooltip(false)}>
+                <X size={18} color={Colors.textMuted} />
+              </Pressable>
+            </View>
+            <Text style={styles.tooltipBody}>{meta?.tooltip_en ?? ''}</Text>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -183,9 +303,24 @@ const styles = StyleSheet.create({
   headerCard: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8, gap: 10 },
   progressTrack: { height: 8, borderRadius: 999, backgroundColor: Colors.ringTrack, overflow: 'hidden' },
   progressFill: { height: '100%', borderRadius: 999, backgroundColor: Colors.accent },
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 },
   counter: { color: Colors.primary, fontWeight: '800' },
-  meta: { color: Colors.textMuted, fontWeight: '600' },
+  metaZone: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1 },
+  helpBtn: { padding: 2 },
+  sectionPill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 99 },
+  horenPill: { backgroundColor: '#2B70EF' },
+  lesenPill: { backgroundColor: '#6A1B9A' },
+  sectionPillText: { color: '#fff', fontSize: 11, fontWeight: '700' },
+  metaTextBlock: { gap: 1 },
+  metaLevelTeil: { fontSize: 12, color: Colors.textBody, fontWeight: '400' },
+  metaTypeName: { fontSize: 12, color: Colors.textMuted, fontWeight: '400' },
+  speakerBadge: { width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
+  speakerBadgeText: { fontSize: 16, fontWeight: '800', color: Colors.primary, fontFamily: 'Outfit_800ExtraBold' },
+  tooltipScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: Colors.scrim, alignItems: 'center', justifyContent: 'center' },
+  tooltipCard: { backgroundColor: Colors.white, borderRadius: 16, padding: 16, maxWidth: 300, marginHorizontal: 24, width: '100%' },
+  tooltipTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  tooltipTitle: { fontSize: 14, fontWeight: '600', color: Colors.text, flex: 1 },
+  tooltipBody: { fontSize: 13, fontWeight: '400', color: Colors.textBody, marginTop: 8, lineHeight: 19 },
   headerButton: { minHeight: 40, justifyContent: 'center', paddingRight: 12 },
   headerButtonText: { color: Colors.primary, fontWeight: '700' },
   loadingWrap: { padding: 20, gap: 12 },

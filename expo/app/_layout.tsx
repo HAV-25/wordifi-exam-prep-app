@@ -1,25 +1,24 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Outfit_800ExtraBold } from '@expo-google-fonts/outfit';
 import {
-  PlusJakartaSans_600SemiBold,
-  PlusJakartaSans_800ExtraBold,
-} from '@expo-google-fonts/plus-jakarta-sans';
-import {
-  BeVietnamPro_400Regular,
-  BeVietnamPro_500Medium,
-  BeVietnamPro_700Bold,
-} from '@expo-google-fonts/be-vietnam-pro';
+  NunitoSans_400Regular,
+  NunitoSans_600SemiBold,
+  NunitoSans_700Bold,
+} from '@expo-google-fonts/nunito-sans';
 import { useFonts } from 'expo-font';
 import { Redirect, Stack, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { colors } from '@/theme';
 import { AccessProvider } from '@/providers/AccessProvider';
 import { AuthProvider, useAuth } from '@/providers/AuthProvider';
 import { ONBOARDING_VERSION } from '@/constants/onboardingVersion';
+import { QuestionTypeMetaProvider, useQuestionTypeMetaContext } from '@/lib/useQuestionTypeMeta';
 
 void SplashScreen.preventAutoHideAsync();
 
@@ -28,14 +27,15 @@ const queryClient = new QueryClient();
 function RouteGate() {
   const segments = useSegments();
   const { isLoading, session, hasCompletedOnboarding } = useAuth();
+  const { isMetaLoading } = useQuestionTypeMetaContext();
 
   useEffect(() => {
-    if (!isLoading) {
+    if (!isLoading && !isMetaLoading) {
       void SplashScreen.hideAsync();
     }
-  }, [isLoading]);
+  }, [isLoading, isMetaLoading]);
 
-  if (isLoading) {
+  if (isLoading || isMetaLoading) {
     return (
       <View style={styles.loadingWrap}>
         <ActivityIndicator color={colors.navy} size="large" />
@@ -95,11 +95,10 @@ function RootLayoutNav() {
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
-    PlusJakartaSans_800ExtraBold,
-    PlusJakartaSans_600SemiBold,
-    BeVietnamPro_400Regular,
-    BeVietnamPro_500Medium,
-    BeVietnamPro_700Bold,
+    Outfit_800ExtraBold,
+    NunitoSans_400Regular,
+    NunitoSans_600SemiBold,
+    NunitoSans_700Bold,
   });
 
   if (!fontsLoaded) {
@@ -114,11 +113,15 @@ export default function RootLayout() {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <AccessProvider>
-          <GestureHandlerRootView style={styles.gestureRoot}>
-            <ErrorBoundary>
-              <RootLayoutNav />
-            </ErrorBoundary>
-          </GestureHandlerRootView>
+          <QuestionTypeMetaProvider>
+          <SafeAreaProvider>
+            <GestureHandlerRootView style={styles.gestureRoot}>
+              <ErrorBoundary>
+                <RootLayoutNav />
+              </ErrorBoundary>
+            </GestureHandlerRootView>
+          </SafeAreaProvider>
+          </QuestionTypeMetaProvider>
         </AccessProvider>
       </AuthProvider>
     </QueryClientProvider>

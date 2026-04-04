@@ -1,6 +1,10 @@
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { PenLine } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+const CTA_BUTTON_HEIGHT = 56;    // primary CTA / footer height
+const BOTTOM_CONTENT_BUFFER = 24; // breathing room below last content item
 import {
   Alert,
   Animated,
@@ -33,6 +37,7 @@ type QuestionState = {
 };
 
 export default function SchreibenTestScreen() {
+  const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{
     level?: string;
     teil?: string;
@@ -374,7 +379,7 @@ export default function SchreibenTestScreen() {
     return (
       <View style={styles.screen}>
         <Stack.Screen options={{ title: 'Ergebnis', headerBackVisible: false }} />
-        <ScrollView contentContainerStyle={styles.summaryContent} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={[styles.summaryContent, { paddingBottom: insets.bottom + CTA_BUTTON_HEIGHT + BOTTOM_CONTENT_BUFFER }]} showsVerticalScrollIndicator={false}>
           <View style={[styles.summaryHero, shadows.card]}>
             <View style={styles.summaryIconWrap}>
               <PenLine color={colors.white} size={24} />
@@ -409,7 +414,7 @@ export default function SchreibenTestScreen() {
           })}
         </ScrollView>
 
-        <View style={styles.footer}>
+        <View style={[styles.footer, { bottom: insets.bottom }]}>
           <CTAButton
             label="Zurück zu den Tests"
             onPress={() => router.replace('/(tabs)/tests')}
@@ -464,7 +469,7 @@ export default function SchreibenTestScreen() {
           <PulsingCachedLoader />
         </View>
       ) : currentQuestion ? (
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + CTA_BUTTON_HEIGHT + BOTTOM_CONTENT_BUFFER }]} showsVerticalScrollIndicator={false}>
           {currentState.assessment ? (
             <SchreibenResult
               assessment={currentState.assessment}
@@ -495,7 +500,7 @@ export default function SchreibenTestScreen() {
       ) : null}
 
       {currentState.assessment && !currentState.isLoading ? (
-        <View style={styles.footer}>
+        <View style={[styles.footer, { bottom: insets.bottom }]}>
           <CTAButton
             label={currentIndex === questions.length - 1 ? 'Test abschließen' : 'Nächste Frage →'}
             onPress={handleNext}

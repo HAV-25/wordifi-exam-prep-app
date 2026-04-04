@@ -1,9 +1,14 @@
 import { Stack, router, useLocalSearchParams } from 'expo-router';
-import { Headphones, BookOpenText } from 'lucide-react-native';
+import { Headphones, BookOpenText, HelpCircle, CheckCircle, XCircle, ThumbsUp, ThumbsDown, X } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+const CTA_BUTTON_HEIGHT = 56;    // primary CTA / footer height
+const BOTTOM_CONTENT_BUFFER = 24; // breathing room below last content item
 import {
   Alert,
   Animated,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -20,10 +25,12 @@ import {
   completeSectionalSession,
   createSectionalSession,
 } from '@/lib/sectionalHelpers';
+import { useQuestionMeta } from '@/lib/useQuestionTypeMeta';
 import { useAuth } from '@/providers/AuthProvider';
 import type { AppQuestion } from '@/types/database';
 
 export default function SectionalTestScreen() {
+  const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{
     level?: string;
     section?: string;
@@ -57,11 +64,16 @@ export default function SectionalTestScreen() {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [sessionId, setSessionId] = useState<string>('');
   const [remainingSeconds, setRemainingSeconds] = useState<number>(timeLimitSeconds);
+  const [showTooltip, setShowTooltip] = useState(false);
 
   const sessionStartTimeRef = useRef<number>(Date.now());
   const timerStartRef = useRef<number>(Date.now());
   const progressAnim = useRef(new Animated.Value(0)).current;
   const timerPulse = useRef(new Animated.Value(1)).current;
+
+  const currentQuestion = questions[currentIndex] ?? null;
+  const currentMeta = useQuestionMeta(currentQuestion?.source_structure_type);
+  const selectedAnswer = currentQuestion ? (answers[currentQuestion.id] ?? '') : '';
 
   useEffect(() => {
     if (questions.length === 0 || !userId) return;
@@ -121,9 +133,6 @@ export default function SectionalTestScreen() {
       useNativeDriver: false,
     }).start();
   }, [currentIndex, questions.length, progressAnim]);
-
-  const currentQuestion = questions[currentIndex] ?? null;
-  const selectedAnswer = currentQuestion ? (answers[currentQuestion.id] ?? '') : '';
 
   const handleSubmit = useCallback(async () => {
     if (isSubmitting || !sessionId) return;
@@ -196,6 +205,8 @@ export default function SectionalTestScreen() {
     return `${m}:${s.toString().padStart(2, '0')}`;
   }, []);
 
+  const closeTooltip = useCallback(() => setShowTooltip(false), []);
+
   const progressWidth = progressAnim.interpolate({
     inputRange: [0, 100],
     outputRange: ['0%', '100%'],
@@ -222,6 +233,133 @@ export default function SectionalTestScreen() {
       </View>
     );
   }
+
+  const renderOptions = () => {
+    if (!currentQuestion) return null;
+
+    const category = currentMeta?.question_category;
+
+    // True/False
+    if (category === 'true_false') {
+      const opts = currentQuestion.options?.length > 0
+        ? currentQuestion.options
+        : [{ key: 'a', text: 'Richtig' }, { key: 'b', text: 'Falsch' }];
+
+      return opts.map((option, idx) => {
+        const normalizedKey = option.key.toLowerCase();
+        const isSelected = selectedAnswer === normalizedKey;
+        const leadingNode = idx === 0
+          ? <CheckCircle color={colors.answerCorrect} size={24} />
+          : <XCircle color={colors.answerIncorrect} size={24} />;
+        return (
+          <OptionButton
+            key={`${currentQuestion.id}-${option.key}`}
+            label={option.text}
+            leadingNode={leadingNode}
+            selected={isSelected}
+            onPress={() =>
+              setAnswers((prev) => ({
+                ...prev,
+                [currentQuestion.id]: normalizedKey,
+              }))
+            }
+            testID={`sectional-option-${option.key}`}
+          />
+        );
+      });
+    }
+
+    // Yes/No
+    if (category === 'yes_no') {
+      const opts = currentQuestion.options?.length > 0
+        ? currentQuestion.options
+        : [{ key: 'a', text: 'Ja' }, { key: 'b', text: 'Nein' }];
+
+      return opts.map((option, idx) => {
+        const normalizedKey = option.key.toLowerCase();
+        const isSelected = selectedAnswer === normalizedKey;
+        const leadingNode = idx === 0
+          ? <ThumbsUp color={colors.answerCorrect} size={24} />
+          : <ThumbsDown color={colors.answerIncorrect} size={24} />;
+        return (
+          <OptionButton
+            key={`${currentQuestion.id}-${option.key}`}
+            label={option.text}
+            leadingNode={leadingNode}
+            selected={isSelected}
+            onPress={() =>
+              setAnswers((prev) => ({
+                ...prev,
+                [currentQuestion.id]: normalizedKey,
+              }))
+            }
+            testID={`sectional-option-${option.key}`}
+          />
+        );
+      });
+    }
+
+    // Speaker matching (Hören)
+    if (category === 'matching' && section === 'Hören') {
+      const opts = currentQuestion.options?.length > 0
+        ? currentQuestion.options
+        : [];
+
+      const letters = ['a', 'b', 'c', 'd'];
+      return opts.map((option, idx) => {
+        const normalizedKey = option.key.toLowerCase();
+        const isSelected = selectedAnswer === normalizedKey;
+        const badgeLetter = letters[idx] ?? option.key.toLowerCase();
+        const leadingNode = (
+          <View style={styles.speakerBadge}>
+            <Text style={styles.speakerBadgeText}>{badgeLetter}</Text>
+          </View>
+        );
+        return (
+          <OptionButton
+            key={`${currentQuestion.id}-${option.key}`}
+            label={option.text}
+            leadingNode={leadingNode}
+            selected={isSelected}
+            onPress={() =>
+              setAnswers((prev) => ({
+                ...prev,
+                [currentQuestion.id]: normalizedKey,
+              }))
+            }
+            testID={`sectional-option-${option.key}`}
+          />
+        );
+      });
+    }
+
+    // Default (multiple choice, etc.)
+    const opts = currentQuestion.options?.length > 0
+      ? currentQuestion.options
+      : currentQuestion.question_type === 'true_false'
+      ? [{ key: 'a', text: 'Richtig' }, { key: 'b', text: 'Falsch' }]
+      : [];
+
+    return opts.map((option) => {
+      const normalizedKey = option.key.toLowerCase();
+      const isSelected = selectedAnswer === normalizedKey;
+      return (
+        <OptionButton
+          key={`${currentQuestion.id}-${option.key}`}
+          label={option.text}
+          leading={option.key}
+          selected={isSelected}
+          onPress={() =>
+            setAnswers((prev) => ({
+              ...prev,
+              [currentQuestion.id]: normalizedKey,
+            }))
+          }
+          testID={`sectional-option-${option.key}`}
+        />
+      );
+    });
+  };
 
   return (
     <View style={styles.screen}>
@@ -266,6 +404,9 @@ export default function SectionalTestScreen() {
             Question {Math.min(currentIndex + 1, questions.length)} of {questions.length}
           </Text>
           <View style={styles.metaRow}>
+            <Pressable onPress={() => setShowTooltip(true)} style={styles.helpBtn}>
+              <HelpCircle color={Colors.textMuted} size={20} />
+            </Pressable>
             <View style={[styles.sectionPill, section === 'Hören' ? styles.horenPill : styles.lesenPill]}>
               {section === 'Hören' ? (
                 <Headphones color="#fff" size={11} />
@@ -274,22 +415,25 @@ export default function SectionalTestScreen() {
               )}
               <Text style={styles.sectionPillText}>{section}</Text>
             </View>
-            <Text style={styles.meta}>Teil {teil} · {level}</Text>
+            <View style={styles.metaTextBlock}>
+              <Text style={styles.metaLevelTeil}>{level} · Teil {teil}</Text>
+              <Text style={styles.metaTypeName}>{currentMeta?.name_en ?? ''}</Text>
+            </View>
           </View>
         </View>
       </View>
 
       {currentQuestion ? (
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + CTA_BUTTON_HEIGHT + BOTTOM_CONTENT_BUFFER }]} showsVerticalScrollIndicator={false}>
           {section === 'Hören' && currentQuestion.audio_url ? (
             <AudioPlayer audioUrl={currentQuestion.audio_url} />
           ) : null}
 
-          {section === 'Lesen' && currentQuestion.stimulus_text ? (
+          {currentQuestion.stimulus_text ? (
             <StimulusCard
               text={currentQuestion.stimulus_text}
               type={currentQuestion.stimulus_type}
-              collapsible
+              collapsible={section === 'Lesen'}
             />
           ) : null}
 
@@ -297,35 +441,19 @@ export default function SectionalTestScreen() {
             <Text style={styles.questionType}>
               {currentQuestion.question_type.replace('_', ' ').toUpperCase()}
             </Text>
-            <Text style={styles.questionText}>{currentQuestion.question_text}</Text>
+            {currentQuestion.question_text ? (
+              <Text style={styles.questionText}>{currentQuestion.question_text}</Text>
+            ) : null}
           </View>
 
           <View style={styles.optionsWrap}>
-            {currentQuestion.options.map((option) => {
-              const normalizedKey = option.key.toLowerCase();
-              const isSelected = selectedAnswer === normalizedKey;
-              return (
-                <OptionButton
-                  key={`${currentQuestion.id}-${option.key}`}
-                  label={option.text}
-                  leading={option.key}
-                  selected={isSelected}
-                  onPress={() =>
-                    setAnswers((prev) => ({
-                      ...prev,
-                      [currentQuestion.id]: normalizedKey,
-                    }))
-                  }
-                  testID={`sectional-option-${option.key}`}
-                />
-              );
-            })}
+            {renderOptions()}
           </View>
         </ScrollView>
       ) : null}
 
       {currentQuestion ? (
-        <View style={styles.footer}>
+        <View style={[styles.footer, { bottom: insets.bottom }]}>
           <Pressable
             accessibilityLabel={
               currentIndex === questions.length - 1 ? 'Submit test' : 'Next question'
@@ -348,6 +476,25 @@ export default function SectionalTestScreen() {
           </Pressable>
         </View>
       ) : null}
+
+      <Modal
+        transparent
+        animationType="fade"
+        visible={showTooltip}
+        onRequestClose={closeTooltip}
+      >
+        <Pressable style={styles.tooltipScrim} onPress={closeTooltip}>
+          <Pressable style={styles.tooltipCard} onPress={(e) => e.stopPropagation()}>
+            <View style={styles.tooltipTitleRow}>
+              <Text style={styles.tooltipTitle}>{currentMeta?.name_en ?? ''}</Text>
+              <Pressable onPress={closeTooltip}>
+                <X color={Colors.textMuted} size={18} />
+              </Pressable>
+            </View>
+            <Text style={styles.tooltipBody}>{currentMeta?.tooltip_en ?? ''}</Text>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -422,6 +569,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
+  helpBtn: {
+    padding: 2,
+  },
+  metaTextBlock: {
+    gap: 2,
+  },
+  metaLevelTeil: {
+    fontSize: 12,
+    color: Colors.textBody,
+    fontWeight: '400' as const,
+  },
+  metaTypeName: {
+    fontSize: 12,
+    color: Colors.textMuted,
+    fontWeight: '400' as const,
+  },
   sectionPill: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -473,6 +636,20 @@ const styles = StyleSheet.create({
   },
   optionsWrap: {
     gap: 10,
+  },
+  speakerBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: Colors.primarySoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  speakerBadgeText: {
+    fontSize: 16,
+    fontWeight: '800' as const,
+    color: Colors.primary,
+    fontFamily: 'Outfit_800ExtraBold',
   },
   footer: {
     position: 'absolute',
@@ -528,5 +705,37 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700' as const,
     color: Colors.primary,
+  },
+  tooltipScrim: {
+    flex: 1,
+    backgroundColor: Colors.scrim,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tooltipCard: {
+    backgroundColor: Colors.white,
+    borderRadius: 16,
+    padding: 16,
+    maxWidth: 300,
+    marginHorizontal: 24,
+    width: '100%' as const,
+  },
+  tooltipTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  tooltipTitle: {
+    fontSize: 14,
+    fontWeight: '600' as const,
+    color: Colors.text,
+    flex: 1,
+  },
+  tooltipBody: {
+    fontSize: 13,
+    fontWeight: '400' as const,
+    color: Colors.textBody,
+    marginTop: 8,
+    lineHeight: 19,
   },
 });

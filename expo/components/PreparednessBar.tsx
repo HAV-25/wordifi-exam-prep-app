@@ -9,9 +9,9 @@ type PreparednessBarProps = {
 };
 
 function getBarColor(score: number): string {
-  if (score < 40) return colors.red;
-  if (score < 70) return colors.amber;
-  return colors.green;
+  if (score < 40) return colors.gaugeRed;
+  if (score < 70) return colors.gaugeAmber;
+  return colors.gaugeGreen;
 }
 
 export function PreparednessBar({ score, compact = false }: PreparednessBarProps) {

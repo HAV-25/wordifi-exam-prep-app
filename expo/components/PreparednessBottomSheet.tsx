@@ -9,6 +9,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import Colors from '@/constants/colors';
 import { colors } from '@/theme';
@@ -115,6 +116,8 @@ function getReadinessColor(pct: number): string {
   return colors.red;
 }
 
+const BOTTOM_CONTENT_BUFFER = 24;
+
 export const PreparednessBottomSheet = React.memo(function PreparednessBottomSheet({
   visible,
   onClose,
@@ -126,7 +129,9 @@ export const PreparednessBottomSheet = React.memo(function PreparednessBottomShe
   streak,
   lastActiveDate,
 }: PreparednessBottomSheetProps) {
-  const translateY = useRef(new Animated.Value(SHEET_HEIGHT)).current;
+  const insets = useSafeAreaInsets();
+  const sheetHeight = SHEET_HEIGHT + insets.bottom;
+  const translateY = useRef(new Animated.Value(sheetHeight)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -137,7 +142,7 @@ export const PreparednessBottomSheet = React.memo(function PreparednessBottomShe
       ]).start();
     } else {
       Animated.parallel([
-        Animated.timing(translateY, { toValue: SHEET_HEIGHT, duration: 200, useNativeDriver: true }),
+        Animated.timing(translateY, { toValue: sheetHeight, duration: 200, useNativeDriver: true }),
         Animated.timing(backdropOpacity, { toValue: 0, duration: 200, useNativeDriver: true }),
       ]).start();
     }
@@ -145,10 +150,10 @@ export const PreparednessBottomSheet = React.memo(function PreparednessBottomShe
 
   const dismiss = useCallback(() => {
     Animated.parallel([
-      Animated.timing(translateY, { toValue: SHEET_HEIGHT, duration: 200, useNativeDriver: true }),
+      Animated.timing(translateY, { toValue: sheetHeight, duration: 200, useNativeDriver: true }),
       Animated.timing(backdropOpacity, { toValue: 0, duration: 200, useNativeDriver: true }),
     ]).start(() => onClose());
-  }, [translateY, backdropOpacity, onClose]);
+  }, [translateY, backdropOpacity, onClose, sheetHeight]);
 
   const panResponder = useRef(
     PanResponder.create({
@@ -160,7 +165,7 @@ export const PreparednessBottomSheet = React.memo(function PreparednessBottomShe
       },
       onPanResponderRelease: (_, g) => {
         if (g.dy > 80 || g.vy > 0.5) {
-          dismiss();
+          void dismiss();
         } else {
           Animated.spring(translateY, { toValue: 0, friction: 9, tension: 65, useNativeDriver: true }).start();
         }
@@ -182,7 +187,14 @@ export const PreparednessBottomSheet = React.memo(function PreparednessBottomShe
         <Pressable style={StyleSheet.absoluteFill} onPress={dismiss} />
       </Animated.View>
       <Animated.View
-        style={[styles.sheet, { transform: [{ translateY }] }]}
+        style={[
+          styles.sheet,
+          {
+            height: sheetHeight,
+            paddingBottom: insets.bottom + BOTTOM_CONTENT_BUFFER,
+            transform: [{ translateY }],
+          },
+        ]}
         {...panResponder.panHandlers}
       >
         <View style={styles.handleBar} />
@@ -235,13 +247,11 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.45)',
   },
   sheet: {
-    height: SHEET_HEIGHT,
     backgroundColor: Colors.surface,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingHorizontal: 20,
     paddingTop: 12,
-    paddingBottom: 24,
     gap: 18,
   },
   handleBar: {

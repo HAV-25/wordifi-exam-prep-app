@@ -1,6 +1,10 @@
 import { Stack, router } from 'expo-router';
 import { Headphones, BookOpenText, AlertTriangle, X } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+const CTA_BUTTON_HEIGHT = 56;    // primary CTA / footer height
+const BOTTOM_CONTENT_BUFFER = 24; // breathing room below last content item
 import {
   Alert,
   Animated,
@@ -29,6 +33,7 @@ import type { AppQuestion } from '@/types/database';
 type MockPhase = 'horen' | 'transition' | 'lesen' | 'submitting';
 
 export default function MockTestScreen() {
+  const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{
     level?: string;
     examType?: string;
@@ -444,7 +449,7 @@ export default function MockTestScreen() {
       </View>
 
       {currentQuestion ? (
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + CTA_BUTTON_HEIGHT + BOTTOM_CONTENT_BUFFER }]} showsVerticalScrollIndicator={false}>
           {section === 'Hören' && currentQuestion.audio_url ? (
             <AudioPlayer audioUrl={currentQuestion.audio_url} />
           ) : null}
@@ -489,7 +494,7 @@ export default function MockTestScreen() {
       ) : null}
 
       {currentQuestion ? (
-        <View style={styles.footer}>
+        <View style={[styles.footer, { bottom: insets.bottom }]}>
           <Pressable
             accessibilityLabel={buttonLabel}
             disabled={!selectedAnswer}
