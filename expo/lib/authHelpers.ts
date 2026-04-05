@@ -51,7 +51,7 @@ function getWebOrigin(): string {
   if (typeof window !== 'undefined' && window.location?.origin) {
     return window.location.origin;
   }
-  return 'https://2ydqsq98wysdgr153a9qi.rork.app';
+  return 'https://wordifi.com';
 }
 
 async function signInWithGoogleWeb() {
@@ -81,7 +81,7 @@ async function signInWithGoogleNative() {
 
   const redirectTo = isExpoGo
     ? makeRedirectUri()
-    : makeRedirectUri({ scheme: 'rork-app' });
+    : makeRedirectUri({ scheme: 'wordifi' });
 
   console.log('[Auth] Google OAuth native redirectTo:', redirectTo);
   console.log('[Auth] Google OAuth native isExpoGo:', isExpoGo);

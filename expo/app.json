@@ -1,11 +1,11 @@
 {
   "expo": {
     "name": "Wordifi",
-    "slug": "2ydqsq98wysdgr153a9qi",
+    "slug": "wordifi",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "rork-app",
+    "scheme": "wordifi",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
@@ -15,7 +15,7 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "app.rork.2ydqsq98wysdgr153a9qi",
+      "bundleIdentifier": "com.wordifi.app",
       "infoPlist": {
         "NSMicrophoneUsageDescription": "Wordifi needs your microphone for the live speaking practice."
       }
@@ -39,7 +39,7 @@
       [
         "expo-router",
         {
-          "origin": "https://rork.com/"
+          "origin": "https://wordifi.com/"
         }
       ],
       "expo-font",
@@ -57,7 +57,7 @@
     },
     "extra": {
       "router": {
-        "origin": "https://rork.com/"
+        "origin": "https://wordifi.com/"
       },
       "eas": {
         "projectId": "b72e1067-0e74-46de-8bde-9fbe63191d37"
