@@ -69,12 +69,18 @@ function RouteGate() {
   const isOnboardingRoute =
     topSegment === 'onboarding_prelaunch' || topSegment === 'onboarding_launch';
 
-  // TEST MODE: onboarding bypassed — go straight to auth, home after login
+  // No session → show onboarding (unless already there or on auth)
   if (!session && !isAuthRoute && !isOnboardingRoute) {
-    return <Redirect href="/auth" />;
+    return <Redirect href="/onboarding_launch" />;
   }
 
-  if (session && (isAuthRoute || isOnboardingRoute)) {
+  // Has session but onboarding not complete → send back to onboarding
+  if (session && !hasCompletedOnboarding && !isOnboardingRoute && !isAuthRoute) {
+    return <Redirect href="/onboarding_launch" />;
+  }
+
+  // Fully onboarded user on auth or onboarding route → go home
+  if (session && hasCompletedOnboarding && (isAuthRoute || isOnboardingRoute)) {
     return <Redirect href="/" />;
   }
 
