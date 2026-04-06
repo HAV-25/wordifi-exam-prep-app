@@ -1,4 +1,5 @@
 import type { User } from '@supabase/supabase-js';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { supabase } from '@/lib/supabaseClient';
 import type { ExamType, Level, StudyPlanJson, UserProfile } from '@/types/database';
@@ -298,7 +299,8 @@ export async function saveOnboardingAnswers(
 ): Promise<void> {
   const { error } = await supabase
     .from('user_profiles')
-    .update({
+    .upsert({
+      id: userId,
       target_level: answers.level ?? null,
       exam_type: answers.cert !== 'not_sure' ? answers.cert : null,
       onboarding_cert: answers.cert,
@@ -308,12 +310,28 @@ export async function saveOnboardingAnswers(
       onboarding_learner_style: answers.learnerStyle,
       onboarding_completed_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
-    } as never)
-    .eq('id', userId);
+    } as never);
 
   if (error) {
-    console.log('saveOnboardingAnswers error', error);
+    console.error('saveOnboardingAnswers error', error);
     throw error;
+  }
+}
+
+const PENDING_ONBOARDING_KEY = 'wordifi_pending_onboarding';
+
+export async function savePendingOnboarding(answers: OnboardingAnswers): Promise<void> {
+  await AsyncStorage.setItem(PENDING_ONBOARDING_KEY, JSON.stringify(answers));
+}
+
+export async function loadAndClearPendingOnboarding(): Promise<OnboardingAnswers | null> {
+  try {
+    const raw = await AsyncStorage.getItem(PENDING_ONBOARDING_KEY);
+    if (!raw) return null;
+    await AsyncStorage.removeItem(PENDING_ONBOARDING_KEY);
+    return JSON.parse(raw) as OnboardingAnswers;
+  } catch {
+    return null;
   }
 }
 

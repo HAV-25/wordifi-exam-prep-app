@@ -21,7 +21,7 @@ import {
 import Colors from '@/constants/colors';
 import { colors, fontFamily } from '@/theme';
 import { resetPassword, signInWithEmail, signInWithGoogle, signUpWithEmail, updateTcAccepted } from '@/lib/authHelpers';
-import { saveOnboardingAnswers } from '@/lib/profileHelpers';
+import { loadAndClearPendingOnboarding, saveOnboardingAnswers, savePendingOnboarding } from '@/lib/profileHelpers';
 import { onboardingStore } from '@/app/onboarding_launch/_store';
 import { useAppConfig } from '@/providers/AppConfigProvider';
 import { supabase } from '@/lib/supabaseClient';
@@ -81,14 +81,23 @@ export default function AuthScreen() {
     try {
       if (mode === 'signIn') {
         const data = await signInWithEmail(email.trim(), password.trim());
-        // Update tc_accepted for users signing in after email confirmation
         if (data?.user) {
           await updateTcAccepted(data.user.id, config.tc_version).catch(() => {});
+          // Apply pending onboarding if it was saved before email confirmation
+          const pending = await loadAndClearPendingOnboarding();
+          if (pending) {
+            await saveOnboardingAnswers(data.user.id, pending).catch(() => {});
+          }
         }
         router.replace('/');
       } else {
         const result = await signUpWithEmail(email.trim(), password);
         if (result.status === 'confirmation_pending') {
+          // Save onboarding data now (profile row already created by signUpWithEmail)
+          await saveOnboardingAnswers(result.userId, onboardingStore).catch(() => {});
+          // Also persist to AsyncStorage as backup in case the DB write fails or app restarts
+          await savePendingOnboarding(onboardingStore).catch(() => {});
+          await updateTcAccepted(result.userId, config.tc_version).catch(() => {});
           router.push({ pathname: '/check-email', params: { email: result.email } });
           return;
         }

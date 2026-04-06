@@ -26,6 +26,7 @@ import { StreamCard } from '@/components/StreamCard';
 import { TrialBanner } from '@/components/TrialBanner';
 import Colors from '@/constants/colors';
 import { colors } from '@/theme';
+import { TEIL_NAMES } from '@/theme/constants';
 import { didCrossBadgeThreshold, formatXp, getBadgeTier } from '@/lib/badgeHelpers';
 import {
   checkAndAwardBadges,
@@ -766,8 +767,11 @@ export default function TestStreamScreen() {
               ) : (
                 <BookOpenText color="rgba(255,255,255,0.8)" size={14} />
               )}
-              <Text style={styles.statusLabelText}>
-                {currentQuestion.section} · Teil {currentQuestion.teil}
+              <Text style={styles.statusLabelText} numberOfLines={1}>
+                {targetLevel} · {currentQuestion.section} · Teil {currentQuestion.teil}
+                {TEIL_NAMES[currentQuestion.section]?.[currentQuestion.teil]
+                  ? ` · ${TEIL_NAMES[currentQuestion.section][currentQuestion.teil].de} / ${TEIL_NAMES[currentQuestion.section][currentQuestion.teil].en}`
+                  : ''}
               </Text>
             </>
           ) : null}

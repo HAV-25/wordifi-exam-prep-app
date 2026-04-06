@@ -184,6 +184,14 @@ export function WalkthroughProvider({ children }: { children: React.ReactNode })
     const currentUser = user;
 
     async function checkWalkthrough() {
+      // Rule 0: never show if DB already marks walkthrough as completed (handles fresh installs)
+      const { data: profileRow } = await supabase
+        .from('user_profiles')
+        .select('walkthrough_completed')
+        .eq('id', currentUser.id)
+        .maybeSingle();
+      if (profileRow?.walkthrough_completed) return;
+
       // Rule 1: never show after 3 days
       const accountAgeDays =
         (Date.now() - new Date(currentUser.created_at).getTime()) / (1000 * 60 * 60 * 24);

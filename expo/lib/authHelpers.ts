@@ -26,7 +26,7 @@ export async function signInWithEmail(email: string, password: string) {
 }
 
 export type SignUpResult =
-  | { status: 'confirmation_pending'; email: string }
+  | { status: 'confirmation_pending'; email: string; userId: string }
   | { status: 'signed_in'; data: Awaited<ReturnType<typeof supabase.auth.signUp>>['data'] };
 
 export async function signUpWithEmail(email: string, password: string): Promise<SignUpResult> {
@@ -42,7 +42,8 @@ export async function signUpWithEmail(email: string, password: string): Promise<
 
   // Confirmation email sent — not an error
   if (data.user && !data.session) {
-    return { status: 'confirmation_pending', email };
+    await ensureUserProfile(data.user); // create profile row immediately so upsert has something to update
+    return { status: 'confirmation_pending', email, userId: data.user.id };
   }
 
   // Fully signed in (email confirmation disabled)

@@ -120,6 +120,33 @@ export function shuffleArray<T>(array: T[]): T[] {
   return arr;
 }
 
+// ─── Teil Names (EN / DE) per section ────────────────────────────────────────
+export const TEIL_NAMES: Record<string, Record<number, { de: string; en: string }>> = {
+  'Hören': {
+    1: { de: 'Gespräche',         en: 'Conversations' },
+    2: { de: 'Kurzmitteilungen',  en: 'Short Messages' },
+    3: { de: 'Ansagen',           en: 'Announcements' },
+    4: { de: 'Interviews',        en: 'Interviews' },
+  },
+  'Lesen': {
+    1: { de: 'Texte lesen',           en: 'Reading Texts' },
+    2: { de: 'Anzeigen',              en: 'Notices' },
+    3: { de: 'Anzeigen zuordnen',     en: 'Matching Notices' },
+    4: { de: 'Briefe und E-Mails',    en: 'Letters and Emails' },
+    5: { de: 'Artikel',               en: 'Articles' },
+  },
+  'Schreiben': {
+    1: { de: 'Formular',          en: 'Form' },
+    2: { de: 'Mitteilung',        en: 'Message' },
+    3: { de: 'Brief oder E-Mail', en: 'Letter or Email' },
+  },
+  'Sprechen': {
+    1: { de: 'Sich vorstellen',         en: 'Introducing yourself' },
+    2: { de: 'Um Informationen bitten', en: 'Asking for information' },
+    3: { de: 'Gemeinsam planen',        en: 'Planning together' },
+  },
+} as const;
+
 // ─── AsyncStorage Keys ───────────────────────────────────────────────────────
 // Centralised to prevent key typos across the codebase
 export const STORAGE_KEYS = {

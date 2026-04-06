@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabaseClient';
-import { MOCK_TEST_QUESTION_COUNTS, shuffleArray } from '@/theme/constants';
+import { MOCK_TEST_QUESTION_COUNTS, shuffleArray, XP_RATES } from '@/theme/constants';
 import type { AppQuestion, UserProfile } from '@/types/database';
 
 export type TeilInfo = {
@@ -261,10 +261,13 @@ export async function completeSectionalSession(params: {
       newStreak = 1;
     }
 
+    const xpRate = XP_RATES[profile?.target_level ?? 'A1'] ?? 1;
+    const xpGain = correctCount * xpRate;
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error: profileError } = await (supabase.from('user_profiles') as any)
       .update({
-        xp_total: (profile?.xp_total ?? 0) + correctCount,
+        xp_total: (profile?.xp_total ?? 0) + xpGain,
         last_active_date: today,
         streak_count: newStreak,
         updated_at: new Date().toISOString(),
@@ -272,7 +275,7 @@ export async function completeSectionalSession(params: {
       .eq('id', userId);
 
     if (profileError) {
-      console.log('completeSectionalSession profile update error', profileError);
+      console.error('completeSectionalSession profile update error', profileError);
     }
   } catch (err) {
     console.log('completeSectionalSession unexpected error', err);

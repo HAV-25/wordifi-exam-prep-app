@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Check, Flag, BookOpenText, Play, X } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Animated,
   Dimensions,
   Easing,
@@ -64,6 +65,10 @@ export const StreamCard = React.memo(function StreamCard({
 }: StreamCardProps) {
   const isHoren = question.section === 'Hören';
   const needsAudioGate = isHoren && Boolean(question.audio_url) && !audioUnlocked && !reviewMode;
+
+  // Loading guard: do not render until question_text is present,
+  // and (for Hören) until audio_url is also present.
+  const isReady = Boolean(question.question_text) && (!isHoren || Boolean(question.audio_url));
 
   const [explanationLang, setExplanationLang] = useState<'en' | 'de'>('en');
   const [showFeedback, setShowFeedback] = useState<boolean>(isAnswered);
@@ -271,6 +276,14 @@ export const StreamCard = React.memo(function StreamCard({
     [isAnswered, selectedAnswer, question.correct_answer, correctScaleAnim, wrongShakeAnim]
   );
 
+  if (!isReady) {
+    return (
+      <View style={[styles.card, styles.loadingCard]}>
+        <ActivityIndicator color={Colors.accent} size="small" />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.card}>
       <ScrollView
@@ -446,6 +459,10 @@ export const StreamCard = React.memo(function StreamCard({
 const styles = StyleSheet.create({
   card: {
     flex: 1,
+  },
+  loadingCard: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   scrollArea: {
     flex: 1,

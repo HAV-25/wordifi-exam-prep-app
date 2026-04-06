@@ -28,6 +28,7 @@ import Colors from '@/constants/colors';
 import { colors } from '@/theme';
 import { updatePreparednessScore } from '@/lib/streamHelpers';
 import { useQuestionMeta } from '@/lib/useQuestionTypeMeta';
+import { XP_RATES } from '@/theme/constants';
 import { useAuth } from '@/providers/AuthProvider';
 import type { AppQuestion } from '@/types/database';
 
@@ -134,13 +135,14 @@ export default function SectionalResultsScreen() {
   const teilNameDe = teilMeta?.name_de ?? '';
   const examType = profile?.exam_type ?? 'German language';
 
+  const xpEarned = correctCount * (XP_RATES[level] ?? 1);
   const xpAnim = useRef(new Animated.Value(0)).current;
   const perf = performanceLabel(scorePct);
   const sColor = scoreColor(scorePct);
 
   useEffect(() => {
     Animated.timing(xpAnim, {
-      toValue: correctCount,
+      toValue: xpEarned,
       duration: 800,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: false,
@@ -149,11 +151,11 @@ export default function SectionalResultsScreen() {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
       }
     });
-  }, [xpAnim, correctCount]);
+  }, [xpAnim, xpEarned]);
 
   const xpDisplay = xpAnim.interpolate({
-    inputRange: [0, correctCount || 1],
-    outputRange: [0, correctCount || 1],
+    inputRange: [0, xpEarned || 1],
+    outputRange: [0, xpEarned || 1],
   });
 
   // Confetti + share sheet

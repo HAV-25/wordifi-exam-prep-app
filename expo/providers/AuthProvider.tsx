@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import * as Sentry from '@sentry/react-native';
 
 import { signOutUser } from '@/lib/authHelpers';
-import { ensureUserProfile } from '@/lib/profileHelpers';
+import { ensureUserProfile, loadAndClearPendingOnboarding, saveOnboardingAnswers } from '@/lib/profileHelpers';
 import { supabase } from '@/lib/supabaseClient';
 import type { UserProfile } from '@/types/database';
 
@@ -60,6 +60,20 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     },
   });
 
+  // Safety net: apply any AsyncStorage-persisted onboarding data that wasn't saved to DB yet
+  // (handles the case where email confirmation link opens a fresh app instance)
+  useEffect(() => {
+    const uid = session?.user?.id;
+    const profile = profileQuery.data;
+    if (!uid || !profile || profile.onboarding_completed_at) return;
+
+    void loadAndClearPendingOnboarding().then(async (pending) => {
+      if (!pending) return;
+      await saveOnboardingAnswers(uid, pending).catch(() => {});
+      await profileQuery.refetch();
+    });
+  }, [session?.user?.id, profileQuery.data?.onboarding_completed_at]);
+
   const signOutMutation = useMutation({
     mutationFn: async () => signOutUser(),
     onSuccess: async () => {
@@ -77,7 +91,7 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       user,
       profile: profileQuery.data ?? null,
       isLoading: isSessionLoading || profileQuery.isLoading,
-      hasCompletedOnboarding: Boolean(profileQuery.data?.target_level && profileQuery.data?.exam_type),
+      hasCompletedOnboarding: Boolean(profileQuery.data?.onboarding_completed_at ?? profileQuery.data?.target_level),
       refreshProfile,
       signOut: signOutMutation.mutateAsync,
       isSigningOut: signOutMutation.isPending,
