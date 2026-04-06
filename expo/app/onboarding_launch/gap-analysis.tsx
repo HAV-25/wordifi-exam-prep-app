@@ -1,14 +1,13 @@
 /**
  * Onboarding Launch — Screen 09: Gap Analysis
- * Source: Stitch screen b3b8b309abb545afa59dd0909382726e
- * Step 9 of 10 — Dynamic TODAY card + static CERTIFIED card
+ * Source: Banani flow FtXTL2Xb5WF4 / screen 2XbFRdXDM05S
+ * BEFORE state (user's current situation) vs CERTIFIED state (goal)
  */
 import React from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { ArrowRight } from 'lucide-react-native';
+import { ArrowDown, ArrowRight } from 'lucide-react-native';
 import {
   onboardingStore,
   CERT_SHORT,
@@ -18,28 +17,27 @@ import {
 } from './_store';
 import { colors } from '@/theme';
 
-// ─── Row components ───────────────────────────────────────────────────────────
+// ─── InfoRow ─────────────────────────────────────────────────────────────────
 
-function TodayRow({ emoji, value, descriptor }: { emoji: string; value: string; descriptor: string }) {
+function InfoRow({
+  emoji,
+  strong,
+  descriptor,
+  variant,
+}: {
+  emoji: string;
+  strong: string;
+  descriptor: string;
+  variant: 'before' | 'goal';
+}) {
+  const isGoal = variant === 'goal';
   return (
-    <View style={styles.todayRow}>
+    <View style={styles.infoRow}>
       <Text style={styles.rowEmoji}>{emoji}</Text>
-      <View style={styles.rowBody}>
-        <Text style={styles.todayValue}>{value}</Text>
-        <Text style={styles.todayDescriptor}>{descriptor}</Text>
-      </View>
-    </View>
-  );
-}
-
-function CertRow({ emoji, value, descriptor }: { emoji: string; value: string; descriptor: string }) {
-  return (
-    <View style={styles.certRow}>
-      <Text style={styles.rowEmoji}>{emoji}</Text>
-      <View style={styles.rowBody}>
-        <Text style={styles.certValue}>{value}</Text>
-        <Text style={styles.certDescriptor}>{descriptor}</Text>
-      </View>
+      <Text style={[styles.rowCopy, isGoal && styles.rowCopyGoal]}>
+        <Text style={[styles.rowStrong, isGoal && styles.rowStrongGoal]}>{strong}</Text>
+        {` — ${descriptor}`}
+      </Text>
     </View>
   );
 }
@@ -49,89 +47,78 @@ function CertRow({ emoji, value, descriptor }: { emoji: string; value: string; d
 export default function GapAnalysisScreen() {
   const { cert, level, timeline, readiness, hardest } = onboardingStore;
 
-  const certShort = cert ? CERT_SHORT[cert] : '—';
-  const levelLabel = level ?? '—';
+  const certShort     = cert ? CERT_SHORT[cert] : '—';
+  const levelLabel    = level ?? '—';
   const timelineLabel = timeline ? TIMELINE_LABELS[timeline] : '—';
   const readinessInfo = readiness ? READINESS_DISPLAY[readiness] : { emoji: '😐', label: 'Getting there' };
-  const hardestInfo = hardest ? HARDEST_DISPLAY[hardest] : { emoji: '📊', label: 'All sections' };
+  const hardestInfo   = hardest ? HARDEST_DISPLAY[hardest] : { emoji: '📊', label: 'All sections' };
 
   return (
     <View style={styles.root}>
-      <SafeAreaView edges={['top']} style={styles.safe}>
-        {/* Wordifi W logo */}
-        <View style={styles.logoWrap}>
-          <LinearGradient
-            colors={[colors.primary, colors.primaryContainer]}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-            style={styles.logoMark}
-          >
-            <Text style={styles.logoLetter}>W</Text>
-          </LinearGradient>
+      {/* Decorative blurred orbs */}
+      <View style={[styles.orb, styles.orbTopRight]} />
+      <View style={[styles.orb, styles.orbBottomLeft]} />
+
+      <SafeAreaView edges={['top', 'bottom']} style={styles.safe}>
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.headline}>Here is where you{'\n'}stand today.</Text>
+          <Text style={styles.subCopy}>Honest. Clear. No guessing.</Text>
         </View>
 
-        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-          {/* Headline */}
-          <Text style={styles.headline}>Here is where you stand today.</Text>
-          <Text style={styles.subhead}>Honest. Clear. No guessing.</Text>
-
-          {/* TODAY card */}
-          <View style={styles.todayCard}>
-            <Text style={styles.todayTag}>TODAY</Text>
-
-            <TodayRow emoji="📍" value={`${certShort} ${levelLabel}`} descriptor="your target" />
-            <View style={styles.rowDivider} />
-            <TodayRow emoji={readinessInfo.emoji} value={readinessInfo.label} descriptor="your confidence" />
-            <View style={styles.rowDivider} />
-            <TodayRow emoji={hardestInfo.emoji} value={hardestInfo.label} descriptor="your biggest gap" />
-            <View style={styles.rowDivider} />
-            <TodayRow emoji="⏱️" value={timelineLabel} descriptor="your window" />
+        {/* Cards stack */}
+        <View style={styles.cardsStack}>
+          {/* BEFORE card */}
+          <View style={styles.beforeCard}>
+            <View style={styles.labelBefore}>
+              <Text style={styles.labelBeforeText}>BEFORE</Text>
+            </View>
+            <View style={styles.rowList}>
+              <InfoRow emoji="📍"               strong={`${certShort} ${levelLabel}`} descriptor="your target"      variant="before" />
+              <InfoRow emoji={readinessInfo.emoji} strong={readinessInfo.label}        descriptor="your confidence"  variant="before" />
+              <InfoRow emoji={hardestInfo.emoji}   strong={hardestInfo.label}          descriptor="your biggest gap" variant="before" />
+              <InfoRow emoji="⏱️"               strong={timelineLabel}               descriptor="your window"      variant="before" />
+            </View>
           </View>
 
-          {/* Gap bridge label */}
+          {/* Bridge */}
           <View style={styles.bridge}>
-            <View style={styles.bridgeLine} />
-            <Text style={styles.bridgeLabel}>GAP  ↓  WORDIFI CLOSES IT</Text>
-            <View style={styles.bridgeLine} />
+            <Text style={styles.bridgeGap}>GAP</Text>
+            <View style={styles.bridgeArrow}>
+              <ArrowDown size={22} color={colors.primary} />
+            </View>
+            <Text style={styles.bridgeHighlight}>WORDIFI CLOSES IT</Text>
           </View>
 
           {/* CERTIFIED card */}
-          <LinearGradient
-            colors={[colors.primary, colors.primaryContainer]}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-            style={styles.certCard}
-          >
-            <Text style={styles.certTag}>CERTIFIED</Text>
-
-            <CertRow emoji="🎓" value={`${certShort} ${levelLabel}`} descriptor="achieved" />
-            <View style={styles.certDivider} />
-            <CertRow emoji="💪" value="Fully confident" descriptor="your state" />
-            <View style={styles.certDivider} />
-            <CertRow emoji="✅" value="All sections" descriptor="mastered" />
-            <View style={styles.certDivider} />
-            <CertRow emoji="🏆" value="On exam day" descriptor="ready" />
-          </LinearGradient>
-
-          <View style={{ height: 120 }} />
-        </ScrollView>
-
-        {/* Sticky CTA */}
-        <View style={styles.footer}>
-          <SafeAreaView edges={['bottom']}>
-            <Pressable
-              onPress={() => router.push('/onboarding_launch/notifications')}
-              style={styles.ctaWrap}
-            >
-              <LinearGradient
-                colors={[colors.primary, colors.primaryContainer]}
-                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                style={styles.cta}
-              >
-                <Text style={styles.ctaText}>Show me how</Text>
-                <ArrowRight size={20} color={colors.onPrimary} />
-              </LinearGradient>
-            </Pressable>
-          </SafeAreaView>
+          <View style={styles.certCard}>
+            <View style={styles.celebrationDots}>
+              <View style={[styles.dot, styles.dotYellow]} />
+              <View style={[styles.dot, styles.dotWhite]} />
+              <View style={[styles.dot, styles.dotBlue]} />
+            </View>
+            <View style={styles.labelCert}>
+              <Text style={styles.labelCertText}>CERTIFIED</Text>
+            </View>
+            <View style={styles.rowList}>
+              <InfoRow emoji="🎓" strong={`${certShort} ${levelLabel}`} descriptor="achieved"   variant="goal" />
+              <InfoRow emoji="💪" strong="Fully confident"               descriptor="your state" variant="goal" />
+              <InfoRow emoji="✅" strong="All sections"                  descriptor="mastered"   variant="goal" />
+              <InfoRow emoji="🏆" strong="On exam day"                   descriptor="ready"      variant="goal" />
+            </View>
+          </View>
         </View>
+
+        {/* CTA */}
+        <Pressable
+          onPress={() => router.push('/onboarding_launch/notifications')}
+          style={styles.cta}
+          accessibilityRole="button"
+          accessibilityLabel="Show me how"
+        >
+          <Text style={styles.ctaText}>Show me how</Text>
+          <ArrowRight size={22} color="#FFFFFF" />
+        </Pressable>
       </SafeAreaView>
     </View>
   );
@@ -140,62 +127,117 @@ export default function GapAnalysisScreen() {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.background },
-  safe: { flex: 1 },
+  root: { flex: 1, backgroundColor: colors.background, overflow: 'hidden' },
 
-  logoWrap: { alignItems: 'center', paddingTop: 20, paddingBottom: 0 },
-  logoMark: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  logoLetter: { fontFamily: 'Outfit_800ExtraBold', fontSize: 22, color: colors.onPrimary },
+  // ── Decorative orbs ─────────────────────────────────────────────────────────
+  orb:           { position: 'absolute', borderRadius: 999, opacity: 0.18 },
+  orbTopRight:   { width: 180, height: 180, backgroundColor: '#F0C808',   top: -72,   right: -64 },
+  orbBottomLeft: { width: 220, height: 220, backgroundColor: colors.primary, bottom: -110, left: -80 },
 
-  scroll: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 16 },
-  headline: { fontFamily: 'Outfit_800ExtraBold', fontSize: 26, lineHeight: 34, color: colors.onPrimaryContainer, textAlign: 'center', marginBottom: 8, letterSpacing: -0.3 },
-  subhead: { fontFamily: 'NunitoSans_400Regular', fontSize: 14, color: colors.onSurfaceVariant, textAlign: 'center', marginBottom: 24 },
+  // ── Layout ──────────────────────────────────────────────────────────────────
+  safe:       { flex: 1, paddingHorizontal: 24, paddingTop: 28, paddingBottom: 24 },
+  header:     { marginBottom: 28 },
+  headline:   { fontFamily: 'Outfit_800ExtraBold', fontSize: 36, lineHeight: 38, color: '#374151', letterSpacing: -1.4, marginBottom: 14 },
+  subCopy:    { fontFamily: 'NunitoSans_600SemiBold', fontSize: 15, lineHeight: 22, color: '#94A3B8' },
+  cardsStack: { flex: 1, gap: 18 },
 
-  // TODAY card
-  todayCard: {
-    backgroundColor: colors.navy,
-    borderRadius: 20,
-    padding: 20,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.2,
-    shadowRadius: 16,
-    elevation: 8,
+  // ── BEFORE card ─────────────────────────────────────────────────────────────
+  beforeCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 22,
+    shadowColor: '#374151',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.05,
+    shadowRadius: 28,
+    elevation: 4,
   },
-  todayTag: { fontFamily: 'NunitoSans_700Bold', fontSize: 10, letterSpacing: 2.5, textTransform: 'uppercase', color: colors.teal, marginBottom: 14 },
+  labelBefore: {
+    alignSelf: 'flex-start',
+    height: 32,
+    paddingHorizontal: 14,
+    borderRadius: 999,
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 18,
+  },
+  labelBeforeText: { fontFamily: 'Outfit_800ExtraBold', fontSize: 12, color: '#94A3B8', letterSpacing: 1.4 },
 
-  todayRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10 },
-  rowEmoji: { fontSize: 20, width: 32, textAlign: 'center' },
-  rowBody: { flex: 1, marginLeft: 12 },
-  todayValue: { fontFamily: 'Outfit_800ExtraBold', fontSize: 15, color: colors.onPrimary },
-  todayDescriptor: { fontFamily: 'NunitoSans_400Regular', fontSize: 12, color: `${colors.onPrimary}60`, marginTop: 1 },
-  rowDivider: { height: 1, backgroundColor: `${colors.onPrimary}12`, marginLeft: 44 },
-
-  // Gap bridge
-  bridge: { flexDirection: 'row', alignItems: 'center', marginVertical: 12, gap: 10 },
-  bridgeLine: { flex: 1, height: 1, backgroundColor: `${colors.outlineVariant}40` },
-  bridgeLabel: { fontFamily: 'NunitoSans_700Bold', fontSize: 10, letterSpacing: 1.2, color: colors.outline, textTransform: 'uppercase' },
-
-  // CERTIFIED card
-  certCard: {
-    borderRadius: 20,
-    padding: 20,
+  // ── Bridge ──────────────────────────────────────────────────────────────────
+  bridge:          { alignItems: 'center', gap: 10, paddingVertical: 2 },
+  bridgeGap:       { fontFamily: 'Outfit_800ExtraBold', fontSize: 12, color: '#94A3B8', letterSpacing: 1.4 },
+  bridgeArrow: {
+    width: 42,
+    height: 42,
+    borderRadius: 999,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
     shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.10,
+    shadowRadius: 28,
+    elevation: 4,
   },
-  certTag: { fontFamily: 'NunitoSans_700Bold', fontSize: 10, letterSpacing: 2.5, textTransform: 'uppercase', color: `${colors.onPrimary}CC`, marginBottom: 14 },
-  certRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10 },
-  certValue: { fontFamily: 'Outfit_800ExtraBold', fontSize: 15, color: colors.onPrimary },
-  certDescriptor: { fontFamily: 'NunitoSans_400Regular', fontSize: 12, color: `${colors.onPrimary}70`, marginTop: 1 },
-  certDivider: { height: 1, backgroundColor: `${colors.onPrimary}20`, marginLeft: 44 },
+  bridgeHighlight: { fontFamily: 'Outfit_800ExtraBold', fontSize: 12, color: colors.primary, letterSpacing: 1.4 },
 
-  // Footer
-  footer: { position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 24, paddingTop: 16, backgroundColor: `${colors.background}F5` },
-  ctaWrap: { borderRadius: 24, overflow: 'hidden', shadowColor: colors.blueShadow, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 1, shadowRadius: 16, elevation: 8, marginBottom: 8 },
-  cta: { paddingVertical: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, borderRadius: 24 },
-  ctaText: { fontFamily: 'Outfit_800ExtraBold', fontSize: 16, color: colors.onPrimary, letterSpacing: 0.3 },
+  // ── CERTIFIED card ──────────────────────────────────────────────────────────
+  certCard: {
+    backgroundColor: colors.primary,
+    borderRadius: 16,
+    padding: 22,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 18 },
+    shadowOpacity: 0.24,
+    shadowRadius: 40,
+    elevation: 10,
+  },
+  celebrationDots: { position: 'absolute', top: 16, right: 16, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  dot:             { borderRadius: 999 },
+  dotYellow:       { width: 10, height: 10, backgroundColor: '#F0C808' },
+  dotWhite:        { width: 8,  height: 8,  backgroundColor: 'rgba(255,255,255,0.72)' },
+  dotBlue:         { width: 8,  height: 8,  backgroundColor: 'rgba(255,255,255,0.42)' },
+
+  labelCert: {
+    alignSelf: 'flex-start',
+    height: 32,
+    paddingHorizontal: 14,
+    borderRadius: 999,
+    backgroundColor: '#22C55E',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 18,
+  },
+  labelCertText: { fontFamily: 'Outfit_800ExtraBold', fontSize: 12, color: '#FFFFFF', letterSpacing: 1.4 },
+
+  // ── Info rows ────────────────────────────────────────────────────────────────
+  rowList:       { gap: 14 },
+  infoRow:       { flexDirection: 'row', alignItems: 'flex-start', gap: 14 },
+  rowEmoji:      { width: 28, minWidth: 28, fontSize: 22, lineHeight: 28, textAlign: 'center' },
+  rowCopy:       { flex: 1, fontFamily: 'NunitoSans_400Regular', fontSize: 15, lineHeight: 20, color: '#94A3B8' },
+  rowCopyGoal:   { color: 'rgba(255,255,255,0.76)' },
+  rowStrong:     { fontFamily: 'NunitoSans_600SemiBold', color: '#374151' },
+  rowStrongGoal: { color: '#FFFFFF' },
+
+  // ── CTA ─────────────────────────────────────────────────────────────────────
+  cta: {
+    width: '100%',
+    height: 60,
+    backgroundColor: colors.primary,
+    borderRadius: 999,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    marginTop: 18,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.24,
+    shadowRadius: 34,
+    elevation: 10,
+  },
+  ctaText: { fontFamily: 'Outfit_800ExtraBold', fontSize: 18, color: '#FFFFFF', letterSpacing: -0.3 },
 });

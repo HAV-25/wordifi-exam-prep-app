@@ -105,6 +105,8 @@ export type UserProfile = {
   onboarding_daily_minutes: number | null;
   onboarding_learner_style: string | null;
   onboarding_completed_at: string | null;
+  walkthrough_completed: boolean;
+  walkthrough_completed_at: string | null;
 };
 
 export type LeaderboardEntry = {

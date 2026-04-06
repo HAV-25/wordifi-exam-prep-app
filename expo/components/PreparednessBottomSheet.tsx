@@ -25,6 +25,7 @@ type PreparednessBottomSheetProps = {
   horenPct: number;
   lesenPct: number;
   schreibenPct?: number;
+  sprechenPct?: number;
   streak: number;
   lastActiveDate: string | null;
 };
@@ -126,6 +127,7 @@ export const PreparednessBottomSheet = React.memo(function PreparednessBottomShe
   horenPct,
   lesenPct,
   schreibenPct = 0,
+  sprechenPct = 0,
   streak,
   lastActiveDate,
 }: PreparednessBottomSheetProps) {
@@ -209,6 +211,7 @@ export const PreparednessBottomSheet = React.memo(function PreparednessBottomShe
           <BarRow label="Hören" pct={horenPct} icon="🎧" />
           <BarRow label="Lesen" pct={lesenPct} icon="📖" />
           <BarRow label="Schreiben" pct={schreibenPct} icon="✍️" />
+          <BarRow label="Sprechen" pct={sprechenPct} icon="🎤" />
           <View style={styles.divider} />
           <BarRow label="Overall" pct={overallScore} icon="📊" />
         </View>

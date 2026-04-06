@@ -128,6 +128,8 @@ export default function MockScreen() {
           isTimed: setup.isTimed ? '1' : '0',
           horenQuestions: JSON.stringify(questions.horen),
           lesenQuestions: JSON.stringify(questions.lesen),
+          sprachbausteineT1Question: JSON.stringify(questions.sprachbausteineT1 ?? null),
+          sprachbausteineT2Question: JSON.stringify(questions.sprachbausteineT2 ?? null),
         },
       });
     } catch (err) {

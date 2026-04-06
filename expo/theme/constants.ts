@@ -15,10 +15,10 @@ export const XP_RATES: Record<string, number> = {
 
 // ─── Official TELC / Goethe Exam Timings (minutes) ───────────────────────────
 // Source: Official exam specifications. Never hardcode "30 min".
-export const EXAM_TIMINGS: Record<string, { hoeren: number; lesen: number }> = {
+export const EXAM_TIMINGS: Record<string, { hoeren: number; lesen: number; sprachbausteine?: number }> = {
   A1: { hoeren: 20, lesen: 25 },
   A2: { hoeren: 20, lesen: 25 },
-  B1: { hoeren: 40, lesen: 70 },
+  B1: { hoeren: 40, lesen: 70, sprachbausteine: 15 },
 } as const;
 
 // ─── Preparedness Score ───────────────────────────────────────────────────────
@@ -104,9 +104,10 @@ export const MOCK_TEST_QUESTION_COUNTS: Record<string, Record<string, Record<num
     Schreiben:{ 1: 1, 2: 1 },
   },
   B1: {
-    Hören:    { 1: 10, 2: 5, 3: 7, 4: 8 },
-    Lesen:    { 1: 6,  2: 6, 3: 7, 4: 7, 5: 4 },
-    Schreiben:{ 1: 1,  2: 1, 3: 1 },
+    Hören:            { 1: 10, 2: 5, 3: 7, 4: 8 },
+    Lesen:            { 1: 6,  2: 6, 3: 7, 4: 7, 5: 4 },
+    Sprachbausteine:  { 1: 1,  2: 1 },
+    Schreiben:        { 1: 1,  2: 1, 3: 1 },
   },
 };
 

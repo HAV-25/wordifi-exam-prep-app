@@ -1,6 +1,6 @@
-import { useQuery } from '@tanstack/react-query';
-import { router } from 'expo-router';
-import { BookOpen, ChevronDown, ChevronRight, Clock, Eye, Headphones, Lock, Mic, PenLine, Play } from 'lucide-react-native';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { router, useFocusEffect } from 'expo-router';
+import { BookOpen, ChevronDown, ChevronRight, Clock, Eye, Headphones, Lock, Mic, PenLine, Play, Puzzle } from 'lucide-react-native';
 import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -27,6 +27,7 @@ import {
   fetchAvailableTeile,
   fetchPreviousSessionResult,
   fetchSectionalQuestions,
+  fetchSprachbausteineQuestions,
   type PreviousSessionResult,
   type RetestInfo,
   type TeilInfo,
@@ -52,14 +53,31 @@ function formatRetestDate(dateStr: string): string {
   return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
+function deduplicateTeile(teile: TeilInfo[]): TeilInfo[] {
+  const seen = new Set<number>();
+  return teile.filter((t) => {
+    if (seen.has(t.teil)) return false;
+    seen.add(t.teil);
+    return true;
+  });
+}
+
 export default function TestsScreen() {
   const { profile, user } = useAuth();
   const { access } = useAccess();
   const { metaMap } = useQuestionTypeMetaContext();
+  const queryClient = useQueryClient();
   const userId = user?.id ?? '';
   const targetLevel = profile?.target_level ?? 'A1';
   const [showPaywall, setShowPaywall] = useState<boolean>(false);
   const sectionalEnabled = access.sectional_tests_enabled;
+
+  useFocusEffect(
+    useCallback(() => {
+      void queryClient.invalidateQueries({ queryKey: ['question-type-meta'] });
+      void queryClient.invalidateQueries({ queryKey: ['sectional-teile', targetLevel] });
+    }, [queryClient, targetLevel])
+  );
 
   const [setup, setSetup] = useState<SetupState>({
     visible: false,
@@ -74,11 +92,13 @@ export default function TestsScreen() {
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     'Hören': true,
     'Lesen': true,
+    'Sprachbausteine': true,
     'Schreiben': true,
     'Sprechen': true,
   });
   const [schreibenStarting, setSchreibenStarting] = useState<number | null>(null);
   const [sprechenStarting, setSprechenStarting] = useState<number | null>(null);
+  const [sprachbausteineStarting, setSprachbausteineStarting] = useState<boolean>(false);
 
   const teileQuery = useQuery({
     queryKey: ['sectional-teile', targetLevel],
@@ -88,8 +108,8 @@ export default function TestsScreen() {
 
   const teile = useMemo(() => teileQuery.data ?? [], [teileQuery.data]);
 
-  const horenTeile = useMemo(() => teile.filter((t) => t.section === 'Hören'), [teile]);
-  const lesenTeile = useMemo(() => teile.filter((t) => t.section === 'Lesen'), [teile]);
+  const horenTeile = useMemo(() => deduplicateTeile(teile.filter((t) => t.section === 'Hören')), [teile]);
+  const lesenTeile = useMemo(() => deduplicateTeile(teile.filter((t) => t.section === 'Lesen')), [teile]);
 
   const schreibenQuery = useQuery({
     queryKey: ['schreiben-teile', targetLevel],
@@ -154,6 +174,34 @@ export default function TestsScreen() {
       setSchreibenStarting(null);
     }
   }, [targetLevel, schreibenEnabled]);
+
+  const handleStartSprachbausteine = useCallback(async () => {
+    if (!sectionalEnabled) {
+      setShowPaywall(true);
+      return;
+    }
+    setSprachbausteineStarting(true);
+    try {
+      const { t1, t2 } = await fetchSprachbausteineQuestions(targetLevel);
+      if (!t1 || !t2) {
+        setSprachbausteineStarting(false);
+        return;
+      }
+      setSprachbausteineStarting(false);
+      router.push({
+        pathname: '/sprachbausteine-test',
+        params: {
+          t1Question: JSON.stringify(t1),
+          t2Question: JSON.stringify(t2),
+          level: targetLevel,
+          examType: profile?.exam_type ?? 'TELC',
+        },
+      });
+    } catch (err) {
+      console.log('TestsScreen handleStartSprachbausteine error', err);
+      setSprachbausteineStarting(false);
+    }
+  }, [targetLevel, sectionalEnabled, profile?.exam_type]);
 
   const toggleSection = useCallback((section: string) => {
     setExpandedSections((prev) => ({ ...prev, [section]: !prev[section] }));
@@ -391,6 +439,65 @@ export default function TestsScreen() {
             lesenTeile,
             <View style={styles.sectionIconLesen}><BookOpen color="#fff" size={16} /></View>
           )}
+
+          {targetLevel === 'B1' ? (
+            <View style={styles.sectionGroup}>
+              <Pressable
+                accessibilityLabel="Toggle Sprachbausteine"
+                onPress={() => toggleSection('Sprachbausteine')}
+                style={styles.sectionHeader}
+                testID="toggle-Sprachbausteine"
+              >
+                <View style={styles.sectionHeaderLeft}>
+                  <View style={styles.sectionIconSprachbausteine}>
+                    <Puzzle color="#fff" size={16} />
+                  </View>
+                  <Text style={styles.sectionTitle}>Sprachbausteine</Text>
+                  <View style={styles.sectionBadge}>
+                    <Text style={styles.sectionBadgeText}>1 Übung</Text>
+                  </View>
+                </View>
+                {expandedSections['Sprachbausteine'] ? (
+                  <ChevronDown color={Colors.textMuted} size={20} />
+                ) : (
+                  <ChevronRight color={Colors.textMuted} size={20} />
+                )}
+              </Pressable>
+              {expandedSections['Sprachbausteine'] ? (
+                <View style={styles.teilList}>
+                  <Pressable
+                    accessibilityLabel="Sprachbausteine Teil 1 + 2"
+                    onPress={handleStartSprachbausteine}
+                    style={[styles.teilCard, !sectionalEnabled && styles.teilCardDisabled]}
+                    testID="teil-card-Sprachbausteine-combined"
+                  >
+                    <View style={styles.teilNumCol}>
+                      <Text style={styles.teilLabel}>TEIL</Text>
+                      <View style={styles.teilNumberWrap}>
+                        <Text style={styles.teilNumber}>1+2</Text>
+                      </View>
+                    </View>
+                    <View style={styles.teilNamesCol}>
+                      <Text style={styles.teilNameEn}>Word Bank + Multiple Choice</Text>
+                      <Text style={styles.teilNameDe}>Wortkasten + Mehrfachwahl</Text>
+                    </View>
+                    <View style={styles.teilCardRight}>
+                      <Text style={styles.teilCount}>18 blanks</Text>
+                      <View style={styles.teilDuration}>
+                        <Clock color={Colors.textMuted} size={12} />
+                        <Text style={styles.teilDurationText}>~15 min</Text>
+                      </View>
+                    </View>
+                    {sprachbausteineStarting ? (
+                      <ActivityIndicator color={colors.blue} size="small" />
+                    ) : (
+                      <ChevronRight color={Colors.textMuted} size={18} />
+                    )}
+                  </Pressable>
+                </View>
+              ) : null}
+            </View>
+          ) : null}
 
           {schreibenVisible ? (
             <View style={styles.sectionGroup}>
@@ -1103,6 +1210,14 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '400' as const,
     color: Colors.textBody,
+  },
+  sectionIconSprachbausteine: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: '#7B1FA2',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   sectionIconSchreiben: {
     width: 32,

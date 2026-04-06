@@ -1,19 +1,19 @@
 /**
- * Onboarding Launch — Screen 12: Notification Buy-In
- * Source: Stitch screen 0dd7fe9dc2b64b2d98260639c29429dd
- * Triggers real expo-notifications permission request on "Yes" tap
+ * Onboarding Launch — Screen 10: Notification Buy-In
+ * Source: Banani flow FtXTL2Xb5WF4 / screen yyu-oL5xHH2h
+ * Triggers real expo-notifications permission request on primary CTA tap
  */
 import React, { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
+import { CheckCircle2 } from 'lucide-react-native';
 import { colors } from '@/theme';
 
-const FEATURES = [
-  { title: 'One notification per day', sub: 'Only when your streak is at risk' },
-  { title: 'Sent at the time that works best for you', sub: 'Optimized for your study habits' },
-  { title: 'Turn it off anytime', sub: 'Complete control over your experience' },
+const BENEFITS = [
+  { title: 'One notification per day',               sub: 'Only when your streak is at risk' },
+  { title: 'Sent at the time that works best for you', sub: 'Optimised for your study habits' },
+  { title: 'Turn it off anytime',                    sub: 'Complete control over your experience' },
 ] as const;
 
 export default function NotificationsScreen() {
@@ -25,90 +25,86 @@ export default function NotificationsScreen() {
       const Notifications = await import('expo-notifications');
       await Notifications.requestPermissionsAsync();
     } catch {
-      // expo-notifications native module not available (Expo Go) — continue anyway
+      // expo-notifications not available in Expo Go — continue anyway
     } finally {
       setLoading(false);
       router.push('/onboarding_launch/plan-summary');
     }
   };
 
-  const handleSkip = () => {
-    router.push('/onboarding_launch/plan-summary');
-  };
-
   return (
     <View style={styles.root}>
+      {/* Yellow glow orb top-right */}
+      <View style={styles.backgroundGlow} />
+
       <SafeAreaView edges={['top', 'bottom']} style={styles.safe}>
-        {/* Mock notification preview */}
-        <View style={styles.notifCard}>
-          <View style={styles.notifHeader}>
-            <View style={styles.notifIconWrap}>
-              <LinearGradient
-                colors={[colors.primary, colors.primaryContainer]}
-                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                style={styles.notifIcon}
-              >
-                <Text style={styles.notifIconLetter}>W</Text>
-              </LinearGradient>
-            </View>
-            <Text style={styles.notifApp}>Wordifi</Text>
-            <Text style={styles.notifTime}>now</Text>
+        <View style={styles.contentWrap}>
+          {/* Header */}
+          <View style={styles.header}>
+            <Text style={styles.headline}>Your streak is your most powerful weapon.</Text>
+            <Text style={styles.subCopy}>
+              The learners who pass are not always the most talented. They are the most consistent.
+            </Text>
           </View>
-          <Text style={styles.notifBody}>
-            Your streak is at 6 days. 5 quick questions to keep it alive 🔥
-          </Text>
-        </View>
 
-        {/* Main content */}
-        <View style={styles.content}>
-          <Text style={styles.headline}>Your streak is your most powerful weapon.</Text>
-          <Text style={styles.body}>
-            The learners who pass are not always the most talented. They are the most consistent.
-          </Text>
+          {/* Notification preview card */}
+          <View style={styles.notifCard}>
+            <View style={styles.notifHeader}>
+              <View style={styles.notifAppInfo}>
+                <View style={styles.notifDot} />
+                <Text style={styles.notifAppName}>Wordifi</Text>
+              </View>
+              <Text style={styles.notifTime}>now</Text>
+            </View>
+            <Text style={styles.notifBody}>
+              "Your B1 streak is at 6 days. 5 quick questions to keep it alive. 🔥"
+            </Text>
+          </View>
 
-          {/* Feature list */}
-          <View style={styles.features}>
-            {FEATURES.map(({ title, sub }) => (
-              <View key={title} style={styles.featureRow}>
-                <View style={styles.featureDot} />
-                <View style={styles.featureBody}>
-                  <Text style={styles.featureTitle}>{title}</Text>
-                  <Text style={styles.featureSub}>{sub}</Text>
+          {/* Benefits list */}
+          <View style={styles.benefitsList}>
+            {BENEFITS.map(({ title, sub }) => (
+              <View key={title} style={styles.benefitItem}>
+                <View style={styles.benefitIcon}>
+                  <CheckCircle2 size={20} color="#22C55E" />
                 </View>
+                <Text style={styles.benefitText}>
+                  <Text style={styles.benefitBold}>{title}</Text>
+                  <Text style={styles.benefitMuted}>{` · ${sub}`}</Text>
+                </Text>
               </View>
             ))}
           </View>
-
-          {/* Stat */}
-          <View style={styles.statBox}>
-            <Text style={styles.statText}>
-              Learners who keep their streak active are{' '}
-              <Text style={styles.statHighlight}>3x more likely</Text> to pass their exam.
-            </Text>
-          </View>
         </View>
 
-        {/* CTAs */}
-        <View style={styles.ctaArea}>
+        {/* Footer */}
+        <View style={styles.footer}>
+          <Text style={styles.socialProof}>
+            Learners who keep their streak active are{' '}
+            <Text style={styles.socialProofHighlight}>3x more likely</Text>
+            {' '}to pass their exam.
+          </Text>
+
           <Pressable
             onPress={handleYes}
             disabled={loading}
-            style={styles.ctaPrimary}
+            style={({ pressed }) => [styles.ctaPrimary, pressed && styles.ctaPressed]}
+            accessibilityRole="button"
+            accessibilityLabel="Yes, keep me on track"
           >
-            <LinearGradient
-              colors={[colors.primary, colors.primaryContainer]}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-              style={styles.ctaPrimaryInner}
-            >
-              {loading ? (
-                <ActivityIndicator color={colors.onPrimary} />
-              ) : (
-                <Text style={styles.ctaPrimaryText}>Yes — keep me on track 🔥</Text>
-              )}
-            </LinearGradient>
+            {loading ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text style={styles.ctaPrimaryText}>Yes — keep me on track 🔥</Text>
+            )}
           </Pressable>
 
-          <Pressable onPress={handleSkip} style={styles.ctaSecondary}>
+          <Pressable
+            onPress={() => router.push('/onboarding_launch/plan-summary')}
+            style={styles.ctaSecondary}
+            accessibilityRole="button"
+            accessibilityLabel="I will remember myself"
+          >
             <Text style={styles.ctaSecondaryText}>I will remember myself</Text>
           </Pressable>
         </View>
@@ -118,40 +114,79 @@ export default function NotificationsScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.background },
-  safe: { flex: 1, paddingHorizontal: 24, justifyContent: 'space-between', paddingTop: 24 },
+  root: { flex: 1, backgroundColor: colors.background, overflow: 'hidden' },
+
+  // Yellow glow orb
+  backgroundGlow: {
+    position: 'absolute',
+    top: -96,
+    right: -72,
+    width: 248,
+    height: 248,
+    borderRadius: 124,
+    backgroundColor: '#F0C808',
+    opacity: 0.14,
+  },
+
+  safe:        { flex: 1, paddingHorizontal: 24, paddingTop: 32, paddingBottom: 24 },
+  contentWrap: { flex: 1, zIndex: 2 },
+
+  // Header
+  header:   { marginBottom: 32 },
+  headline: { fontFamily: 'Outfit_800ExtraBold', fontSize: 34, lineHeight: 37, color: '#374151', letterSpacing: -1, marginBottom: 12 },
+  subCopy:  { fontFamily: 'NunitoSans_400Regular', fontSize: 16, lineHeight: 23, color: '#94A3B8', maxWidth: 310 },
 
   // Notification preview card
-  notifCard: { backgroundColor: colors.surfaceContainerLow, borderRadius: 18, padding: 16, marginBottom: 28, shadowColor: colors.onSurface, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 12, elevation: 4 },
-  notifHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
-  notifIconWrap: { borderRadius: 8, overflow: 'hidden' },
-  notifIcon: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
-  notifIconLetter: { fontFamily: 'Outfit_800ExtraBold', fontSize: 12, color: colors.onPrimary },
-  notifApp: { fontFamily: 'NunitoSans_700Bold', fontSize: 13, color: colors.onSurface, flex: 1 },
-  notifTime: { fontFamily: 'NunitoSans_400Regular', fontSize: 12, color: colors.outline },
-  notifBody: { fontFamily: 'NunitoSans_400Regular', fontSize: 14, lineHeight: 20, color: colors.onSurface },
+  notifCard: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 20,
+    padding: 16,
+    paddingHorizontal: 20,
+    marginBottom: 40,
+    shadowColor: '#374151',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.08,
+    shadowRadius: 32,
+    elevation: 6,
+  },
+  notifHeader:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
+  notifAppInfo: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  notifDot:     { width: 14, height: 14, borderRadius: 7, backgroundColor: colors.primary },
+  notifAppName: { fontFamily: 'NunitoSans_600SemiBold', fontSize: 13, color: '#94A3B8', letterSpacing: 0.2 },
+  notifTime:    { fontFamily: 'NunitoSans_400Regular', fontSize: 12, color: '#94A3B8' },
+  notifBody:    { fontFamily: 'NunitoSans_600SemiBold', fontSize: 15, lineHeight: 22, color: '#374151' },
 
-  // Content
-  content: { flex: 1 },
-  headline: { fontFamily: 'Outfit_800ExtraBold', fontSize: 24, lineHeight: 32, color: colors.onPrimaryContainer, marginBottom: 12, letterSpacing: -0.3 },
-  body: { fontFamily: 'NunitoSans_400Regular', fontSize: 14, lineHeight: 21, color: colors.onSurfaceVariant, marginBottom: 24 },
+  // Benefits
+  benefitsList: { gap: 16 },
+  benefitItem:  { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+  benefitIcon:  { marginTop: 1 },
+  benefitText:  { flex: 1, fontSize: 15, lineHeight: 22, fontFamily: 'NunitoSans_400Regular' },
+  benefitBold:  { fontFamily: 'NunitoSans_700Bold', color: '#374151' },
+  benefitMuted: { color: '#94A3B8' },
 
-  features: { gap: 14, marginBottom: 24 },
-  featureRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
-  featureDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.primary, marginTop: 5 },
-  featureBody: { flex: 1 },
-  featureTitle: { fontFamily: 'NunitoSans_700Bold', fontSize: 14, color: colors.onSurface, marginBottom: 1 },
-  featureSub: { fontFamily: 'NunitoSans_400Regular', fontSize: 12, color: colors.onSurfaceVariant, lineHeight: 17 },
+  // Footer
+  footer:               { paddingTop: 32, gap: 12, zIndex: 2 },
+  socialProof:          { fontFamily: 'NunitoSans_400Regular', fontSize: 15, lineHeight: 22, color: '#374151', textAlign: 'center', marginBottom: 12, paddingHorizontal: 16 },
+  socialProofHighlight: { fontFamily: 'NunitoSans_700Bold', color: colors.primary },
 
-  statBox: { backgroundColor: `${colors.primary}0D`, borderRadius: 12, padding: 14 },
-  statText: { fontFamily: 'NunitoSans_400Regular', fontSize: 13, lineHeight: 20, color: colors.onSurfaceVariant },
-  statHighlight: { fontFamily: 'NunitoSans_700Bold', color: colors.primary },
+  ctaPrimary: {
+    width: '100%',
+    height: 60,
+    backgroundColor: colors.primary,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.24,
+    shadowRadius: 34,
+    elevation: 10,
+  },
+  ctaPressed:      { opacity: 0.88 },
+  ctaPrimaryText:  { fontFamily: 'Outfit_800ExtraBold', fontSize: 18, color: '#FFFFFF' },
 
-  // CTAs
-  ctaArea: { gap: 12, paddingBottom: 8 },
-  ctaPrimary: { borderRadius: 24, overflow: 'hidden', shadowColor: colors.blueShadow, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 1, shadowRadius: 16, elevation: 8 },
-  ctaPrimaryInner: { paddingVertical: 18, alignItems: 'center', borderRadius: 24 },
-  ctaPrimaryText: { fontFamily: 'Outfit_800ExtraBold', fontSize: 16, color: colors.onPrimary, letterSpacing: 0.3 },
-  ctaSecondary: { paddingVertical: 14, alignItems: 'center' },
-  ctaSecondaryText: { fontFamily: 'NunitoSans_400Regular', fontSize: 14, color: colors.onSurfaceVariant },
+  ctaSecondary:     { height: 44, alignItems: 'center', justifyContent: 'center' },
+  ctaSecondaryText: { fontFamily: 'NunitoSans_600SemiBold', fontSize: 14, color: '#94A3B8' },
 });

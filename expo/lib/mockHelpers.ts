@@ -97,7 +97,7 @@ export async function checkMockRetestAvailability(
 
 export async function fetchMockQuestions(
   level: string
-): Promise<{ horen: AppQuestion[]; lesen: AppQuestion[] }> {
+): Promise<{ horen: AppQuestion[]; lesen: AppQuestion[]; sprachbausteineT1: AppQuestion | null; sprachbausteineT2: AppQuestion | null }> {
   console.log('mockHelpers fetchMockQuestions', level);
 
   const { data, error } = await supabase
@@ -147,9 +147,20 @@ export async function fetchMockQuestions(
   const horen = selectForSection('Hören');
   const lesen = selectForSection('Lesen');
 
-  console.log('fetchMockQuestions selected', { horenCount: horen.length, lesenCount: lesen.length, level });
+  // B1 only: pick one random T1 and one random T2 Sprachbausteine question
+  let sprachbausteineT1: AppQuestion | null = null;
+  let sprachbausteineT2: AppQuestion | null = null;
+  if (level === 'B1') {
+    const spPool = all.filter((q) => q.section === 'Sprachbausteine');
+    const t1Pool = shuffleArray(spPool.filter((q) => q.teil === 1));
+    const t2Pool = shuffleArray(spPool.filter((q) => q.teil === 2));
+    sprachbausteineT1 = t1Pool[0] ?? null;
+    sprachbausteineT2 = t2Pool[0] ?? null;
+  }
 
-  return { horen, lesen };
+  console.log('fetchMockQuestions selected', { horenCount: horen.length, lesenCount: lesen.length, level, hasSprachbausteine: Boolean(sprachbausteineT1) });
+
+  return { horen, lesen, sprachbausteineT1, sprachbausteineT2 };
 }
 
 export async function createMockTest(params: {
@@ -199,6 +210,7 @@ export async function abandonMockTest(mockTestId: string): Promise<void> {
 export function generateStudyPlan(
   hoerenPct: number,
   lesenPct: number,
+  sprachbausteinePct: number,
   overallPct: number
 ): StudyPlanItem[] {
   const plan: StudyPlanItem[] = [];
@@ -217,6 +229,14 @@ export function generateStudyPlan(
       section: 'Lesen',
       action: 'Practise Lesen reading speed — 2 Lesen sections per week',
       resource: 'Sectional Tests → Lesen',
+    });
+  }
+  if (sprachbausteinePct > 0 && sprachbausteinePct < 60) {
+    plan.push({
+      priority: plan.length + 1,
+      section: 'Sprachbausteine',
+      action: 'Review grammar and vocabulary gap-fill exercises — target 70%+',
+      resource: 'Sectional Tests → Sprachbausteine',
     });
   }
   if (overallPct >= 60) {
@@ -239,6 +259,21 @@ export function generateStudyPlan(
   return plan;
 }
 
+function scoreSprachbausteineBlankAnswers(
+  userAnswers: Record<string, string>,
+  correctAnswerStr: string
+): { correct: number; total: number } {
+  let correctMap: Record<string, string>;
+  try {
+    correctMap = JSON.parse(correctAnswerStr) as Record<string, string>;
+  } catch {
+    return { correct: 0, total: 0 };
+  }
+  const total = Object.keys(correctMap).length;
+  const correct = Object.entries(correctMap).filter(([k, v]) => userAnswers[k] === v).length;
+  return { correct, total };
+}
+
 export async function completeMockTest(params: {
   mockTestId: string;
   userId: string;
@@ -250,6 +285,10 @@ export async function completeMockTest(params: {
   answers: Record<string, string>;
   timeTakenSeconds: number;
   profile: UserProfile | null;
+  sprachbausteineT1Question?: AppQuestion | null;
+  sprachbausteineT2Question?: AppQuestion | null;
+  t1Answers?: Record<string, string>;
+  t2Answers?: Record<string, string>;
 }): Promise<{
   horenCorrect: number;
   horenTotal: number;
@@ -257,6 +296,9 @@ export async function completeMockTest(params: {
   lesenCorrect: number;
   lesenTotal: number;
   lesenPct: number;
+  sprachbausteineCorrect: number;
+  sprachbausteineTotal: number;
+  sprachbausteinePct: number;
   overallPct: number;
   totalCorrect: number;
   totalQuestions: number;
@@ -273,6 +315,10 @@ export async function completeMockTest(params: {
     answers,
     timeTakenSeconds,
     profile,
+    sprachbausteineT1Question = null,
+    sprachbausteineT2Question = null,
+    t1Answers = {},
+    t2Answers = {},
   } = params;
 
   const calcSection = (questions: AppQuestion[]) => {
@@ -287,13 +333,27 @@ export async function completeMockTest(params: {
 
   const horen = calcSection(horenQuestions);
   const lesen = calcSection(lesenQuestions);
-  const totalCorrect = horen.correct + lesen.correct;
-  const totalQuestions = horen.total + lesen.total;
+
+  // Score Sprachbausteine (blank-level scoring)
+  const t1Score = sprachbausteineT1Question
+    ? scoreSprachbausteineBlankAnswers(t1Answers, sprachbausteineT1Question.correct_answer)
+    : { correct: 0, total: 0 };
+  const t2Score = sprachbausteineT2Question
+    ? scoreSprachbausteineBlankAnswers(t2Answers, sprachbausteineT2Question.correct_answer)
+    : { correct: 0, total: 0 };
+  const sprachbausteineCorrect = t1Score.correct + t2Score.correct;
+  const sprachbausteineTotal = t1Score.total + t2Score.total;
+  const sprachbausteinePct = sprachbausteineTotal > 0
+    ? Number(((sprachbausteineCorrect / sprachbausteineTotal) * 100).toFixed(2))
+    : 0;
+
+  const totalCorrect = horen.correct + lesen.correct + sprachbausteineCorrect;
+  const totalQuestions = horen.total + lesen.total + sprachbausteineTotal;
   const overallPct = totalQuestions > 0
     ? Number(((totalCorrect / totalQuestions) * 100).toFixed(2))
     : 0;
 
-  const studyPlan = generateStudyPlan(horen.pct, lesen.pct, overallPct);
+  const studyPlan = generateStudyPlan(horen.pct, lesen.pct, sprachbausteinePct, overallPct);
 
   const retestDate = new Date();
   retestDate.setDate(retestDate.getDate() + 7);
@@ -357,6 +417,61 @@ export async function completeMockTest(params: {
         console.log('completeMockTest lesen session error', lErr);
       } else {
         sessionIds.push((lSession as { id: string }).id);
+      }
+    }
+
+    // Save Sprachbausteine session (B1 only)
+    if (sprachbausteineTotal > 0 && sprachbausteineT1Question && sprachbausteineT2Question) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: spSession, error: spErr } = await (supabase.from('test_sessions') as any)
+        .insert({
+          user_id: userId,
+          session_type: 'mock',
+          level,
+          section: 'Sprachbausteine',
+          teil: 0,
+          exam_type: examType,
+          score_pct: sprachbausteinePct,
+          questions_total: sprachbausteineTotal,
+          questions_correct: sprachbausteineCorrect,
+          time_taken_seconds: Math.round(timeTakenSeconds * (sprachbausteineTotal / totalQuestions)),
+          is_timed: isTimed,
+          completed_at: new Date().toISOString(),
+          mock_test_id: mockTestId,
+          retest_available_at: retestStr,
+        })
+        .select('id')
+        .single();
+
+      if (spErr) {
+        console.log('completeMockTest sprachbausteine session error', spErr);
+      } else {
+        const spSessionId = (spSession as { id: string }).id;
+        sessionIds.push(spSessionId);
+
+        const spAnswerRows = [
+          {
+            session_id: spSessionId,
+            user_id: userId,
+            question_id: sprachbausteineT1Question.id,
+            selected_answer: JSON.stringify(t1Answers),
+            is_correct: t1Score.correct === t1Score.total,
+            time_taken_seconds: null,
+          },
+          {
+            session_id: spSessionId,
+            user_id: userId,
+            question_id: sprachbausteineT2Question.id,
+            selected_answer: JSON.stringify(t2Answers),
+            is_correct: t2Score.correct === t2Score.total,
+            time_taken_seconds: null,
+          },
+        ];
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { error: spAErr } = await (supabase.from('user_answers') as any).insert(spAnswerRows);
+        if (spAErr) {
+          console.log('completeMockTest sprachbausteine answers error', spAErr);
+        }
       }
     }
 
@@ -431,6 +546,9 @@ export async function completeMockTest(params: {
     lesenCorrect: lesen.correct,
     lesenTotal: lesen.total,
     lesenPct: lesen.pct,
+    sprachbausteineCorrect,
+    sprachbausteineTotal,
+    sprachbausteinePct,
     overallPct,
     totalCorrect,
     totalQuestions,

@@ -30,7 +30,9 @@ import {
 import { useAuth } from '@/providers/AuthProvider';
 import type { AppQuestion } from '@/types/database';
 
-type MockPhase = 'horen' | 'transition' | 'lesen' | 'submitting';
+type MockPhase = 'horen' | 'transition' | 'lesen' | 'sprachbausteine' | 'submitting';
+type SprachSubPhase = 't1' | 't2';
+type BlankAnswers = Record<string, string>;
 
 export default function MockTestScreen() {
   const insets = useSafeAreaInsets();
@@ -40,6 +42,8 @@ export default function MockTestScreen() {
     isTimed?: string;
     horenQuestions?: string;
     lesenQuestions?: string;
+    sprachbausteineT1Question?: string;
+    sprachbausteineT2Question?: string;
   }>();
 
   const { user, profile, refreshProfile } = useAuth();
@@ -65,8 +69,20 @@ export default function MockTestScreen() {
     }
   }, [params.lesenQuestions]);
 
+  const sprachbausteineT1 = useMemo<AppQuestion | null>(() => {
+    try { return JSON.parse(params.sprachbausteineT1Question ?? 'null') as AppQuestion; }
+    catch { return null; }
+  }, [params.sprachbausteineT1Question]);
+
+  const sprachbausteineT2 = useMemo<AppQuestion | null>(() => {
+    try { return JSON.parse(params.sprachbausteineT2Question ?? 'null') as AppQuestion; }
+    catch { return null; }
+  }, [params.sprachbausteineT2Question]);
+
+  const hasSprachbausteine = Boolean(sprachbausteineT1 && sprachbausteineT2);
+
   const allQuestions = useMemo(() => [...horenQuestions, ...lesenQuestions], [horenQuestions, lesenQuestions]);
-  const totalQuestions = allQuestions.length;
+  const totalQuestions = allQuestions.length + (hasSprachbausteine ? 1 : 0); // +1 represents the combined sprachbausteine block in progress
 
   const [phase, setPhase] = useState<MockPhase>(horenQuestions.length > 0 ? 'horen' : 'lesen');
   const [currentIndex, setCurrentIndex] = useState<number>(0);
@@ -74,6 +90,12 @@ export default function MockTestScreen() {
   const [mockTestId, setMockTestId] = useState<string>('');
   const [horenCorrectCount, setHorenCorrectCount] = useState<number>(0);
   const [remainingSeconds, setRemainingSeconds] = useState<number>(0);
+
+  // Sprachbausteine phase state
+  const [sprachSubPhase, setSprachSubPhase] = useState<SprachSubPhase>('t1');
+  const [t1Answers, setT1Answers] = useState<BlankAnswers>({});
+  const [t2Answers, setT2Answers] = useState<BlankAnswers>({});
+  const [t1SelectedBlank, setT1SelectedBlank] = useState<string | null>(null);
 
   const sessionStartTimeRef = useRef<number>(Date.now());
   const sectionTimerStartRef = useRef<number>(Date.now());
@@ -176,10 +198,16 @@ export default function MockTestScreen() {
         void handleSubmit();
       }
     } else if (phase === 'lesen') {
-      void handleSubmit();
+      if (hasSprachbausteine) {
+        setPhase('sprachbausteine');
+        setSprachSubPhase('t1');
+        setCurrentIndex(0);
+      } else {
+        void handleSubmit();
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, horenQuestions, lesenQuestions, answers]);
+  }, [phase, horenQuestions, lesenQuestions, answers, hasSprachbausteine]);
 
   const handleSubmit = useCallback(async () => {
     if (phase === 'submitting') return;
@@ -198,6 +226,10 @@ export default function MockTestScreen() {
         answers,
         timeTakenSeconds: timeTaken,
         profile,
+        sprachbausteineT1Question: sprachbausteineT1,
+        sprachbausteineT2Question: sprachbausteineT2,
+        t1Answers,
+        t2Answers,
       });
 
       await refreshProfile();
@@ -212,6 +244,9 @@ export default function MockTestScreen() {
           lesenCorrect: String(result.lesenCorrect),
           lesenTotal: String(result.lesenTotal),
           lesenPct: String(result.lesenPct),
+          sprachbausteineCorrect: String(result.sprachbausteineCorrect),
+          sprachbausteineTotal: String(result.sprachbausteineTotal),
+          sprachbausteinePct: String(result.sprachbausteinePct),
           overallPct: String(result.overallPct),
           totalCorrect: String(result.totalCorrect),
           totalQuestions: String(result.totalQuestions),
@@ -226,9 +261,9 @@ export default function MockTestScreen() {
       });
     } catch (err) {
       console.log('MockTest handleSubmit error', err);
-      setPhase(lesenQuestions.length > 0 ? 'lesen' : 'horen');
+      setPhase(hasSprachbausteine ? 'sprachbausteine' : lesenQuestions.length > 0 ? 'lesen' : 'horen');
     }
-  }, [phase, mockTestId, userId, level, examType, isTimed, horenQuestions, lesenQuestions, answers, profile, refreshProfile, params.horenQuestions, params.lesenQuestions]);
+  }, [phase, mockTestId, userId, level, examType, isTimed, horenQuestions, lesenQuestions, answers, profile, refreshProfile, params.horenQuestions, params.lesenQuestions, sprachbausteineT1, sprachbausteineT2, t1Answers, t2Answers, hasSprachbausteine]);
 
   const handleBack = useCallback(() => {
     if (Object.keys(answers).length > 0) {
@@ -268,11 +303,18 @@ export default function MockTestScreen() {
         setCurrentIndex(0);
         return;
       }
+      // After lesen, go to sprachbausteine if available (B1 only)
+      if (phase === 'lesen' && hasSprachbausteine) {
+        setPhase('sprachbausteine');
+        setSprachSubPhase('t1');
+        setCurrentIndex(0);
+        return;
+      }
       void handleSubmit();
       return;
     }
     setCurrentIndex((v) => v + 1);
-  }, [currentIndex, currentQuestions.length, currentQuestion, phase, lesenQuestions.length, horenQuestions, answers, handleSubmit]);
+  }, [currentIndex, currentQuestions.length, currentQuestion, phase, lesenQuestions.length, horenQuestions, answers, handleSubmit, hasSprachbausteine]);
 
   const handleContinueToLesen = useCallback(() => {
     setPhase('lesen');
@@ -362,6 +404,212 @@ export default function MockTestScreen() {
     );
   }
 
+  if (phase === 'sprachbausteine' && sprachbausteineT1 && sprachbausteineT2) {
+    const isT1 = sprachSubPhase === 't1';
+    const currentQ = isT1 ? sprachbausteineT1 : sprachbausteineT2;
+
+    // Parse T1 word bank
+    const t1Opt = (sprachbausteineT1.options as unknown as Array<Record<string, unknown>>)?.[0];
+    const t1Words: string[] = isT1 && t1Opt?.['type'] === 'word_bank'
+      ? (t1Opt['words'] as string[]) ?? []
+      : [];
+    const t1PlacedWords = new Set(Object.values(t1Answers));
+    const t1StimulusParts = sprachbausteineT1.stimulus_text
+      ? sprachbausteineT1.stimulus_text.split(/\((\d+)\)/).map((p, i) =>
+          i % 2 === 1 ? { kind: 'gap' as const, num: p } : { kind: 'text' as const, value: p }
+        )
+      : [];
+
+    // Parse T2 MCQ
+    const t2Opts = !isT1
+      ? (sprachbausteineT2.options as unknown as Array<{ blank: number; choices: { id: string; text: string }[] }>) ?? []
+      : [];
+    const t2StimulusParts = sprachbausteineT2.stimulus_text
+      ? sprachbausteineT2.stimulus_text.split(/\((\d+)\)/).map((p, i) =>
+          i % 2 === 1 ? { kind: 'gap' as const, num: p } : { kind: 'text' as const, value: p }
+        )
+      : [];
+
+    const t1AllFilled = t1Words.length > 0 && Object.keys(t1Answers).length === 10;
+    const t2AllAnswered = t2Opts.length > 0 && t2Opts.every((o) => t2Answers[String(o.blank)]);
+    const canProceed = isT1 ? t1AllFilled : t2AllAnswered;
+
+    const handleT1GapPress = (num: string) => {
+      if (t1Answers[num]) {
+        setT1Answers((prev) => { const n = { ...prev }; delete n[num]; return n; });
+        setT1SelectedBlank(null);
+      } else {
+        setT1SelectedBlank((prev) => prev === num ? null : num);
+      }
+    };
+
+    const handleWordPress = (word: string) => {
+      if (t1SelectedBlank) {
+        setT1Answers((prev) => ({ ...prev, [t1SelectedBlank]: word }));
+        setT1SelectedBlank(null);
+      } else {
+        const nextEmpty = t1StimulusParts
+          .filter((p) => p.kind === 'gap')
+          .map((p) => (p as { kind: 'gap'; num: string }).num)
+          .find((n) => !t1Answers[n]);
+        if (nextEmpty) setT1Answers((prev) => ({ ...prev, [nextEmpty]: word }));
+      }
+    };
+
+    return (
+      <View style={styles.screen}>
+        <Stack.Screen options={{ title: '', headerShown: false }} />
+        <View style={styles.headerCard}>
+          <View style={styles.mockBadgeRow}>
+            <View style={styles.mockBadge}>
+              <Text style={styles.mockBadgeText}>Mock Exam</Text>
+            </View>
+            <View style={[styles.sectionPill, styles.sprachbausteinePill]}>
+              <Text style={styles.sectionPillText}>Sprachbausteine T{isT1 ? '1' : '2'}</Text>
+            </View>
+            <Text style={styles.meta}>{level}</Text>
+          </View>
+          <View style={styles.progressTrack}>
+            <Animated.View style={[styles.progressFill, { width: progressWidth }]} />
+          </View>
+        </View>
+
+        <ScrollView
+          contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + CTA_BUTTON_HEIGHT + BOTTOM_CONTENT_BUFFER }]}
+          showsVerticalScrollIndicator={false}
+        >
+          <Text style={styles.sprachSectionLabel}>
+            {isT1
+              ? 'Teil 1 — Ergänzen Sie die Lücken mit Wörtern aus dem Wortkasten'
+              : 'Teil 2 — Wählen Sie die richtige Antwort (a, b oder c)'}
+          </Text>
+
+          {/* Stimulus with gaps */}
+          <View style={styles.sprachStimulusCard}>
+            <Text style={styles.sprachStimulusBody}>
+              {(isT1 ? t1StimulusParts : t2StimulusParts).map((part, i) => {
+                if (part.kind === 'text') {
+                  return <Text key={i} style={styles.sprachStimulusText}>{part.value}</Text>;
+                }
+                if (isT1) {
+                  const word = t1Answers[part.num];
+                  const isSelected = t1SelectedBlank === part.num;
+                  return (
+                    <Pressable
+                      key={i}
+                      onPress={() => handleT1GapPress(part.num)}
+                      style={[
+                        styles.sprachGapChip,
+                        word ? styles.sprachGapFilled : styles.sprachGapEmpty,
+                        isSelected && styles.sprachGapSelected,
+                      ]}
+                    >
+                      <Text style={[styles.sprachGapText, !word && styles.sprachGapTextEmpty]}>
+                        {word ?? `(${part.num})`}
+                      </Text>
+                    </Pressable>
+                  );
+                }
+                return (
+                  <View key={i} style={styles.sprachT2InlineGap}>
+                    <Text style={styles.sprachT2InlineGapNum}>({part.num})</Text>
+                  </View>
+                );
+              })}
+            </Text>
+          </View>
+
+          {/* T1: Word bank */}
+          {isT1 && (
+            <View style={styles.sprachWordBank}>
+              <View style={styles.sprachWordBankHeader}>
+                <Text style={styles.sprachWordBankTitle}>Wortkasten</Text>
+                <Text style={styles.sprachWordBankCount}>
+                  {t1Words.filter((w) => !t1PlacedWords.has(w)).length} übrig
+                </Text>
+              </View>
+              <View style={styles.sprachWordChipRow}>
+                {t1Words.map((word) => {
+                  const isPlaced = t1PlacedWords.has(word);
+                  return (
+                    <Pressable
+                      key={word}
+                      onPress={() => !isPlaced && handleWordPress(word)}
+                      disabled={isPlaced}
+                      style={[styles.sprachWordChip, isPlaced && styles.sprachWordChipUsed]}
+                    >
+                      <Text style={[styles.sprachWordChipText, isPlaced && styles.sprachWordChipTextUsed]}>
+                        {word}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+          )}
+
+          {/* T2: Per-blank choices */}
+          {!isT1 && (
+            <View style={styles.sprachT2Choices}>
+              {t2Opts.map((blankOpt) => {
+                const blankKey = String(blankOpt.blank);
+                const selected = t2Answers[blankKey];
+                return (
+                  <View key={blankKey} style={styles.sprachT2BlankRow}>
+                    <Text style={styles.sprachT2BlankNum}>({blankOpt.blank})</Text>
+                    <View style={styles.sprachT2ChoiceButtons}>
+                      {blankOpt.choices.map((choice) => (
+                        <Pressable
+                          key={choice.id}
+                          onPress={() => setT2Answers((prev) => ({ ...prev, [blankKey]: choice.id }))}
+                          style={[
+                            styles.sprachT2ChoiceBtn,
+                            selected === choice.id && styles.sprachT2ChoiceBtnSelected,
+                          ]}
+                        >
+                          <Text style={[styles.sprachT2ChoiceId, selected === choice.id && styles.sprachT2ChoiceIdSelected]}>
+                            {choice.id}
+                          </Text>
+                          <Text style={[styles.sprachT2ChoiceText, selected === choice.id && styles.sprachT2ChoiceTextSelected]}>
+                            {choice.text}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          )}
+        </ScrollView>
+
+        <View style={[styles.footer, { bottom: insets.bottom }]}>
+          <Pressable
+            accessibilityLabel={isT1 ? 'Continue to Teil 2' : 'Submit Mock Test'}
+            disabled={!canProceed}
+            onPress={() => {
+              if (isT1) {
+                setSprachSubPhase('t2');
+              } else {
+                void handleSubmit();
+              }
+            }}
+            style={[styles.nextButton, !canProceed && styles.nextButtonDisabled]}
+          >
+            <Text style={styles.nextButtonText}>
+              {isT1 ? 'Weiter zu Teil 2 →' : 'Submit Mock Test'}
+            </Text>
+          </Pressable>
+          {isT1 && !t1AllFilled && (
+            <Text style={styles.sprachFooterHint}>
+              {Object.keys(t1Answers).length}/10 Lücken ausgefüllt
+            </Text>
+          )}
+        </View>
+      </View>
+    );
+  }
+
   if (phase === 'submitting') {
     return (
       <View style={styles.screen}>
@@ -377,9 +625,12 @@ export default function MockTestScreen() {
 
   const section = phase === 'horen' ? 'Hören' : 'Lesen';
   const isLastQuestion = currentIndex === currentQuestions.length - 1;
-  const isLastSection = phase === 'lesen' || lesenQuestions.length === 0;
+  // After lesen, sprachbausteine comes next (B1); after hören, lesen is next
+  const isLastSection = (phase === 'lesen' && !hasSprachbausteine) || lesenQuestions.length === 0;
   const buttonLabel = isLastQuestion && isLastSection
     ? 'Submit Mock Test'
+    : isLastQuestion && phase === 'lesen' && hasSprachbausteine
+    ? 'Continue to Sprachbausteine'
     : isLastQuestion && !isLastSection
     ? 'Continue to Lesen'
     : 'Next';
@@ -591,6 +842,9 @@ const styles = StyleSheet.create({
   },
   lesenPill: {
     backgroundColor: '#6A1B9A',
+  },
+  sprachbausteinePill: {
+    backgroundColor: '#7B1FA2',
   },
   sectionPillText: {
     color: '#fff',
@@ -813,5 +1067,186 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700' as const,
     color: Colors.primary,
+  },
+
+  // ── Sprachbausteine phase styles ──────────────────────────────────────────
+  sprachSectionLabel: {
+    fontFamily: 'NunitoSans_400Regular',
+    fontSize: 13,
+    color: '#7B1FA2',
+    backgroundColor: '#7B1FA220',
+    borderRadius: 10,
+    padding: 10,
+    lineHeight: 18,
+  },
+  sprachStimulusCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    padding: 16,
+  },
+  sprachStimulusBody: {
+    fontFamily: 'NunitoSans_400Regular',
+    fontSize: 15,
+    color: Colors.text,
+    lineHeight: 26,
+    flexWrap: 'wrap',
+  },
+  sprachStimulusText: {
+    fontFamily: 'NunitoSans_400Regular',
+    fontSize: 15,
+    color: Colors.text,
+  },
+  sprachGapChip: {
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    marginHorizontal: 2,
+    marginVertical: 2,
+  },
+  sprachGapEmpty: {
+    backgroundColor: Colors.border,
+    borderWidth: 1.5,
+    borderColor: Colors.textMuted + '40',
+  },
+  sprachGapFilled: {
+    backgroundColor: '#7B1FA220',
+    borderWidth: 1.5,
+    borderColor: '#7B1FA250',
+  },
+  sprachGapSelected: {
+    borderColor: '#7B1FA2',
+    borderWidth: 2,
+  },
+  sprachGapText: {
+    fontFamily: 'NunitoSans_600SemiBold',
+    fontSize: 14,
+    color: '#7B1FA2',
+  },
+  sprachGapTextEmpty: {
+    color: Colors.textMuted,
+    fontFamily: 'NunitoSans_400Regular',
+    fontSize: 13,
+  },
+  sprachT2InlineGap: {
+    backgroundColor: '#E65100' + '20',
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    marginHorizontal: 2,
+  },
+  sprachT2InlineGapNum: {
+    fontFamily: 'NunitoSans_600SemiBold',
+    fontSize: 13,
+    color: '#E65100',
+  },
+  sprachWordBank: {
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    padding: 14,
+    gap: 10,
+  },
+  sprachWordBankHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  sprachWordBankTitle: {
+    fontFamily: 'Outfit_800ExtraBold',
+    fontSize: 14,
+    color: Colors.text,
+  },
+  sprachWordBankCount: {
+    fontFamily: 'NunitoSans_400Regular',
+    fontSize: 13,
+    color: Colors.textMuted,
+  },
+  sprachWordChipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  sprachWordChip: {
+    backgroundColor: '#7B1FA215',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderWidth: 1.5,
+    borderColor: '#7B1FA240',
+  },
+  sprachWordChipUsed: {
+    backgroundColor: Colors.border,
+    borderColor: Colors.border,
+    opacity: 0.45,
+  },
+  sprachWordChipText: {
+    fontFamily: 'NunitoSans_600SemiBold',
+    fontSize: 14,
+    color: '#7B1FA2',
+  },
+  sprachWordChipTextUsed: {
+    color: Colors.textMuted,
+  },
+  sprachT2Choices: {
+    gap: 10,
+  },
+  sprachT2BlankRow: {
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+  },
+  sprachT2BlankNum: {
+    fontFamily: 'Outfit_800ExtraBold',
+    fontSize: 13,
+    color: Colors.text,
+    minWidth: 32,
+    paddingTop: 2,
+  },
+  sprachT2ChoiceButtons: {
+    flex: 1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  sprachT2ChoiceBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    backgroundColor: Colors.background,
+    minWidth: 70,
+  },
+  sprachT2ChoiceBtnSelected: {
+    backgroundColor: '#7B1FA215',
+    borderColor: '#7B1FA2',
+  },
+  sprachT2ChoiceId: {
+    fontFamily: 'Outfit_800ExtraBold',
+    fontSize: 12,
+    color: Colors.textMuted,
+  },
+  sprachT2ChoiceIdSelected: {
+    color: '#7B1FA2',
+  },
+  sprachT2ChoiceText: {
+    fontFamily: 'NunitoSans_400Regular',
+    fontSize: 13,
+    color: Colors.text,
+  },
+  sprachT2ChoiceTextSelected: {
+    fontFamily: 'NunitoSans_600SemiBold',
+    color: '#7B1FA2',
+  },
+  sprachFooterHint: {
+    fontFamily: 'NunitoSans_400Regular',
+    fontSize: 12,
+    color: Colors.textMuted,
+    textAlign: 'center',
+    marginTop: 4,
   },
 });

@@ -25,19 +25,44 @@ export async function signInWithEmail(email: string, password: string) {
   return data;
 }
 
-export async function signUpWithEmail(email: string, password: string) {
+export type SignUpResult =
+  | { status: 'confirmation_pending'; email: string }
+  | { status: 'signed_in'; data: Awaited<ReturnType<typeof supabase.auth.signUp>>['data'] };
+
+export async function signUpWithEmail(email: string, password: string): Promise<SignUpResult> {
   const { data, error } = await supabase.auth.signUp({ email, password });
 
   if (error) {
     console.log('signUpWithEmail error', error);
+    if (error.message.toLowerCase().includes('already registered')) {
+      throw new Error('An account with this email already exists. Try signing in instead.');
+    }
     throw error;
   }
 
-  if (data.user) {
-    await ensureUserProfile(data.user);
+  // Confirmation email sent — not an error
+  if (data.user && !data.session) {
+    return { status: 'confirmation_pending', email };
   }
 
-  return data;
+  // Fully signed in (email confirmation disabled)
+  if (data.user && data.session) {
+    await ensureUserProfile(data.user);
+    return { status: 'signed_in', data };
+  }
+
+  throw new Error('Unexpected response from sign up');
+}
+
+export async function updateTcAccepted(userId: string, tcVersion: string): Promise<void> {
+  await supabase
+    .from('user_profiles')
+    .update({
+      tc_accepted: true,
+      tc_accepted_at: new Date().toISOString(),
+      tc_version: tcVersion,
+    } as never)
+    .eq('id', userId);
 }
 
 export async function signInWithGoogle() {

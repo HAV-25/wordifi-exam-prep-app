@@ -66,22 +66,22 @@ function SessionProgressBar({ answered, total }: { answered: number; total: numb
     }
   }, [answered, total, progressAnim]);
 
-  if (answered === 0) return null;
-
   return (
     <View style={progressStyles.wrapper}>
       <View style={progressStyles.container}>
-        <Animated.View
-          style={[
-            progressStyles.fill,
-            {
-              width: progressAnim.interpolate({
-                inputRange: [0, 1],
-                outputRange: ['0%', '100%'],
-              }),
-            },
-          ]}
-        />
+        {answered > 0 && (
+          <Animated.View
+            style={[
+              progressStyles.fill,
+              {
+                width: progressAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: ['0%', '100%'],
+                }),
+              },
+            ]}
+          />
+        )}
       </View>
       <Text style={progressStyles.counter}>{answered} / {total}</Text>
     </View>
@@ -135,6 +135,8 @@ export default function TestStreamScreen() {
   const router = useRouter();
   const userId = user?.id ?? '';
   const targetLevel = profile?.target_level ?? 'A1';
+  const today = new Date().toISOString().slice(0, 10);
+  const SESSION_KEY = `wordifi_stream_${targetLevel}_${today}`;
   const [showPaywall, setShowPaywall] = useState<boolean>(false);
 
   const [currentIndex, setCurrentIndex] = useState<number>(0);
@@ -150,8 +152,8 @@ export default function TestStreamScreen() {
   const [reportQuestionId, setReportQuestionId] = useState<string | null>(null);
   const [totalAnswered, setTotalAnswered] = useState<number>(0);
   const [showSwipeHint, setShowSwipeHint] = useState<boolean>(false);
-  const [horenPct, setHorenPct] = useState<number>(50);
-  const [lesenPct, setLesenPct] = useState<number>(50);
+  const [horenPct, setHorenPct] = useState<number>(0);
+  const [lesenPct, setLesenPct] = useState<number>(0);
   const [previousIndex, setPreviousIndex] = useState<number | null>(null);
   const [sessionAnsweredCount, setSessionAnsweredCount] = useState<number>(0);
   const [correctStreak, setCorrectStreak] = useState<number>(0);
@@ -170,12 +172,21 @@ export default function TestStreamScreen() {
   const answeredCountRef = useRef<number>(0);
   const hasUpdatedStreakRef = useRef<boolean>(false);
   const isAnimatingRef = useRef<boolean>(false);
+  const hasRestoredSession = useRef(false);
 
   const translateY = useRef(new Animated.Value(0)).current;
   const streakToastAnim = useRef(new Animated.Value(-80)).current;
   const swipeHintPulse = useRef(new Animated.Value(1)).current;
   const gaugeScaleAnim = useRef(new Animated.Value(1)).current;
   const comboToastAnim = useRef(new Animated.Value(0)).current;
+
+  // Refs for PanResponder — always hold the latest values so the handler
+  // doesn't need to be recreated on each render (which breaks gestures after Q2).
+  const currentIndexRef = useRef(currentIndex);
+  const answeredMapRef = useRef(answeredMap);
+  const questionsRef = useRef<AppQuestion[]>([]);
+  const isReviewModeRef = useRef<boolean>(false);
+  const previousIndexRef = useRef(previousIndex);
 
   const XP_PER_LEVEL: Record<string, number> = useMemo(() => ({
     A1: 5,
@@ -239,12 +250,63 @@ export default function TestStreamScreen() {
       }
       return result.questions;
     },
-    staleTime: 0,
+    staleTime: 1000 * 60 * 60,     // 1 hour — questions stay stable for a full session
+    gcTime: 1000 * 60 * 60 * 2,
   });
 
   const questions = useMemo(() => questionsQuery.data ?? [], [questionsQuery.data]);
   const currentQuestion = previousIndex !== null ? questions[previousIndex] ?? null : questions[currentIndex] ?? null;
   const isReviewMode = previousIndex !== null;
+
+  // Bug 4: restore day-session state from AsyncStorage once questions are available
+  useEffect(() => {
+    if (!userId || !targetLevel || hasRestoredSession.current) return;
+    if (questionsQuery.isLoading) return;
+    if (questions.length === 0) return;
+
+    hasRestoredSession.current = true;
+
+    async function restoreSession() {
+      try {
+        // Clean up yesterday's key
+        const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+        AsyncStorage.removeItem(`wordifi_stream_${targetLevel}_${yesterday}`).catch(() => {});
+
+        const saved = await AsyncStorage.getItem(SESSION_KEY);
+        if (!saved) return;
+
+        const parsed = JSON.parse(saved) as {
+          date: string;
+          currentIndex?: number;
+          answeredMap?: Record<string, string>;
+          sessionAnsweredCount?: number;
+          correctStreak?: number;
+        };
+        if (parsed.date !== today) return;
+
+        if (typeof parsed.currentIndex === 'number' && parsed.currentIndex > 0) {
+          setCurrentIndex(parsed.currentIndex);
+          currentIndexRef.current = parsed.currentIndex;
+        }
+        if (parsed.answeredMap && Object.keys(parsed.answeredMap).length > 0) {
+          setAnsweredMap(parsed.answeredMap);
+          answeredMapRef.current = parsed.answeredMap;
+        }
+        if (typeof parsed.sessionAnsweredCount === 'number') {
+          answeredCountRef.current = parsed.sessionAnsweredCount;
+          setSessionAnsweredCount(parsed.sessionAnsweredCount);
+        }
+        if (typeof parsed.correctStreak === 'number') {
+          setCorrectStreak(parsed.correctStreak);
+        }
+      } catch {
+        // Silent fail — start fresh
+      }
+    }
+
+    restoreSession().catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId, targetLevel, questions.length, questionsQuery.isLoading]);
 
   const ensureSession = useCallback(async () => {
     if (!sessionIdRef.current || sessionIdRef.current === 'placeholder-session') {
@@ -438,6 +500,16 @@ export default function TestStreamScreen() {
       if (remaining <= 5) {
         fetchMoreQuestions().catch(() => {});
       }
+
+      // Persist session progress so user can resume after leaving the app
+      const sessionSnapshot = {
+        date: today,
+        currentIndex: currentIndexRef.current,
+        answeredMap: { ...answeredMapRef.current, [questionId]: selectedKey },
+        sessionAnsweredCount: answeredCountRef.current,
+        correctStreak: isCorrect ? correctStreak + 1 : 0,
+      };
+      AsyncStorage.setItem(SESSION_KEY, JSON.stringify(sessionSnapshot)).catch(() => {});
     },
     [
       userId, localXp, localStreak, profile, totalAnswered,
@@ -445,6 +517,7 @@ export default function TestStreamScreen() {
       ensureSession, writeBlockSession, targetLevel, questions.length,
       currentIndex, fetchMoreQuestions, refreshProfile, checkMilestones, animateGaugePulse,
       showStreakToastBanner, showComboToastBanner, decrementStreamRemaining, incrementDailyStreamCount, triggerXpBurst,
+      SESSION_KEY, today,
     ]
   );
 
@@ -454,7 +527,11 @@ export default function TestStreamScreen() {
 
   const advanceToNext = useCallback(() => {
     if (isAnimatingRef.current) return;
-    if (currentIndex >= questions.length - 1) return;
+
+    // Use refs — not closure values — so the guard is never stale
+    const latestIndex = currentIndexRef.current;
+    const latestQuestions = questionsRef.current;
+    if (latestIndex >= latestQuestions.length - 1) return;
 
     if (isStreamLimited) {
       setShowPaywall(true);
@@ -471,11 +548,27 @@ export default function TestStreamScreen() {
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start(() => {
-      setCurrentIndex((prev) => prev + 1);
+      setCurrentIndex((prev) => {
+        const next = prev + 1;
+        currentIndexRef.current = next;
+
+        // Persist the advanced index immediately
+        AsyncStorage.getItem(SESSION_KEY).then((saved) => {
+          if (saved) {
+            try {
+              const parsed = JSON.parse(saved) as Record<string, unknown>;
+              parsed.currentIndex = next;
+              AsyncStorage.setItem(SESSION_KEY, JSON.stringify(parsed)).catch(() => {});
+            } catch { /* silent */ }
+          }
+        }).catch(() => {});
+
+        return next;
+      });
       translateY.setValue(0);
       isAnimatingRef.current = false;
     });
-  }, [currentIndex, questions.length, translateY, isStreamLimited]);
+  }, [translateY, isStreamLimited, SESSION_KEY]);
 
   const goToPrevious = useCallback(() => {
     if (isAnimatingRef.current) return;
@@ -518,46 +611,69 @@ export default function TestStreamScreen() {
     ]).start();
   }, [translateY]);
 
-  const panResponder = useMemo(
-    () =>
-      PanResponder.create({
-        onMoveShouldSetPanResponder: (_, g) => {
-          return Math.abs(g.dy) > 12 && Math.abs(g.dy) > Math.abs(g.dx) * 1.5;
-        },
-        onPanResponderMove: (_, g) => {
-          if (isAnimatingRef.current) return;
-          translateY.setValue(g.dy * 0.6);
-        },
-        onPanResponderRelease: (_, g) => {
-          if (isAnimatingRef.current) return;
-          const activeQ = isReviewMode
-            ? questions[previousIndex ?? 0]
-            : questions[currentIndex];
-          const questionAnswered = activeQ ? Boolean(answeredMap[activeQ.id]) : false;
+  // Keep refs in sync with latest state/callbacks so panResponder can read them
+  // without needing to be recreated on every render.
+  useEffect(() => { currentIndexRef.current = currentIndex; }, [currentIndex]);
+  useEffect(() => { answeredMapRef.current = answeredMap; }, [answeredMap]);
+  useEffect(() => { questionsRef.current = questions; }, [questions]);
+  useEffect(() => { isReviewModeRef.current = isReviewMode; }, [isReviewMode]);
+  useEffect(() => { previousIndexRef.current = previousIndex; }, [previousIndex]);
 
-          if (g.dy < -SWIPE_THRESHOLD || g.vy < -SWIPE_VELOCITY / 1000) {
-            if (isReviewMode) {
-              returnFromReview();
-            } else if (questionAnswered) {
-              advanceToNext();
-            } else {
-              bounceCard();
-            }
-          } else if (g.dy > SWIPE_THRESHOLD || g.vy > SWIPE_VELOCITY / 1000) {
-            if (isReviewMode) {
-              Animated.spring(translateY, { toValue: 0, friction: 8, useNativeDriver: true }).start();
-            } else if (currentIndex > 0 && !isReviewMode) {
-              goToPrevious();
-            } else {
-              Animated.spring(translateY, { toValue: 0, friction: 8, useNativeDriver: true }).start();
-            }
+  const advanceToNextRef = useRef(advanceToNext);
+  const goToPreviousRef = useRef(goToPrevious);
+  const returnFromReviewRef = useRef(returnFromReview);
+  const bounceCardRef = useRef(bounceCard);
+  useEffect(() => { advanceToNextRef.current = advanceToNext; }, [advanceToNext]);
+  useEffect(() => { goToPreviousRef.current = goToPrevious; }, [goToPrevious]);
+  useEffect(() => { returnFromReviewRef.current = returnFromReview; }, [returnFromReview]);
+  useEffect(() => { bounceCardRef.current = bounceCard; }, [bounceCard]);
+
+  // Stable PanResponder — created once, reads latest values through refs.
+  // Recreating it on every render (useMemo) causes gesture handling to break after Q2.
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, g) => {
+        return Math.abs(g.dy) > 12 && Math.abs(g.dy) > Math.abs(g.dx) * 1.5;
+      },
+      onPanResponderMove: (_, g) => {
+        if (isAnimatingRef.current) return;
+        translateY.setValue(g.dy * 0.6);
+      },
+      onPanResponderRelease: (_, g) => {
+        if (isAnimatingRef.current) return;
+        const curIdx = currentIndexRef.current;
+        const curAnsweredMap = answeredMapRef.current;
+        const curQuestions = questionsRef.current;
+        const curIsReviewMode = isReviewModeRef.current;
+        const curPreviousIndex = previousIndexRef.current;
+
+        const activeQ = curIsReviewMode
+          ? curQuestions[curPreviousIndex ?? 0]
+          : curQuestions[curIdx];
+        const questionAnswered = activeQ ? Boolean(curAnsweredMap[activeQ.id]) : false;
+
+        if (g.dy < -SWIPE_THRESHOLD || g.vy < -SWIPE_VELOCITY / 1000) {
+          if (curIsReviewMode) {
+            returnFromReviewRef.current();
+          } else if (questionAnswered) {
+            advanceToNextRef.current();
+          } else {
+            bounceCardRef.current();
+          }
+        } else if (g.dy > SWIPE_THRESHOLD || g.vy > SWIPE_VELOCITY / 1000) {
+          if (curIsReviewMode) {
+            Animated.spring(translateY, { toValue: 0, friction: 8, useNativeDriver: true }).start();
+          } else if (curIdx > 0 && !curIsReviewMode) {
+            goToPreviousRef.current();
           } else {
             Animated.spring(translateY, { toValue: 0, friction: 8, useNativeDriver: true }).start();
           }
-        },
-      }),
-    [translateY, currentIndex, answeredMap, questions, isReviewMode, previousIndex, advanceToNext, goToPrevious, returnFromReview, bounceCard]
-  );
+        } else {
+          Animated.spring(translateY, { toValue: 0, friction: 8, useNativeDriver: true }).start();
+        }
+      },
+    })
+  ).current;
 
   useEffect(() => {
     if (showSwipeHint && totalAnswered <= 10) {
@@ -658,7 +774,7 @@ export default function TestStreamScreen() {
         </View>
         <Pressable onPress={() => setShowBottomSheet(true)} testID="gauge-pill">
           <Animated.View style={[styles.gaugePill, { backgroundColor: gaugeColor, transform: [{ scale: gaugeScaleAnim }] }]}>
-            <Text style={styles.gaugeText}>{targetLevel} · {Math.round(localPreparedness)}%</Text>
+            <Text style={styles.gaugeText}>{sessionAnsweredCount}/{SESSION_SIZE}</Text>
           </Animated.View>
         </Pressable>
       </View>
@@ -677,7 +793,7 @@ export default function TestStreamScreen() {
       {isFirstLaunch && currentQuestion ? (
         <View style={styles.welcomeBanner}>
           <Text style={styles.welcomeText}>
-            Your first {targetLevel} question. Swipe up when you're ready.
+            Your first {targetLevel} question. Answer to continue.
           </Text>
         </View>
       ) : null}
@@ -688,7 +804,7 @@ export default function TestStreamScreen() {
         </View>
       ) : null}
 
-      <View style={styles.cardContainer} {...panResponder.panHandlers}>
+      <View style={styles.cardContainer}>
         {currentQuestion ? (
           <Animated.View style={[styles.animatedCard, { transform: [{ translateY }] }]}>
             <StreamCard
@@ -705,11 +821,33 @@ export default function TestStreamScreen() {
         ) : null}
       </View>
 
-      {isCurrentAnswered && !isReviewMode && totalAnswered <= 10 ? (
-        <Animated.View style={[styles.swipeHint, { opacity: swipeHintPulse }]}>
-          <ChevronUp color={Colors.textMuted} size={18} />
-          <Text style={styles.swipeHintText}>Swipe up</Text>
-        </Animated.View>
+      {/* Next button — appears once the question is answered */}
+      {isCurrentAnswered && !isReviewMode ? (
+        <Pressable
+          onPress={advanceToNext}
+          style={styles.nextBtn}
+          accessibilityRole="button"
+          accessibilityLabel="Next question"
+        >
+          <Text style={styles.nextBtnText}>Next</Text>
+          <ChevronUp
+            color={Colors.white}
+            size={20}
+            style={{ transform: [{ rotate: '90deg' }] }}
+          />
+        </Pressable>
+      ) : null}
+
+      {/* Exit review mode */}
+      {isReviewMode ? (
+        <Pressable
+          onPress={returnFromReview}
+          style={styles.reviewExitBtn}
+          accessibilityRole="button"
+          accessibilityLabel="Back to current question"
+        >
+          <Text style={styles.reviewExitText}>Back to current →</Text>
+        </Pressable>
       ) : null}
 
       <View style={styles.progressRow}>
@@ -1012,5 +1150,37 @@ const styles = StyleSheet.create({
     color: colors.green,
     fontSize: 18,
     fontWeight: '800' as const,
+  },
+  nextBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginHorizontal: 24,
+    marginBottom: 8,
+    paddingVertical: 16,
+    borderRadius: 16,
+    backgroundColor: Colors.primary,
+  },
+  nextBtnText: {
+    color: Colors.white,
+    fontSize: 16,
+    fontWeight: '700' as const,
+    fontFamily: 'NunitoSans_700Bold',
+  },
+  reviewExitBtn: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginHorizontal: 24,
+    marginBottom: 8,
+    paddingVertical: 12,
+    borderRadius: 16,
+    backgroundColor: Colors.surface,
+  },
+  reviewExitText: {
+    color: Colors.primary,
+    fontSize: 14,
+    fontWeight: '600' as const,
+    fontFamily: 'NunitoSans_600SemiBold',
   },
 });

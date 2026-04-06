@@ -216,10 +216,10 @@ export function useHomeData(): HomeData {
 
   const horenAccuracy = sectionAccuracyQuery.data
     ? Math.round(sectionAccuracyQuery.data.horenAccuracy * 100)
-    : 50;
+    : 0;
   const lesenAccuracy = sectionAccuracyQuery.data
     ? Math.round(sectionAccuracyQuery.data.lesenAccuracy * 100)
-    : 50;
+    : 0;
 
   const sectionMap = statsQuery.data?.sectionMap ?? {};
   const sectionHistory: SectionHistoryItem[] = SECTION_ORDER.map((section) => {

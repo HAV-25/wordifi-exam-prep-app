@@ -26,18 +26,28 @@ export async function ensureUserProfile(user: User): Promise<UserProfile> {
     return data as UserProfile;
   }
 
-  const trialExpiresAt = new Date(Date.now() + 72 * 60 * 60 * 1000).toISOString();
+  const trialExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  const playerName =
+    user.user_metadata?.full_name ??
+    user.user_metadata?.name ??
+    user.email?.split('@')[0] ??
+    'User';
 
   const { data: inserted, error: insertError } = await supabase
     .from('user_profiles')
     .insert({
       id: user.id,
+      player_name: playerName,
       subscription_tier: 'free_trial',
       trial_active: true,
+      trial_expires_at: trialExpiresAt,
       preparedness_score: 0,
       streak_count: 0,
       xp_total: 0,
       credit_balance: 0,
+      notifications_permission: 'not_asked',
+      notifications_enabled: false,
+      tc_accepted: false,
     } as never)
     .select('*')
     .single();
@@ -48,13 +58,6 @@ export async function ensureUserProfile(user: User): Promise<UserProfile> {
   }
 
   console.log('ensureUserProfile new user created with free_trial tier, trial expires at', trialExpiresAt);
-
-  await supabase
-    .from('user_profiles')
-    .update({
-      trial_expires_at: trialExpiresAt,
-    } as never)
-    .eq('id', user.id);
 
   return inserted as UserProfile;
 }
@@ -296,6 +299,8 @@ export async function saveOnboardingAnswers(
   const { error } = await supabase
     .from('user_profiles')
     .update({
+      target_level: answers.level ?? null,
+      exam_type: answers.cert !== 'not_sure' ? answers.cert : null,
       onboarding_cert: answers.cert,
       onboarding_readiness: answers.readiness,
       onboarding_hardest: answers.hardest,

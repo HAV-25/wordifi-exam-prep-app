@@ -85,6 +85,9 @@ export default function MockResultsScreen() {
     lesenQuestions?: string;
     answers?: string;
     studyPlan?: string;
+    sprachbausteineCorrect?: string;
+    sprachbausteineTotal?: string;
+    sprachbausteinePct?: string;
   }>();
 
   const { user } = useAuth();
@@ -106,6 +109,9 @@ export default function MockResultsScreen() {
   const lesenCorrect = Number(params.lesenCorrect ?? '0');
   const lesenTotal = Number(params.lesenTotal ?? '0');
   const lesenPct = Number(params.lesenPct ?? '0');
+  const sprachbausteineCorrect = Number(params.sprachbausteineCorrect ?? '0');
+  const sprachbausteineTotal = Number(params.sprachbausteineTotal ?? '0');
+  const sprachbausteinePct = Number(params.sprachbausteinePct ?? '0');
   const overallPct = Number(params.overallPct ?? '0');
   const totalCorrect = Number(params.totalCorrect ?? '0');
   const totalQuestions = Number(params.totalQuestions ?? '0');
@@ -391,9 +397,26 @@ export default function MockResultsScreen() {
               {Math.round(lesenPct)}%
             </Text>
           </View>
+          {sprachbausteineTotal > 0 ? (
+            <View style={styles.sectionBarRow}>
+              <View style={styles.sectionBarLabel}>
+                <View style={styles.sectionDotSprachbausteine} />
+                <Text style={styles.sectionBarName}>Sprachbausteine</Text>
+              </View>
+              <View style={styles.barTrackOuter}>
+                <View style={[styles.barFillOuter, { width: `${Math.min(100, sprachbausteinePct)}%`, backgroundColor: scoreColor(sprachbausteinePct) }]} />
+              </View>
+              <Text style={[styles.sectionBarPct, { color: scoreColor(sprachbausteinePct) }]}>
+                {Math.round(sprachbausteinePct)}%
+              </Text>
+            </View>
+          ) : null}
           <View style={styles.sectionBarDetails}>
             <Text style={styles.sectionBarDetail}>Hören: {horenCorrect}/{horenTotal}</Text>
             <Text style={styles.sectionBarDetail}>Lesen: {lesenCorrect}/{lesenTotal}</Text>
+            {sprachbausteineTotal > 0 ? (
+              <Text style={styles.sectionBarDetail}>Sprachbausteine: {sprachbausteineCorrect}/{sprachbausteineTotal}</Text>
+            ) : null}
           </View>
         </View>
 
@@ -675,6 +698,12 @@ const styles = StyleSheet.create({
     height: 10,
     borderRadius: 5,
     backgroundColor: '#6A1B9A',
+  },
+  sectionDotSprachbausteine: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#7B1FA2',
   },
   sectionBarName: {
     fontSize: 13,

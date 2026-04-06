@@ -116,9 +116,10 @@ export default function AuthScreen() {
     setIsLoading(true);
     try {
       await signInWithGoogle();
-      // Update tc_accepted after successful Google sign-in
+      // Update tc_accepted and save onboarding answers after successful Google sign-in
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
+        await saveOnboardingAnswers(user.id, onboardingStore).catch(() => {});
         await updateTcAccepted(user.id, config.tc_version).catch(() => {});
       }
       router.replace('/');

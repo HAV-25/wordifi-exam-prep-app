@@ -1,66 +1,60 @@
 /**
- * Onboarding Launch — Screen 10: Leaderboard Teaser
- * Source: Stitch screen 4045ec04ddeb49cd9d302d6a5e854066
- * Step 10 of 10 — Social proof / motivational leaderboard
+ * Onboarding Launch — Screen 11: Leaderboard Teaser
+ * Source: Banani flow FtXTL2Xb5WF4 / screen zWIIlP9-7Aaj
+ * Social proof screen — worldwide learners motivational card
  */
 import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { ArrowRight } from 'lucide-react-native';
 import { onboardingStore } from './_store';
 import { colors } from '@/theme';
 
-// ─── Leaderboard data ─────────────────────────────────────────────────────────
+// ─── Types & data ─────────────────────────────────────────────────────────────
 
-type LeaderEntry = {
-  rank: number;
+type LbRow = {
+  rank: string;       // emoji medal or '—'
   name: string;
   flag: string;
-  badge: string;
-  pct: number;
+  level: string;
+  score: number;
   days: string;
+  passed?: boolean;
   isUser?: boolean;
 };
 
-const ENTRIES: LeaderEntry[] = [
-  { rank: 1, name: 'Maria',  flag: '🇧🇷', badge: 'LEVEL B1 PASSED',   pct: 91, days: '47 days' },
-  { rank: 2, name: 'Yusuf',  flag: '🇹🇷', badge: 'Intensive Track',   pct: 84, days: '31 days' },
-  { rank: 3, name: 'Priya',  flag: '🇮🇳', badge: 'Vocabulary Master', pct: 79, days: '24 days' },
-  { rank: 4, name: 'You',    flag: '🏳️', badge: 'JOURNEY STARTED',   pct: 22, days: 'Day 1', isUser: true },
+const BASE_ROWS: LbRow[] = [
+  { rank: '🥇', name: 'Maria', flag: '🇧🇷', level: 'B1', score: 91, days: '47 days', passed: true },
+  { rank: '🥈', name: 'Yusuf', flag: '🇹🇷', level: 'B1', score: 84, days: '31 days' },
+  { rank: '🥉', name: 'Priya', flag: '🇮🇳', level: 'A2', score: 79, days: '24 days' },
 ];
 
-const RANK_MEDALS = ['🥇', '🥈', '🥉'];
+// ─── Row component ────────────────────────────────────────────────────────────
 
-function LeaderRow({ entry }: { entry: LeaderEntry }) {
-  const medal = entry.rank <= 3 ? RANK_MEDALS[entry.rank - 1] : null;
+function LeaderRow({ row }: { row: LbRow }) {
+  const isUser = !!row.isUser;
   return (
-    <View style={[styles.row, entry.isUser && styles.rowUser]}>
-      <Text style={styles.rankMedal}>{medal ?? `#${entry.rank}`}</Text>
-      <View style={styles.rowFlag}>
-        <Text style={{ fontSize: 20 }}>{entry.flag}</Text>
-      </View>
-      <View style={styles.rowBody}>
-        <View style={styles.rowTop}>
-          <Text style={[styles.rowName, entry.isUser && styles.rowNameUser]}>{entry.name}</Text>
-          <View style={[styles.rowBadge, entry.isUser && styles.rowBadgeUser]}>
-            <Text style={[styles.rowBadgeText, entry.isUser && styles.rowBadgeTextUser]}>
-              {entry.badge}
-            </Text>
-          </View>
+    <View style={[styles.lbRow, isUser && styles.lbRowHighlighted]}>
+      <Text style={[styles.lbRank, isUser && styles.lbRankUser]}>{row.rank}</Text>
+      <View style={styles.lbDetails}>
+        <View style={styles.lbDetailsTop}>
+          <Text style={[styles.lbName, isUser && styles.lbNameUser]}>
+            {row.name} {row.flag}
+          </Text>
+          {row.passed && (
+            <View style={styles.passedBadge}>
+              <Text style={styles.passedBadgeText}>PASSED</Text>
+            </View>
+          )}
         </View>
-        <View style={styles.progressWrap}>
-          <View style={styles.progressTrack}>
-            <View style={[
-              styles.progressFill,
-              { width: `${entry.pct}%` },
-              entry.isUser && styles.progressFillUser,
-            ]} />
-          </View>
-          <Text style={styles.progressPct}>{entry.pct}%</Text>
-        </View>
-        <Text style={styles.rowDays}>{entry.days}</Text>
+        <Text style={[styles.lbMeta, isUser && styles.lbMetaUser]}>
+          {row.level}
+          <Text style={styles.dot}> · </Text>
+          <Text style={[styles.lbScore, isUser && styles.lbScoreUser]}>{row.score}%</Text>
+          <Text style={styles.dot}> · </Text>
+          {row.days}
+        </Text>
       </View>
     </View>
   );
@@ -69,71 +63,82 @@ function LeaderRow({ entry }: { entry: LeaderEntry }) {
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function LeaderboardTeaserScreen() {
-  const levelLabel = onboardingStore.level ?? 'B1';
+  const level = onboardingStore.level ?? 'B1';
+
+  const userRow: LbRow = {
+    rank: '—',
+    name: 'You',
+    flag: '🏳️',
+    level: `[${level}]`,
+    score: 22,
+    days: 'Day 1',
+    isUser: true,
+  };
+
+  const allRows = [...BASE_ROWS, userRow];
 
   return (
     <View style={styles.root}>
-      <SafeAreaView edges={['top']} style={styles.safe}>
-        {/* Header progress */}
-        <View style={styles.navRow}>
-          <View style={styles.progressWrapOuter}>
-            <View style={styles.progressTrackOuter}>
-              <View style={[styles.progressFillOuter, { width: '100%' }]}>
-                <View style={styles.progressDot} />
-              </View>
-            </View>
-            <Text style={styles.stepLabel}>Step 10 of 10</Text>
-          </View>
-        </View>
+      {/* Decorative orbs */}
+      <View style={[styles.orb, styles.orbTopRight]} />
+      <View style={[styles.orb, styles.orbBottomLeft]} />
 
+      <SafeAreaView edges={['top']} style={styles.safe}>
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-          {/* Headline */}
-          <Text style={styles.headline}>You are not the only one{'\n'}on this journey.</Text>
-          <Text style={styles.subhead}>These learners started exactly where you are today.</Text>
+          {/* Header */}
+          <View style={styles.header}>
+            <Text style={styles.headline}>You are not the only one on this journey.</Text>
+            <Text style={styles.subCopy}>These learners started exactly where you are today.</Text>
+          </View>
 
           {/* Leaderboard card */}
-          <View style={styles.boardCard}>
-            <Text style={styles.boardLabel}>WORDIFI LEARNERS · WORLDWIDE 🌍</Text>
-            {ENTRIES.map((e) => (
-              <React.Fragment key={e.name}>
-                <LeaderRow entry={e} />
-                {e.rank < ENTRIES.length && <View style={styles.rowDivider} />}
-              </React.Fragment>
-            ))}
+          <View style={styles.lbCard}>
+            <View style={styles.lbLabelWrap}>
+              <View style={styles.lbLabel}>
+                <Text style={styles.lbLabelText}>WORDIFI LEARNERS · WORLDWIDE 🌍</Text>
+              </View>
+            </View>
+
+            <View style={styles.lbList}>
+              {allRows.map((row, i) => (
+                <React.Fragment key={row.name}>
+                  <LeaderRow row={row} />
+                  {!row.isUser && i < BASE_ROWS.length - 1 && (
+                    <View style={styles.rowDivider} />
+                  )}
+                </React.Fragment>
+              ))}
+            </View>
           </View>
 
-          {/* Testimonial */}
-          <View style={styles.testimonial}>
-            <Text style={styles.testimonialText}>
-              "Maria started at 19%. She sat her Goethe {levelLabel} six weeks later."
+          {/* Story block */}
+          <View style={styles.storyBlock}>
+            <Text style={styles.storyQuote}>
+              "Maria started at 19%. She sat her Goethe {level} six weeks later. She passed first time."
             </Text>
+            <Text style={styles.storyAuthor}>Maria Silva · Goethe {level} · 2024</Text>
           </View>
 
-          {/* Tagline */}
-          <Text style={styles.tagline}>
-            Your name belongs on this list. Let's put it there.
-          </Text>
-
-          <Text style={styles.footnote}>Thousands of learners worldwide</Text>
+          {/* Close block */}
+          <View style={styles.closeBlock}>
+            <Text style={styles.closeLine}>Your name belongs on this list.{'\n'}Let's put it there.</Text>
+          </View>
 
           <View style={{ height: 120 }} />
         </ScrollView>
 
-        {/* Sticky CTA */}
+        {/* Sticky footer */}
         <View style={styles.footer}>
           <SafeAreaView edges={['bottom']}>
+            <Text style={styles.footerNote}>Thousands of learners worldwide</Text>
             <Pressable
               onPress={() => router.push('/onboarding_launch/plan-builder')}
-              style={styles.ctaWrap}
+              style={({ pressed }) => [styles.cta, pressed && styles.ctaPressed]}
+              accessibilityRole="button"
+              accessibilityLabel="Show me how"
             >
-              <LinearGradient
-                colors={[colors.primary, colors.primaryContainer]}
-                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                style={styles.cta}
-              >
-                <Text style={styles.ctaText}>Show me how</Text>
-                <ArrowRight size={20} color={colors.onPrimary} />
-              </LinearGradient>
+              <Text style={styles.ctaText}>Show me how</Text>
+              <ArrowRight size={22} color="#FFFFFF" />
             </Pressable>
           </SafeAreaView>
         </View>
@@ -145,51 +150,110 @@ export default function LeaderboardTeaserScreen() {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.background },
+  root: { flex: 1, backgroundColor: colors.background, overflow: 'hidden' },
+
+  // Decorative orbs
+  orb:          { position: 'absolute', borderRadius: 999, opacity: 0.18 },
+  orbTopRight:  { width: 180, height: 180, backgroundColor: '#F0C808',   top: -72,    right: -64 },
+  orbBottomLeft:{ width: 220, height: 220, backgroundColor: colors.primary, bottom: -110, left: -80  },
+
   safe: { flex: 1 },
 
-  navRow: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 8 },
-  progressWrapOuter: { gap: 6 },
-  progressTrackOuter: { height: 8, backgroundColor: colors.surfaceContainerHighest, borderRadius: 4, overflow: 'hidden' },
-  progressFillOuter: { height: '100%', backgroundColor: colors.primary, position: 'relative' },
-  progressDot: { position: 'absolute', right: 0, top: 0, height: '100%', width: 8, backgroundColor: colors.secondaryFixed, shadowColor: colors.secondaryFixed, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 1, shadowRadius: 8 },
-  stepLabel: { fontFamily: 'NunitoSans_700Bold', fontSize: 10, letterSpacing: 1.5, textTransform: 'uppercase', color: colors.onSurfaceVariant },
+  scroll:  { paddingHorizontal: 24, paddingTop: 28 },
+  header:  { marginBottom: 24 },
+  headline: { fontFamily: 'Outfit_800ExtraBold', fontSize: 34, lineHeight: 37, color: '#374151', letterSpacing: -1, marginBottom: 12 },
+  subCopy:  { fontFamily: 'NunitoSans_600SemiBold', fontSize: 15, lineHeight: 22, color: '#94A3B8' },
 
-  scroll: { paddingHorizontal: 24, paddingTop: 16 },
-  headline: { fontFamily: 'Outfit_800ExtraBold', fontSize: 26, lineHeight: 34, color: colors.onPrimaryContainer, marginBottom: 8, letterSpacing: -0.3 },
-  subhead: { fontFamily: 'NunitoSans_400Regular', fontSize: 14, lineHeight: 21, color: colors.onSurfaceVariant, marginBottom: 20 },
+  // Leaderboard card
+  lbCard: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    paddingVertical: 20,
+    paddingHorizontal: 16,
+    marginBottom: 24,
+    shadowColor: '#374151',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.05,
+    shadowRadius: 28,
+    elevation: 4,
+  },
+  lbLabelWrap: { alignItems: 'center', marginBottom: 16 },
+  lbLabel:     { height: 32, paddingHorizontal: 14, borderRadius: 999, backgroundColor: colors.background, borderWidth: 1, borderColor: '#E2E8F0', alignItems: 'center', justifyContent: 'center' },
+  lbLabelText: { fontFamily: 'Outfit_800ExtraBold', fontSize: 11, color: '#94A3B8', letterSpacing: 1.4 },
 
-  boardCard: { backgroundColor: colors.navy, borderRadius: 20, padding: 20, marginBottom: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 16, elevation: 8 },
-  boardLabel: { fontFamily: 'NunitoSans_700Bold', fontSize: 10, letterSpacing: 2, textTransform: 'uppercase', color: colors.teal, marginBottom: 16 },
+  lbList:    {},
+  lbRow:     { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 8, gap: 12 },
+  lbRowHighlighted: {
+    backgroundColor: 'rgba(43,112,239,0.04)',
+    borderWidth: 1,
+    borderColor: 'rgba(43,112,239,0.4)',
+    borderRadius: 8,
+    marginTop: 12,
+    paddingHorizontal: 12,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 2,
+  },
+  rowDivider: { height: 1, backgroundColor: '#E2E8F0', marginHorizontal: 8 },
 
-  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, gap: 10 },
-  rowUser: { backgroundColor: `${colors.primary}18`, borderRadius: 12, paddingHorizontal: 8, marginHorizontal: -8 },
-  rankMedal: { width: 28, textAlign: 'center', fontSize: 18 },
-  rowFlag: { width: 28, alignItems: 'center' },
-  rowBody: { flex: 1 },
-  rowTop: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 5 },
-  rowName: { fontFamily: 'Outfit_800ExtraBold', fontSize: 14, color: colors.onPrimary },
-  rowNameUser: { color: colors.secondaryFixed },
-  rowBadge: { backgroundColor: `${colors.onPrimary}18`, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
-  rowBadgeUser: { backgroundColor: `${colors.secondaryFixed}25` },
-  rowBadgeText: { fontFamily: 'NunitoSans_700Bold', fontSize: 9, letterSpacing: 0.8, textTransform: 'uppercase', color: `${colors.onPrimary}80` },
-  rowBadgeTextUser: { color: colors.secondaryFixed },
-  progressWrap: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 3 },
-  progressTrack: { flex: 1, height: 4, backgroundColor: `${colors.onPrimary}20`, borderRadius: 2, overflow: 'hidden' },
-  progressFill: { height: '100%', backgroundColor: `${colors.onPrimary}50`, borderRadius: 2 },
-  progressFillUser: { backgroundColor: colors.secondaryFixed },
-  progressPct: { fontFamily: 'NunitoSans_700Bold', fontSize: 11, color: `${colors.onPrimary}70`, width: 34, textAlign: 'right' },
-  rowDays: { fontFamily: 'NunitoSans_400Regular', fontSize: 11, color: `${colors.onPrimary}50` },
-  rowDivider: { height: 1, backgroundColor: `${colors.onPrimary}10`, marginVertical: 2 },
+  lbRank:     { fontSize: 22, width: 28, textAlign: 'center', lineHeight: 26 },
+  lbRankUser: { fontFamily: 'Outfit_800ExtraBold', fontSize: 18, color: colors.primary },
 
-  testimonial: { backgroundColor: `${colors.primary}10`, borderRadius: 14, padding: 16, marginBottom: 14 },
-  testimonialText: { fontFamily: 'NunitoSans_400Regular', fontSize: 13, lineHeight: 20, color: colors.onSurfaceVariant, fontStyle: 'italic' },
+  lbDetails:    { flex: 1, gap: 4 },
+  lbDetailsTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  lbName:       { fontFamily: 'NunitoSans_700Bold', fontSize: 16, color: '#374151' },
+  lbNameUser:   { color: colors.primary },
 
-  tagline: { fontFamily: 'Outfit_800ExtraBold', fontSize: 16, lineHeight: 24, color: colors.onPrimaryContainer, textAlign: 'center', marginBottom: 8 },
-  footnote: { fontFamily: 'NunitoSans_400Regular', fontSize: 12, color: colors.outline, textAlign: 'center' },
+  passedBadge:     { backgroundColor: '#22C55E', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 },
+  passedBadgeText: { fontFamily: 'Outfit_800ExtraBold', fontSize: 11, color: '#FFFFFF', letterSpacing: 0.5 },
 
-  footer: { position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 24, paddingTop: 16, backgroundColor: `${colors.background}F5` },
-  ctaWrap: { borderRadius: 24, overflow: 'hidden', shadowColor: colors.blueShadow, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 1, shadowRadius: 16, elevation: 8, marginBottom: 8 },
-  cta: { paddingVertical: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, borderRadius: 24 },
-  ctaText: { fontFamily: 'Outfit_800ExtraBold', fontSize: 16, color: colors.onPrimary, letterSpacing: 0.3 },
+  lbMeta:     { fontFamily: 'NunitoSans_600SemiBold', fontSize: 13, color: '#94A3B8' },
+  lbMetaUser: { color: colors.primary },
+  dot:        { opacity: 0.4 },
+  lbScore:    { fontFamily: 'Outfit_800ExtraBold', color: '#374151' },
+  lbScoreUser:{ color: colors.primary },
+
+  // Story block
+  storyBlock: { alignItems: 'center', paddingHorizontal: 16, marginBottom: 28 },
+  storyQuote: { fontFamily: 'NunitoSans_400Regular', fontSize: 15, lineHeight: 22, color: '#374151', fontStyle: 'italic', textAlign: 'center', marginBottom: 8 },
+  storyAuthor: { fontFamily: 'NunitoSans_600SemiBold', fontSize: 13, color: '#94A3B8', textAlign: 'center' },
+
+  // Close block
+  closeBlock: { alignItems: 'center', marginBottom: 20 },
+  closeLine:  { fontFamily: 'Outfit_800ExtraBold', fontSize: 24, lineHeight: 30, color: '#374151', textAlign: 'center', letterSpacing: -0.5 },
+
+  // Footer
+  footer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    backgroundColor: `${colors.background}F5`,
+  },
+  footerNote: { fontFamily: 'Outfit_800ExtraBold', fontSize: 13, color: '#94A3B8', textAlign: 'center', marginBottom: 16 },
+
+  cta: {
+    width: '100%',
+    height: 60,
+    backgroundColor: colors.primary,
+    borderRadius: 999,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    marginBottom: 8,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.24,
+    shadowRadius: 34,
+    elevation: 10,
+  },
+  ctaPressed: { opacity: 0.88 },
+  ctaText:    { fontFamily: 'Outfit_800ExtraBold', fontSize: 18, color: '#FFFFFF', letterSpacing: -0.3 },
 });

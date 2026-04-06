@@ -2,6 +2,7 @@ import createContextHook from '@nkzw/create-context-hook';
 import type { Session, User } from '@supabase/supabase-js';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import * as Sentry from '@sentry/react-native';
 
 import { signOutUser } from '@/lib/authHelpers';
 import { ensureUserProfile } from '@/lib/profileHelpers';
@@ -29,6 +30,15 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       console.log('AuthProvider auth state changed', event, Boolean(nextSession));
       setSession(nextSession);
       setIsSessionLoading(false);
+
+      if (nextSession?.user) {
+        Sentry.setUser({
+          id: nextSession.user.id,
+          email: nextSession.user.email,
+        });
+      } else {
+        Sentry.setUser(null);
+      }
     });
 
     return () => {

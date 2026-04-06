@@ -10,6 +10,7 @@ import {
   Gift,
   Info,
   LogOut,
+  Pencil,
   Share2 as ShareIcon,
   Star,
   TrendingUp,
@@ -317,6 +318,20 @@ export default function ProfileScreen() {
             </>
           ) : (
             <>
+              {/* Complete your profile banner */}
+              {!profile?.target_level && (
+                <Pressable
+                  onPress={() => router.push('/profile-setup' as never)}
+                  style={styles.profileBanner}
+                  accessibilityRole="button"
+                  accessibilityLabel="Complete your profile"
+                >
+                  <Info size={16} color={colors.primary} />
+                  <Text style={styles.profileBannerText}>Complete your profile to get started</Text>
+                  <ChevronRight size={16} color={colors.primary} />
+                </Pressable>
+              )}
+
               {/* Email row */}
               <InfoRow label="Email">
                 <Text style={styles.infoValue} numberOfLines={1}>
@@ -327,24 +342,38 @@ export default function ProfileScreen() {
                 </Pressable>
               </InfoRow>
 
-              {/* Level row */}
-              <InfoRow label="Level">
-                <View style={styles.levelPill}>
-                  <Text style={styles.levelPillText}>{profile?.target_level ?? '—'}</Text>
-                </View>
-              </InfoRow>
-
-              {/* Exam date row */}
-              <InfoRow label="Target exam" showDivider={false}>
-                <Text style={styles.infoValue}>{formatLong(profile?.exam_date)}</Text>
-                {examDays !== null && examDays > 0 ? (
-                  <View style={styles.daysBadge}>
-                    <Text style={styles.daysBadgeText}>{examDays} days</Text>
+              {/* Level row — tappable */}
+              <Pressable
+                onPress={() => router.push('/profile-setup' as never)}
+                accessibilityRole="button"
+                accessibilityLabel="Edit level"
+              >
+                <InfoRow label="Level">
+                  <View style={styles.levelPill}>
+                    <Text style={styles.levelPillText}>{profile?.target_level ?? '—'}</Text>
                   </View>
-                ) : examDays !== null && examDays <= 0 ? (
-                  <Text style={[styles.infoValue, { color: Colors.accent }]}>Completed</Text>
-                ) : null}
-              </InfoRow>
+                  <Pencil size={14} color={Colors.textMuted} style={{ marginLeft: 6 }} />
+                </InfoRow>
+              </Pressable>
+
+              {/* Exam date row — tappable */}
+              <Pressable
+                onPress={() => router.push('/profile-setup' as never)}
+                accessibilityRole="button"
+                accessibilityLabel="Edit exam date"
+              >
+                <InfoRow label="Target exam" showDivider={false}>
+                  <Text style={styles.infoValue}>{formatLong(profile?.exam_date)}</Text>
+                  {examDays !== null && examDays > 0 ? (
+                    <View style={styles.daysBadge}>
+                      <Text style={styles.daysBadgeText}>{examDays} days</Text>
+                    </View>
+                  ) : examDays !== null && examDays <= 0 ? (
+                    <Text style={[styles.infoValue, { color: Colors.accent }]}>Completed</Text>
+                  ) : null}
+                  <Pencil size={14} color={Colors.textMuted} style={{ marginLeft: 6 }} />
+                </InfoRow>
+              </Pressable>
             </>
           )}
 
@@ -685,6 +714,24 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: Colors.primary,
     fontFamily: 'NunitoSans_600SemiBold',
+  },
+
+  // ── Profile incomplete banner ──────────────────────────────────────────────
+  profileBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: `${colors.primary}12`,
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginBottom: 16,
+  },
+  profileBannerText: {
+    flex: 1,
+    fontSize: 13,
+    fontFamily: 'NunitoSans_600SemiBold',
+    color: colors.primary,
   },
 
   // ── Readiness ──────────────────────────────────────────────────────────────

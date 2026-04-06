@@ -14,11 +14,32 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { WalkthroughProvider } from '@/components/walkthrough';
 import { colors } from '@/theme';
 import { AccessProvider } from '@/providers/AccessProvider';
+import { AppConfigProvider } from '@/providers/AppConfigProvider';
 import { AuthProvider, useAuth } from '@/providers/AuthProvider';
-import { ONBOARDING_VERSION } from '@/constants/onboardingVersion';
 import { QuestionTypeMetaProvider, useQuestionTypeMetaContext } from '@/lib/useQuestionTypeMeta';
+import * as Sentry from '@sentry/react-native';
+
+Sentry.init({
+  dsn: 'https://108675a38db2e4a51c253936dcaf84aa@o4510781679992832.ingest.de.sentry.io/4511166563483728',
+
+  // Adds more context data to events (IP address, cookies, user, etc.)
+  // For more information, visit: https://docs.sentry.io/platforms/react-native/data-management/data-collected/
+  sendDefaultPii: true,
+
+  // Enable Logs
+  enableLogs: true,
+
+  // Configure Session Replay
+  replaysSessionSampleRate: 0.1,
+  replaysOnErrorSampleRate: 1,
+  integrations: [Sentry.mobileReplayIntegration(), Sentry.feedbackIntegration()],
+
+  // uncomment the line below to enable Spotlight (https://spotlightjs.com)
+  // spotlight: __DEV__,
+});
 
 void SplashScreen.preventAutoHideAsync();
 
@@ -44,21 +65,16 @@ function RouteGate() {
   }
 
   const topSegment = segments[0] ?? '';
-  const isAuthRoute = topSegment === 'auth';
+  const isAuthRoute = topSegment === 'auth' || topSegment === 'check-email';
   const isOnboardingRoute =
     topSegment === 'onboarding_prelaunch' || topSegment === 'onboarding_launch';
-  const onboardingHref =
-    ONBOARDING_VERSION === 'launch' ? '/onboarding_launch' : '/onboarding_prelaunch';
 
+  // TEST MODE: onboarding bypassed — go straight to auth, home after login
   if (!session && !isAuthRoute && !isOnboardingRoute) {
-    return <Redirect href={onboardingHref} />;
+    return <Redirect href="/auth" />;
   }
 
-  if (session && !hasCompletedOnboarding && !isOnboardingRoute) {
-    return <Redirect href={onboardingHref} />;
-  }
-
-  if (session && hasCompletedOnboarding && (isAuthRoute || isOnboardingRoute)) {
+  if (session && (isAuthRoute || isOnboardingRoute)) {
     return <Redirect href="/" />;
   }
 
@@ -71,6 +87,7 @@ function RootLayoutNav() {
       <RouteGate />
       <Stack screenOptions={{ headerBackTitle: 'Back', headerTintColor: colors.navy }}>
         <Stack.Screen name="auth" options={{ headerShown: false }} />
+        <Stack.Screen name="check-email" options={{ headerShown: false }} />
         <Stack.Screen name="onboarding_prelaunch" options={{ headerShown: false }} />
         <Stack.Screen name="onboarding_launch" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
@@ -83,6 +100,9 @@ function RootLayoutNav() {
         <Stack.Screen name="sectional-results" options={{ title: 'Results', headerBackVisible: false }} />
         <Stack.Screen name="mock-test" options={{ title: 'Mock Test' }} />
         <Stack.Screen name="mock-results" options={{ title: 'Mock Results', headerBackVisible: false }} />
+        <Stack.Screen name="sprachbausteine-test" options={{ title: 'Sprachbausteine', headerShown: false }} />
+        <Stack.Screen name="sprachbausteine-results" options={{ title: 'Sprachbausteine Results', headerShown: false }} />
+        <Stack.Screen name="profile-setup" options={{ title: 'Profile Setup' }} />
         <Stack.Screen name="leaderboard" options={{ headerShown: false }} />
         <Stack.Screen name="review-mistakes" options={{ headerShown: false }} />
         <Stack.Screen name="desktop-code" options={{ headerShown: false, presentation: 'modal' }} />
@@ -93,7 +113,7 @@ function RootLayoutNav() {
   );
 }
 
-export default function RootLayout() {
+export default Sentry.wrap(function RootLayout() {
   const [fontsLoaded] = useFonts({
     Outfit_800ExtraBold,
     NunitoSans_400Regular,
@@ -111,22 +131,26 @@ export default function RootLayout() {
 
   return (
     <QueryClientProvider client={queryClient}>
+      <AppConfigProvider>
       <AuthProvider>
         <AccessProvider>
           <QuestionTypeMetaProvider>
           <SafeAreaProvider>
             <GestureHandlerRootView style={styles.gestureRoot}>
               <ErrorBoundary>
-                <RootLayoutNav />
+                <WalkthroughProvider>
+                  <RootLayoutNav />
+                </WalkthroughProvider>
               </ErrorBoundary>
             </GestureHandlerRootView>
           </SafeAreaProvider>
           </QuestionTypeMetaProvider>
         </AccessProvider>
       </AuthProvider>
+      </AppConfigProvider>
     </QueryClientProvider>
   );
-}
+});
 
 const styles = StyleSheet.create({
   gestureRoot: {

@@ -281,6 +281,142 @@ export async function completeSectionalSession(params: {
   return { correctCount, total, scorePct };
 }
 
+export type BlankAnswers = Record<string, string>;
+
+function scoreBlankAnswers(
+  userAnswers: BlankAnswers,
+  correctAnswerStr: string
+): { correct: number; total: number } {
+  let correctMap: Record<string, string>;
+  try {
+    correctMap = JSON.parse(correctAnswerStr) as Record<string, string>;
+  } catch {
+    return { correct: 0, total: 0 };
+  }
+  const total = Object.keys(correctMap).length;
+  const correct = Object.entries(correctMap).filter(([k, v]) => userAnswers[k] === v).length;
+  return { correct, total };
+}
+
+export async function fetchSprachbausteineQuestions(
+  level: string
+): Promise<{ t1: AppQuestion | null; t2: AppQuestion | null }> {
+  console.log('sectionalHelpers fetchSprachbausteineQuestions', level);
+
+  const { data, error } = await supabase
+    .from('app_questions')
+    .select('*')
+    .eq('section', 'Sprachbausteine')
+    .eq('level', level)
+    .eq('is_active', true);
+
+  if (error) {
+    console.log('fetchSprachbausteineQuestions error', error);
+    throw error;
+  }
+
+  const all = (data ?? []) as AppQuestion[];
+  const t1Pool = shuffleArray(all.filter((q) => q.teil === 1));
+  const t2Pool = shuffleArray(all.filter((q) => q.teil === 2));
+
+  return {
+    t1: t1Pool[0] ?? null,
+    t2: t2Pool[0] ?? null,
+  };
+}
+
+export async function completeSprachbausteineSession(params: {
+  sessionId: string;
+  userId: string;
+  t1Question: AppQuestion;
+  t2Question: AppQuestion;
+  t1Answers: BlankAnswers;
+  t2Answers: BlankAnswers;
+  timeTakenSeconds: number;
+  profile: UserProfile | null;
+}): Promise<{ totalCorrect: number; totalBlanks: number; scorePct: number }> {
+  const { sessionId, userId, t1Question, t2Question, t1Answers, t2Answers, timeTakenSeconds, profile } = params;
+
+  const t1Score = scoreBlankAnswers(t1Answers, t1Question.correct_answer);
+  const t2Score = scoreBlankAnswers(t2Answers, t2Question.correct_answer);
+
+  const totalCorrect = t1Score.correct + t2Score.correct;
+  const totalBlanks = t1Score.total + t2Score.total;
+  const scorePct = totalBlanks > 0 ? Number(((totalCorrect / totalBlanks) * 100).toFixed(2)) : 0;
+
+  console.log('completeSprachbausteineSession', { sessionId, totalCorrect, totalBlanks, scorePct });
+
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error: sessionError } = await (supabase.from('test_sessions') as any)
+      .update({
+        score_pct: scorePct,
+        questions_correct: totalCorrect,
+        questions_total: totalBlanks,
+        time_taken_seconds: timeTakenSeconds,
+        completed_at: new Date().toISOString(),
+        retest_available_at: getRetestDate(),
+      })
+      .eq('id', sessionId);
+
+    if (sessionError) {
+      console.log('completeSprachbausteineSession session update error', sessionError);
+    }
+
+    const answerRows = [
+      {
+        session_id: sessionId,
+        user_id: userId,
+        question_id: t1Question.id,
+        selected_answer: JSON.stringify(t1Answers),
+        is_correct: t1Score.correct === t1Score.total,
+        time_taken_seconds: null,
+      },
+      {
+        session_id: sessionId,
+        user_id: userId,
+        question_id: t2Question.id,
+        selected_answer: JSON.stringify(t2Answers),
+        is_correct: t2Score.correct === t2Score.total,
+        time_taken_seconds: null,
+      },
+    ];
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error: answersError } = await (supabase.from('user_answers') as any).insert(answerRows);
+    if (answersError) {
+      console.log('completeSprachbausteineSession answers insert error', answersError);
+    }
+
+    const today = new Date().toISOString().split('T')[0] ?? '';
+    const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0] ?? '';
+    let newStreak = profile?.streak_count ?? 0;
+    if (profile?.last_active_date === yesterday) {
+      newStreak = (profile?.streak_count ?? 0) + 1;
+    } else if (profile?.last_active_date !== today) {
+      newStreak = 1;
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error: profileError } = await (supabase.from('user_profiles') as any)
+      .update({
+        xp_total: (profile?.xp_total ?? 0) + totalCorrect,
+        last_active_date: today,
+        streak_count: newStreak,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', userId);
+
+    if (profileError) {
+      console.log('completeSprachbausteineSession profile update error', profileError);
+    }
+  } catch (err) {
+    console.log('completeSprachbausteineSession unexpected error', err);
+  }
+
+  return { totalCorrect, totalBlanks, scorePct };
+}
+
 export async function createSessionLink(params: {
   userId: string;
   level: string;

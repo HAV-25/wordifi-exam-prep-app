@@ -18,6 +18,7 @@ import {
   Zap,
 } from 'lucide-react-native';
 import React, { useMemo, useState } from 'react';
+import { useWalkthroughTarget } from '@/hooks/useWalkthroughTarget';
 import {
   Pressable,
   ScrollView,
@@ -222,6 +223,11 @@ export default function HomeScreen() {
   const formattedXp = useMemo(() => formatXp(data.xp), [data.xp]);
   const initial = (user?.email ?? '?').charAt(0).toUpperCase();
 
+  // Walkthrough targets — refs only, no layout changes
+  const avatarRef = useWalkthroughTarget('profile-avatar');
+  const scoreRef = useWalkthroughTarget('readiness-score');
+  const chipsRef = useWalkthroughTarget('stats-chips');
+
   const showUpgradeBanner =
     UPGRADEABLE_TIERS.has(data.subscriptionTier) || access.trial_hours_remaining !== null;
 
@@ -282,6 +288,7 @@ export default function HomeScreen() {
         {/* ── Header ── */}
         <View style={styles.header}>
           <Pressable
+            ref={avatarRef}
             style={styles.avatar}
             onPress={() => router.push('/(tabs)/profile' as never)}
             testID="home-profile-avatar"
@@ -318,7 +325,7 @@ export default function HomeScreen() {
 
           {/* Row 2: Readiness number */}
           <Text style={styles.readinessLabel}>EXAM READINESS</Text>
-          <View style={styles.scoreRow}>
+          <View ref={scoreRef} style={styles.scoreRow}>
             <Text style={styles.scoreInt}>{scoreInt}</Text>
             <Text style={styles.scorePct}>%</Text>
           </View>
@@ -330,7 +337,7 @@ export default function HomeScreen() {
           </View>
 
           {/* Row 4: 4 stat chips */}
-          <View style={styles.statsRow}>
+          <View ref={chipsRef} style={styles.statsRow}>
             <View style={styles.statChip}>
               <Flame color={colors.accentTeal} size={14} />
               <Text style={styles.statVal}>{data.streak}</Text>

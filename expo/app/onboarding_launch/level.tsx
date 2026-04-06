@@ -1,61 +1,28 @@
 /**
  * Onboarding Launch — Screen 03: Level Targeting
- * Source: Stitch screen 0e01812a71bb482c873292b14dbbf57d
+ * Source: Banani flow FtXTL2Xb5WF4 / screen _ATEWWmSBUV9
  * Step 2 of 10
  */
 import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { ArrowLeft, ArrowRight, Lock } from 'lucide-react-native';
+import { ArrowLeft, Lock } from 'lucide-react-native';
 import { onboardingStore } from './_store';
-import Svg, { Circle, Path, G } from 'react-native-svg';
-import { colors } from '@/theme';
 
-// ─── Mountain illustration ────────────────────────────────────────────────────
-
-function MountainIllustration() {
-  return (
-    <Svg width={280} height={160} viewBox="0 0 400 200">
-      {/* Far background peaks */}
-      <Path d="M0 200 L120 80 L220 200 Z" fill={colors.surfaceContainerHighest} />
-      <Path d="M180 200 L280 110 L400 200 Z" fill={colors.surfaceContainerHighest} />
-      {/* Midground peak */}
-      <Path d="M50 200 L200 40 L350 200 Z" fill={colors.inversePrimary} opacity={0.8} />
-      {/* Summit glow */}
-      <Circle cx={200} cy={40} r={15} fill={colors.tertiaryFixed} />
-      <Path d="M180 40 L200 15 L220 40 Z" fill={colors.tertiaryFixedDim} />
-      {/* Climber */}
-      <G transform="translate(145, 100)">
-        <Circle cx={0} cy={0} r={3} fill={colors.onPrimaryContainer} />
-        <Path d="M-2 3 L2 3 L4 10 L-4 10 Z" fill={colors.onPrimaryContainer} />
-      </G>
-      {/* Dashed path */}
-      <Path
-        d="M50 200 Q 100 180, 145 105 T 200 40"
-        fill="none"
-        stroke={colors.background}
-        strokeDasharray="4 4"
-        strokeWidth={2}
-      />
-    </Svg>
-  );
-}
-
-// ─── Level options ────────────────────────────────────────────────────────────
+// ─── Data ─────────────────────────────────────────────────────────────────────
 
 type LevelId = 'A1' | 'A2' | 'B1';
 
 const LEVELS: { id: LevelId; emoji: string; title: string; subtitle: string; popular?: boolean }[] = [
-  { id: 'A1', emoji: '🌱', title: 'A1 · Beginner', subtitle: 'Your first step into German' },
-  { id: 'A2', emoji: '📗', title: 'A2 · Elementary', subtitle: 'Everyday conversations and basics' },
-  { id: 'B1', emoji: '🔥', title: 'B1 · Intermediate', subtitle: 'The most important certification for visas and residency', popular: true },
+  { id: 'A1', emoji: '🌱', title: 'A1 · Beginner',      subtitle: 'Your first step into German' },
+  { id: 'A2', emoji: '📗', title: 'A2 · Elementary',    subtitle: 'Everyday conversations and basics' },
+  { id: 'B1', emoji: '🔥', title: 'B1 · Intermediate',  subtitle: 'The most important cert for visas and residency', popular: true },
 ];
 
 const LOCKED = [
-  { emoji: '🔒', title: 'B2 · Upper Intermediate', subtitle: 'Coming Soon' },
-  { emoji: '🔒', title: 'C1 · Advanced', subtitle: 'Coming Soon' },
+  { emoji: '📘', title: 'B2 · Upper Intermediate', subtitle: 'Advanced fluency for work and study' },
+  { emoji: '🎓', title: 'C1/C2 · Advanced',        subtitle: 'Near-native proficiency mastery' },
 ];
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
@@ -63,96 +30,96 @@ const LOCKED = [
 export default function LevelScreen() {
   const [selected, setSelected] = useState<LevelId | null>(null);
 
+  function handleContinue() {
+    if (!selected) return;
+    onboardingStore.level = selected;
+    router.push('/onboarding_launch/empathy');
+  }
+
   return (
     <View style={styles.root}>
-      {/* Glass header */}
-      <SafeAreaView edges={['top']} style={styles.header}>
+      {/* Progress bar */}
+      <View style={styles.progressTrack}>
+        <View style={[styles.progressFill, { width: '20%' }]} />
+      </View>
+
+      <SafeAreaView edges={['top']} style={styles.safe}>
+        {/* Nav row */}
         <View style={styles.navRow}>
-          <Pressable onPress={() => router.back()} style={styles.backBtn}>
-            <ArrowLeft size={20} color={colors.onSurfaceVariant} />
+          <Pressable onPress={() => router.back()} style={styles.backBtn} accessibilityLabel="Go back">
+            <ArrowLeft size={24} color="#374151" />
           </Pressable>
-          <Text style={styles.stepLabel}>2 / 10</Text>
+          <Text style={styles.stepLabel}>STEP 2 OF 10</Text>
           <View style={styles.navSpacer} />
         </View>
-        <View style={styles.progressTrack}>
-          <View style={[styles.progressFill, { width: '20%' }]}>
-            <View style={styles.progressDot} />
+
+        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+          {/* Headline */}
+          <Text style={styles.headline}>What level are you targeting?</Text>
+
+          {/* Selectable cards */}
+          <View style={styles.cardList}>
+            {LEVELS.map((lvl) => (
+              <Pressable
+                key={lvl.id}
+                onPress={() => setSelected(lvl.id)}
+                style={({ pressed }) => [
+                  styles.card,
+                  selected === lvl.id && styles.cardSelected,
+                  pressed && styles.cardPressed,
+                ]}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: selected === lvl.id }}
+                accessibilityLabel={lvl.title}
+              >
+                <Text style={styles.emoji}>{lvl.emoji}</Text>
+                <View style={styles.cardContent}>
+                  <View style={styles.cardHeaderRow}>
+                    <Text style={[styles.cardTitle, selected === lvl.id && styles.cardTitleSelected]}>
+                      {lvl.title}
+                    </Text>
+                    {lvl.popular && (
+                      <View style={styles.popularBadge}>
+                        <Text style={styles.popularText}>Most Popular 🔥</Text>
+                      </View>
+                    )}
+                  </View>
+                  <Text style={styles.cardSubtitle}>{lvl.subtitle}</Text>
+                </View>
+              </Pressable>
+            ))}
+
+            {/* Locked cards */}
+            {LOCKED.map((lvl) => (
+              <View key={lvl.title} style={[styles.card, styles.cardLocked]}>
+                <Text style={styles.emoji}>{lvl.emoji}</Text>
+                <View style={styles.cardContent}>
+                  <Text style={styles.cardTitle}>{lvl.title}</Text>
+                  <Text style={styles.cardSubtitle}>{lvl.subtitle}</Text>
+                </View>
+                <Lock size={20} color="#94A3B8" />
+              </View>
+            ))}
           </View>
-        </View>
+
+          {/* CTA */}
+          <Pressable
+            onPress={handleContinue}
+            disabled={!selected}
+            style={({ pressed }) => [
+              styles.ctaButton,
+              !selected && styles.ctaDisabled,
+              pressed && selected && styles.ctaPressed,
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel="Continue"
+          >
+            <Text style={[styles.ctaText, !selected && styles.ctaTextDisabled]}>Continue →</Text>
+          </Pressable>
+        </ScrollView>
       </SafeAreaView>
 
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        {/* Illustration */}
-        <View style={styles.illustrationWrap}>
-          <MountainIllustration />
-        </View>
-
-        {/* Headline */}
-        <Text style={styles.headline}>What level are you targeting?</Text>
-
-        {/* Selectable cards */}
-        {LEVELS.map((lvl) => (
-          <Pressable
-            key={lvl.id}
-            onPress={() => setSelected(lvl.id)}
-            style={({ pressed }) => [
-              styles.card,
-              selected === lvl.id && styles.cardSelected,
-              pressed && styles.cardPressed,
-            ]}
-          >
-            {lvl.popular && (
-              <View style={styles.popularBadge}>
-                <Text style={styles.popularText}>Most Popular 🔥</Text>
-              </View>
-            )}
-            <Text style={styles.cardEmoji}>{lvl.emoji}</Text>
-            <View style={styles.cardBody}>
-              <Text style={[styles.cardTitle, selected === lvl.id && styles.cardTitleSelected]}>
-                {lvl.title}
-              </Text>
-              <Text style={styles.cardSubtitle}>{lvl.subtitle}</Text>
-            </View>
-            {selected === lvl.id && (
-              <View style={styles.checkDot}><View style={styles.checkInner} /></View>
-            )}
-          </Pressable>
-        ))}
-
-        {/* Locked cards */}
-        {LOCKED.map((lvl) => (
-          <View key={lvl.title} style={styles.cardLocked}>
-            <Text style={styles.cardEmoji}>🔒</Text>
-            <View style={styles.cardBody}>
-              <Text style={styles.cardTitleLocked}>{lvl.title}</Text>
-              <Text style={styles.cardSubtitleLocked}>{lvl.subtitle}</Text>
-            </View>
-            <Lock size={18} color={colors.outline} />
-          </View>
-        ))}
-
-        <View style={{ height: 120 }} />
-      </ScrollView>
-
-      {/* Sticky CTA */}
-      <View style={styles.footer}>
-        <SafeAreaView edges={['bottom']}>
-          <Pressable
-            onPress={() => { if (selected) { onboardingStore.level = selected; router.push('/onboarding_launch/empathy'); } }}
-            disabled={!selected}
-            style={[styles.ctaWrap, !selected && styles.ctaDisabled]}
-          >
-            <LinearGradient
-              colors={selected ? [colors.primary, colors.primaryContainer] : [colors.surfaceContainerHigh, colors.surfaceContainerHigh]}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-              style={styles.cta}
-            >
-              <Text style={[styles.ctaText, !selected && styles.ctaTextDisabled]}>Continue</Text>
-              <ArrowRight size={20} color={selected ? colors.onPrimary : colors.outline} />
-            </LinearGradient>
-          </Pressable>
-        </SafeAreaView>
-      </View>
+      <SafeAreaView edges={['bottom']} />
     </View>
   );
 }
@@ -160,41 +127,157 @@ export default function LevelScreen() {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.background },
+  root: {
+    flex: 1,
+    backgroundColor: '#F8FAFF',
+  },
 
-  header: { backgroundColor: `${colors.background}CC`, borderBottomWidth: 0 },
-  navRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 24, paddingTop: 12, paddingBottom: 8 },
-  backBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surfaceContainerLow, alignItems: 'center', justifyContent: 'center' },
-  stepLabel: { fontFamily: 'Outfit_800ExtraBold', fontSize: 14, color: colors.onSurface },
+  // Progress
+  progressTrack: {
+    height: 4,
+    backgroundColor: '#EBF1FF',
+    width: '100%',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#2B70EF',
+    borderTopRightRadius: 4,
+    borderBottomRightRadius: 4,
+  },
+
+  // Layout
+  safe: { flex: 1 },
+  scroll: {
+    paddingHorizontal: 24,
+    paddingTop: 32,
+    paddingBottom: 40,
+  },
+
+  // Nav
+  navRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    paddingBottom: 0,
+  },
+  backBtn: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 20,
+  },
+  stepLabel: {
+    flex: 1,
+    textAlign: 'center',
+    fontFamily: 'Outfit_800ExtraBold',
+    fontSize: 13,
+    color: '#94A3B8',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
   navSpacer: { width: 40 },
-  progressTrack: { height: 4, backgroundColor: colors.surfaceContainer, marginHorizontal: 24, borderRadius: 4, marginBottom: 4, overflow: 'hidden' },
-  progressFill: { height: '100%', backgroundColor: colors.primaryContainer, position: 'relative' },
-  progressDot: { position: 'absolute', right: -4, top: '50%', marginTop: -4, width: 8, height: 8, borderRadius: 4, backgroundColor: colors.secondaryFixed, shadowColor: colors.secondaryFixed, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 1, shadowRadius: 6 },
 
-  scroll: { paddingHorizontal: 24, paddingTop: 8 },
-  illustrationWrap: { alignItems: 'center', marginBottom: 24, height: 160 },
-  headline: { fontFamily: 'Outfit_800ExtraBold', fontSize: 30, lineHeight: 38, color: colors.onSurface, marginBottom: 20, letterSpacing: -0.3 },
+  // Headline
+  headline: {
+    fontFamily: 'Outfit_800ExtraBold',
+    fontSize: 32,
+    lineHeight: 38,
+    color: '#374151',
+    marginBottom: 32,
+    letterSpacing: -0.5,
+  },
 
-  card: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surfaceContainerLowest, borderRadius: 16, padding: 20, marginBottom: 12, borderWidth: 1, borderColor: `${colors.outlineVariant}1A`, shadowColor: colors.onSurface, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
-  cardSelected: { borderColor: `${colors.primary}33`, backgroundColor: colors.surfaceContainerLow, elevation: 4 },
-  cardPressed: { transform: [{ scale: 0.98 }] },
-  cardLocked: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surfaceContainerLow, borderRadius: 16, padding: 20, marginBottom: 12, opacity: 0.55 },
-  popularBadge: { position: 'absolute', top: -12, right: 16, backgroundColor: colors.primaryContainer, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 4 },
-  popularText: { fontFamily: 'NunitoSans_700Bold', fontSize: 10, color: colors.onPrimary, letterSpacing: 0.8, textTransform: 'uppercase' },
-  cardEmoji: { fontSize: 26, marginRight: 16 },
-  cardBody: { flex: 1 },
-  cardTitle: { fontFamily: 'Outfit_800ExtraBold', fontSize: 16, color: colors.onSurface, marginBottom: 3 },
-  cardTitleSelected: { color: colors.primary },
-  cardTitleLocked: { fontFamily: 'Outfit_800ExtraBold', fontSize: 16, color: colors.outline, marginBottom: 3 },
-  cardSubtitle: { fontFamily: 'NunitoSans_400Regular', fontSize: 13, lineHeight: 18, color: colors.onSurfaceVariant },
-  cardSubtitleLocked: { fontFamily: 'NunitoSans_400Regular', fontSize: 13, color: colors.outline },
-  checkDot: { width: 22, height: 22, borderRadius: 11, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', marginLeft: 12 },
-  checkInner: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.onPrimary },
+  // Cards
+  cardList: { gap: 12, marginBottom: 32 },
+  card: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    borderRadius: 16,
+    padding: 20,
+    gap: 16,
+    shadowColor: '#374151',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  cardSelected: {
+    borderColor: '#2B70EF',
+    backgroundColor: '#F0F5FF',
+  },
+  cardLocked: {
+    opacity: 0.6,
+    backgroundColor: '#F8FAFF',
+  },
+  cardPressed: {
+    transform: [{ scale: 0.98 }],
+  },
+  emoji: { fontSize: 28, lineHeight: 32 },
+  cardContent: { flex: 1, gap: 4 },
+  cardHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  cardTitle: {
+    fontFamily: 'NunitoSans_600SemiBold',
+    fontSize: 18,
+    color: '#374151',
+    lineHeight: 22,
+  },
+  cardTitleSelected: { color: '#2B70EF' },
+  cardSubtitle: {
+    fontFamily: 'NunitoSans_400Regular',
+    fontSize: 15,
+    color: '#94A3B8',
+    lineHeight: 21,
+  },
 
-  footer: { position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 24, paddingTop: 16, backgroundColor: `${colors.background}F5` },
-  ctaWrap: { borderRadius: 24, overflow: 'hidden', shadowColor: colors.blueShadow, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 1, shadowRadius: 16, elevation: 8, marginBottom: 8 },
-  ctaDisabled: { shadowOpacity: 0, elevation: 0 },
-  cta: { paddingVertical: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, borderRadius: 24 },
-  ctaText: { fontFamily: 'Outfit_800ExtraBold', fontSize: 16, color: colors.onPrimary, letterSpacing: 0.3 },
-  ctaTextDisabled: { color: colors.outline },
+  // Popular badge
+  popularBadge: {
+    backgroundColor: 'rgba(240, 200, 8, 0.15)',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+  },
+  popularText: {
+    fontFamily: 'Outfit_800ExtraBold',
+    fontSize: 12,
+    color: '#B59500',
+  },
+
+  // CTA
+  ctaButton: {
+    width: '100%',
+    height: 64,
+    backgroundColor: '#2B70EF',
+    borderRadius: 100,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    shadowColor: '#2B70EF',
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.5,
+    shadowRadius: 32,
+    elevation: 10,
+  },
+  ctaDisabled: {
+    backgroundColor: '#E2E8F0',
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  ctaPressed: { opacity: 0.88 },
+  ctaText: {
+    fontFamily: 'Outfit_800ExtraBold',
+    fontSize: 20,
+    color: '#FFFFFF',
+    letterSpacing: -0.5,
+  },
+  ctaTextDisabled: { color: '#94A3B8' },
 });
