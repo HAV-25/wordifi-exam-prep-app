@@ -1,12 +1,13 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { Check, Eye, EyeOff, Lock, Mail, Sparkles, X } from 'lucide-react-native';
+import { CheckSquare, Eye, EyeOff, Lock, Mail, Sparkles, Square, X } from 'lucide-react-native';
 import React, { useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Animated,
   KeyboardAvoidingView,
+  Linking,
   Modal,
   Platform,
   Pressable,
@@ -18,31 +19,32 @@ import {
 } from 'react-native';
 
 import Colors from '@/constants/colors';
-import { colors } from '@/theme';
-import { resetPassword, signInWithEmail, signInWithGoogle, signUpWithEmail } from '@/lib/authHelpers';
+import { colors, fontFamily } from '@/theme';
+import { resetPassword, signInWithEmail, signInWithGoogle, signUpWithEmail, updateTcAccepted } from '@/lib/authHelpers';
 import { saveOnboardingAnswers } from '@/lib/profileHelpers';
 import { onboardingStore } from '@/app/onboarding_launch/_store';
+import { useAppConfig } from '@/providers/AppConfigProvider';
+import { supabase } from '@/lib/supabaseClient';
 
-function getFriendlyError(errorMessage: string, isSignUp: boolean): string {
+function getFriendlySignInError(errorMessage: string): string {
   const normalized = errorMessage.toLowerCase();
   if (normalized.includes('invalid login credentials')) {
     return 'Email or password is incorrect';
   }
-  if (normalized.includes('already registered') || normalized.includes('already exists')) {
-    return 'An account with this email already exists';
-  }
   if (normalized.includes('network') || normalized.includes('fetch')) {
     return 'Could not connect. Please try again.';
   }
-  return isSignUp ? 'Could not create your account. Please try again.' : 'Something went wrong. Please check your connection.';
+  return 'Something went wrong. Please check your connection.';
 }
 
 export default function AuthScreen() {
+  const config = useAppConfig();
+
   const [mode, setMode] = useState<'signIn' | 'signUp'>('signIn');
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [showPassword, setShowPassword] = useState<boolean>(false);
-  const [acceptedTerms, setAcceptedTerms] = useState<boolean>(false);
+  const [tcAccepted, setTcAccepted] = useState<boolean>(false);
   const [touched, setTouched] = useState<{ email: boolean; password: boolean }>({ email: false, password: false });
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
@@ -61,13 +63,13 @@ export default function AuthScreen() {
   }, [email, touched.email]);
 
   const passwordError = useMemo<string>(() => {
-    if (!touched.password) {
+    if (!touched.password || mode === 'signIn') {
       return '';
     }
     return password.length >= 8 ? '' : 'Password must be at least 8 characters';
-  }, [password, touched.password]);
+  }, [password, touched.password, mode]);
 
-  const canSubmit = email.length > 0 && password.length >= 8 && /\S+@\S+\.\S+/.test(email) && (mode === 'signIn' || acceptedTerms);
+  const canSubmit = email.length > 0 && password.length > 0 && /\S+@\S+\.\S+/.test(email) && (mode === 'signIn' || (password.length >= 8 && tcAccepted));
 
   const handleEmailAuth = async () => {
     setTouched({ email: true, password: true });
@@ -78,31 +80,51 @@ export default function AuthScreen() {
     setIsLoading(true);
     try {
       if (mode === 'signIn') {
-        await signInWithEmail(email.trim(), password);
+        const data = await signInWithEmail(email.trim(), password.trim());
+        // Update tc_accepted for users signing in after email confirmation
+        if (data?.user) {
+          await updateTcAccepted(data.user.id, config.tc_version).catch(() => {});
+        }
         router.replace('/');
       } else {
-        const data = await signUpWithEmail(email.trim(), password);
-        if (data?.user?.id) {
-          await saveOnboardingAnswers(data.user.id, onboardingStore).catch(() => {});
+        const result = await signUpWithEmail(email.trim(), password);
+        if (result.status === 'confirmation_pending') {
+          router.push({ pathname: '/check-email', params: { email: result.email } });
+          return;
+        }
+        // Immediately signed in (email confirmation disabled)
+        if (result.data?.user?.id) {
+          await saveOnboardingAnswers(result.data.user.id, onboardingStore).catch(() => {});
+          await updateTcAccepted(result.data.user.id, config.tc_version).catch(() => {});
         }
         router.replace('/');
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
-      Alert.alert('Wordifi', getFriendlyError(message, mode === 'signUp'));
+      if (mode === 'signUp') {
+        Alert.alert('Wordifi', message);
+      } else {
+        Alert.alert('Wordifi', getFriendlySignInError(message));
+      }
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleGoogleAuth = async () => {
+    if (mode === 'signUp' && !tcAccepted) return;
     setIsLoading(true);
     try {
       await signInWithGoogle();
+      // Update tc_accepted after successful Google sign-in
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await updateTcAccepted(user.id, config.tc_version).catch(() => {});
+      }
       router.replace('/');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
-      Alert.alert('Wordifi', getFriendlyError(message, false));
+      Alert.alert('Wordifi', getFriendlySignInError(message));
     } finally {
       setIsLoading(false);
     }
@@ -156,9 +178,9 @@ export default function AuthScreen() {
           <View style={styles.card}>
             <Pressable
               accessibilityLabel="Continue with Google"
-              disabled={isLoading}
+              disabled={isLoading || (mode === 'signUp' && !tcAccepted)}
               onPress={handleGoogleAuth}
-              style={styles.googleButton}
+              style={[styles.googleButton, ((mode === 'signUp' && !tcAccepted) || isLoading) ? styles.buttonDisabled : null]}
               testID="google-auth-button"
             >
               <View style={styles.googleIconWrap}>
@@ -259,24 +281,43 @@ export default function AuthScreen() {
             </View>
 
             {mode === 'signUp' ? (
-              <Pressable
-                accessibilityLabel="Agree to terms"
-                onPress={() => setAcceptedTerms((value) => !value)}
-                style={styles.termsRow}
-                testID="terms-checkbox"
-              >
-                <View style={[styles.checkbox, acceptedTerms ? styles.checkboxSelected : null]}>
-                  {acceptedTerms ? <Check color={Colors.surface} size={14} /> : null}
-                </View>
-                <Text style={styles.termsText}>I agree to Terms</Text>
-              </Pressable>
+              <View style={styles.tcRow}>
+                <Pressable
+                  onPress={() => setTcAccepted((prev) => !prev)}
+                  style={styles.tcCheckbox}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  accessibilityLabel="Agree to terms and conditions"
+                  testID="tc-checkbox"
+                >
+                  {tcAccepted
+                    ? <CheckSquare size={20} color={Colors.primary} />
+                    : <Square size={20} color={Colors.textMuted} />
+                  }
+                </Pressable>
+                <Text style={styles.tcText}>
+                  {'I agree to the '}
+                  <Text
+                    style={styles.tcLink}
+                    onPress={() => Linking.openURL(config.terms_url)}
+                  >
+                    Terms & Conditions
+                  </Text>
+                  {' and '}
+                  <Text
+                    style={styles.tcLink}
+                    onPress={() => Linking.openURL(config.privacy_url)}
+                  >
+                    Privacy Policy
+                  </Text>
+                </Text>
+              </View>
             ) : null}
 
             <Pressable
               accessibilityLabel={mode === 'signIn' ? 'Sign in with email' : 'Create account'}
               disabled={!canSubmit || isLoading}
               onPress={handleEmailAuth}
-              style={[styles.primaryButton, !canSubmit || isLoading ? styles.buttonDisabled : null]}
+              style={[styles.primaryButton, (!canSubmit || isLoading) ? styles.buttonDisabled : null]}
               testID="email-auth-button"
             >
               {isLoading ? (
@@ -387,6 +428,28 @@ const styles = StyleSheet.create({
     padding: 18,
     gap: 16,
   },
+  tcRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    marginHorizontal: 6,
+  },
+  tcCheckbox: {
+    paddingTop: 1,
+  },
+  tcText: {
+    fontFamily: fontFamily.bodyRegular,
+    fontSize: 13,
+    color: Colors.textBody,
+    flex: 1,
+    lineHeight: 20,
+  },
+  tcLink: {
+    fontFamily: fontFamily.bodySemiBold,
+    fontSize: 13,
+    color: Colors.primary,
+    textDecorationLine: 'underline',
+  },
   googleButton: {
     minHeight: 52,
     borderRadius: 26,
@@ -440,18 +503,6 @@ const styles = StyleSheet.create({
   errorText: { color: Colors.danger, fontSize: 13, fontWeight: '600' as const },
   forgotLink: { alignSelf: 'flex-end' as const, paddingVertical: 2 },
   forgotLinkText: { color: Colors.textMuted, fontSize: 13, fontWeight: '600' as const },
-  termsRow: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 44 },
-  checkbox: {
-    width: 22,
-    height: 22,
-    borderRadius: 7,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  checkboxSelected: { backgroundColor: Colors.primary, borderColor: Colors.primary },
-  termsText: { color: Colors.text, fontWeight: '600' as const },
   primaryButton: {
     minHeight: 52,
     borderRadius: 26,
@@ -459,7 +510,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  buttonDisabled: { opacity: 0.5 },
+  buttonDisabled: { opacity: 0.45 },
   primaryButtonText: { color: Colors.surface, fontWeight: '800' as const, fontSize: 16 },
 
   modalOverlay: {

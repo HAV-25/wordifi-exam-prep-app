@@ -8,6 +8,8 @@ const BOTTOM_CONTENT_BUFFER = 24; // breathing room below last content item
 import {
   Alert,
   Animated,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -429,7 +431,11 @@ export default function SchreibenTestScreen() {
   const isLoadingCached = currentState.isLoadingCached;
 
   return (
-    <View style={styles.screen}>
+    <KeyboardAvoidingView
+      style={styles.screen}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 24}
+    >
       <Stack.Screen
         options={{
           title: '',
@@ -509,7 +515,7 @@ export default function SchreibenTestScreen() {
           />
         </View>
       ) : null}
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 

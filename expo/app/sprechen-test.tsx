@@ -10,6 +10,8 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -523,7 +525,11 @@ export default function SprechenTestScreen() {
   const isCurrentUploading = currentState.isUploading;
 
   return (
-    <View style={styles.screen}>
+    <KeyboardAvoidingView
+      style={styles.screen}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 24}
+    >
       <Stack.Screen
         options={{
           title: '',
@@ -590,7 +596,7 @@ export default function SprechenTestScreen() {
           />
         </View>
       ) : null}
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 

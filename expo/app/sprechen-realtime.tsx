@@ -628,7 +628,7 @@ export default function SprechenRealtimeScreen() {
           ) : null}
         </ScrollView>
 
-        <View style={styles.convFooter}>
+        <View style={[styles.convFooter, { paddingBottom: insets.bottom + spacing.lg }]}>
           {!isWebRTC && (
             <Pressable
               onPress={handleNativeRecord}
