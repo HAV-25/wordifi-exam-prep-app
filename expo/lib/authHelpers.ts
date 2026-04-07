@@ -31,7 +31,7 @@ export type SignUpResult =
 
 export async function signUpWithEmail(email: string, password: string): Promise<SignUpResult> {
   const emailRedirectTo = process.env.EXPO_PUBLIC_AUTH_REDIRECT_URL
-    ?? 'https://2ydqsq98wysdgr153a9qi.rork.app';
+    ?? 'https://wordifi-auth.netlify.app/auth-confirm.html';
 
   const { data, error } = await supabase.auth.signUp({
     email,
