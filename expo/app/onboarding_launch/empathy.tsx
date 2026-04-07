@@ -4,11 +4,12 @@
  * Step 3 of 10
  */
 import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { ArrowLeft } from 'lucide-react-native';
 import { onboardingStore } from './_store';
+import { ScreenLayout } from '@/components/ScreenLayout';
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 
@@ -34,6 +35,22 @@ export default function EmpathyScreen() {
     router.push('/onboarding_launch/timeline');
   }
 
+  const ctaFooter = (
+    <Pressable
+      onPress={handleContinue}
+      disabled={!selected}
+      style={({ pressed }) => [
+        styles.ctaButton,
+        !selected && styles.ctaDisabled,
+        pressed && selected && styles.ctaPressed,
+      ]}
+      accessibilityRole="button"
+      accessibilityLabel="Continue"
+    >
+      <Text style={[styles.ctaText, !selected && styles.ctaTextDisabled]}>Continue →</Text>
+    </Pressable>
+  );
+
   return (
     <View style={styles.root}>
       {/* Progress bar */}
@@ -51,7 +68,7 @@ export default function EmpathyScreen() {
           <View style={styles.navSpacer} />
         </View>
 
-        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        <ScreenLayout footer={ctaFooter} contentContainerStyle={styles.scroll}>
           {/* Headline */}
           <Text style={styles.headline}>This exam matters. Tell us why.</Text>
 
@@ -80,25 +97,8 @@ export default function EmpathyScreen() {
               </Pressable>
             ))}
           </View>
-
-          {/* CTA */}
-          <Pressable
-            onPress={handleContinue}
-            disabled={!selected}
-            style={({ pressed }) => [
-              styles.ctaButton,
-              !selected && styles.ctaDisabled,
-              pressed && selected && styles.ctaPressed,
-            ]}
-            accessibilityRole="button"
-            accessibilityLabel="Continue"
-          >
-            <Text style={[styles.ctaText, !selected && styles.ctaTextDisabled]}>Continue →</Text>
-          </Pressable>
-        </ScrollView>
+        </ScreenLayout>
       </SafeAreaView>
-
-      <SafeAreaView edges={['bottom']} />
     </View>
   );
 }
@@ -129,7 +129,6 @@ const styles = StyleSheet.create({
   scroll: {
     paddingHorizontal: 24,
     paddingTop: 32,
-    paddingBottom: 40,
   },
 
   // Nav

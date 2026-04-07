@@ -10,10 +10,11 @@
  *  5. ✦ stars in emotional close pulse infinitely (starts at mount, visible when box fades in)
  */
 import React, { useEffect, useRef } from 'react';
-import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { ArrowRight, CheckCircle2 } from 'lucide-react-native';
+import { ScreenLayout } from '@/components/ScreenLayout';
 import {
   onboardingStore,
   CERT_SHORT,
@@ -130,13 +131,32 @@ export default function PlanSummaryScreen() {
 
   // ── Render ───────────────────────────────────────────────────────────────────
 
+  const ctaFooter = (
+    <Animated.View style={{ opacity: ctaOpacity }}>
+      <Pressable
+        onPress={() => router.push('/onboarding_launch/trial-transparency')}
+        style={({ pressed }) => [styles.cta, pressed && styles.ctaPressed]}
+        accessibilityRole="button"
+        accessibilityLabel="Yes — start my plan today"
+      >
+        <Text style={styles.ctaText}>Yes — start my plan today</Text>
+        <ArrowRight size={24} color="#FFFFFF" />
+      </Pressable>
+
+      <View style={styles.socialProof}>
+        <Text style={styles.stars}>★★★★★</Text>
+        <Text style={styles.socialProofText}>4.9/5 User Rating · 12k+ Learners Worldwide</Text>
+      </View>
+    </Animated.View>
+  );
+
   return (
     <View style={styles.root}>
       {/* Yellow radial glow top-right */}
       <View style={styles.glow} />
 
-      <SafeAreaView edges={['top', 'bottom']} style={styles.safe}>
-        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+      <SafeAreaView edges={['top']} style={styles.safe}>
+        <ScreenLayout footer={ctaFooter} contentContainerStyle={styles.scroll} backgroundColor={colors.background}>
 
           {/* ── Header (static) ──────────────────────────────────────────────── */}
           <View style={styles.header}>
@@ -235,26 +255,7 @@ export default function PlanSummaryScreen() {
             </Text>
           </Animated.View>
 
-          {/* ── CTA + social proof — fade in last ────────────────────────────── */}
-          <Animated.View style={{ opacity: ctaOpacity }}>
-            <Pressable
-              onPress={() => router.push('/onboarding_launch/trial-transparency')}
-              style={({ pressed }) => [styles.cta, pressed && styles.ctaPressed]}
-              accessibilityRole="button"
-              accessibilityLabel="Yes — start my plan today"
-            >
-              <Text style={styles.ctaText}>Yes — start my plan today</Text>
-              <ArrowRight size={24} color="#FFFFFF" />
-            </Pressable>
-
-            <View style={styles.socialProof}>
-              <Text style={styles.stars}>★★★★★</Text>
-              <Text style={styles.socialProofText}>4.9/5 User Rating · 12k+ Learners Worldwide</Text>
-            </View>
-          </Animated.View>
-
-          <View style={{ height: 32 }} />
-        </ScrollView>
+        </ScreenLayout>
       </SafeAreaView>
     </View>
   );
@@ -278,7 +279,7 @@ const styles = StyleSheet.create({
   },
 
   safe:   { flex: 1 },
-  scroll: { paddingHorizontal: 24, paddingTop: 44, paddingBottom: 32 },
+  scroll: { paddingHorizontal: 24, paddingTop: 44 },
 
   // ── Header ──────────────────────────────────────────────────────────────────
   header:   { marginBottom: 24 },

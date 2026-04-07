@@ -145,6 +145,10 @@ export const TEIL_NAMES: Record<string, Record<number, { de: string; en: string 
     2: { de: 'Um Informationen bitten', en: 'Asking for information' },
     3: { de: 'Gemeinsam planen',        en: 'Planning together' },
   },
+  'Sprachbausteine': {
+    1: { de: 'Lückentext',              en: 'Gap Fill' },
+    2: { de: 'Textrekonstruktion',      en: 'Text Reconstruction' },
+  },
 } as const;
 
 // ─── AsyncStorage Keys ───────────────────────────────────────────────────────

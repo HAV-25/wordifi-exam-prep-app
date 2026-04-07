@@ -5,6 +5,7 @@ export type StreamFetchParams = {
   userId: string;
   targetLevel: string;
   limit?: number;
+  sections?: string[]; // restrict to specific sections (e.g. ['Hören','Lesen'] for free_trial)
 };
 
 export type SectionAccuracy = {
@@ -88,7 +89,7 @@ export async function fetchSectionAccuracy(userId: string): Promise<SectionAccur
 export async function fetchStreamQuestions(
   params: StreamFetchParams
 ): Promise<{ questions: AppQuestion[]; isRecycled: boolean }> {
-  const { userId, targetLevel, limit = 20 } = params;
+  const { userId, targetLevel, limit = 20, sections } = params;
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
   const cutoff = thirtyDaysAgo.toISOString();
@@ -108,6 +109,10 @@ export async function fetchStreamQuestions(
       .eq('level', targetLevel)
       .eq('is_active', true);
 
+    if (sections && sections.length > 0) {
+      query = query.in('section', sections);
+    }
+
     if (seenIds.length > 0) {
       query = query.not('id', 'in', `(${seenIds.join(',')})`);
     }
@@ -125,12 +130,17 @@ export async function fetchStreamQuestions(
 
     if (questions.length === 0 && seenIds.length > 0) {
       console.log('fetchStreamQuestions all seen, recycling');
-      const { data: recycled, error: recycleError } = await supabase
+      let recycleQuery = supabase
         .from('app_questions')
         .select('*')
         .eq('level', targetLevel)
-        .eq('is_active', true)
-        .limit(limit * 2);
+        .eq('is_active', true);
+
+      if (sections && sections.length > 0) {
+        recycleQuery = recycleQuery.in('section', sections);
+      }
+
+      const { data: recycled, error: recycleError } = await recycleQuery.limit(limit * 2);
 
       if (recycleError) {
         console.log('fetchStreamQuestions recycle error', recycleError);

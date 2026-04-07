@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { CheckCircle2, ArrowRight } from 'lucide-react-native';
 import { colors } from '@/theme';
+import { ScreenLayout } from '@/components/ScreenLayout';
 import { savePendingOnboarding } from '@/lib/profileHelpers';
 import { onboardingStore, onboardingSessionNonce } from './_store';
 
@@ -98,15 +99,50 @@ export default function PaywallScreen() {
     ]).start();
   }, []);
 
+  const ctaFooter = (
+    <>
+      <Text style={styles.trustLine}>
+        🔒  No charge today · Cancel anytime · Reminder before trial ends
+      </Text>
+
+      <Pressable
+        onPress={async () => {
+          await savePendingOnboarding(onboardingStore, onboardingSessionNonce);
+          router.dismissAll();
+          router.replace('/auth');
+        }}
+        style={({ pressed }) => [styles.cta, pressed && styles.ctaPressed]}
+        accessibilityRole="button"
+        accessibilityLabel="Start my free trial — 72 hours free"
+      >
+        <Text style={styles.ctaText}>Start my free trial — 72 hours free</Text>
+        <ArrowRight size={22} color="#FFFFFF" />
+      </Pressable>
+
+      <Pressable
+        onPress={async () => {
+          await savePendingOnboarding(onboardingStore, onboardingSessionNonce);
+          router.replace('/auth');
+        }}
+        style={styles.secondary}
+        accessibilityRole="button"
+        accessibilityLabel="Continue with 5 free questions per day"
+      >
+        <Text style={styles.secondaryText}>Continue with 5 free questions per day</Text>
+      </Pressable>
+    </>
+  );
+
   return (
     <View style={styles.root}>
       {/* Yellow glow top-right */}
       <View style={styles.glow} />
 
       <SafeAreaView edges={['top']} style={styles.safe}>
-        <ScrollView
+        <ScreenLayout
+          backgroundColor="transparent"
+          footer={ctaFooter}
           contentContainerStyle={styles.scroll}
-          showsVerticalScrollIndicator={false}
         >
           {/* Header */}
           <View style={styles.header}>
@@ -193,46 +229,8 @@ export default function PaywallScreen() {
               ))}
             </ScrollView>
           </Animated.View>
-
-          {/* Spacer for sticky footer */}
-          <View style={{ height: 160 }} />
-        </ScrollView>
+        </ScreenLayout>
       </SafeAreaView>
-
-      {/* Sticky footer */}
-      <View style={styles.footer}>
-        <SafeAreaView edges={['bottom']}>
-          <Text style={styles.trustLine}>
-            🔒  No charge today · Cancel anytime · Reminder before trial ends
-          </Text>
-
-          <Pressable
-            onPress={async () => {
-              await savePendingOnboarding(onboardingStore, onboardingSessionNonce);
-              router.dismissAll();
-              router.replace('/auth');
-            }}
-            style={({ pressed }) => [styles.cta, pressed && styles.ctaPressed]}
-            accessibilityRole="button"
-            accessibilityLabel="Start my free trial — 72 hours free"
-          >
-            <Text style={styles.ctaText}>Start my free trial — 72 hours free</Text>
-            <ArrowRight size={22} color="#FFFFFF" />
-          </Pressable>
-
-          <Pressable
-            onPress={async () => {
-              await savePendingOnboarding(onboardingStore, onboardingSessionNonce);
-              router.replace('/auth');
-            }}
-            style={styles.secondary}
-            accessibilityRole="button"
-            accessibilityLabel="Continue with 5 free questions per day"
-          >
-            <Text style={styles.secondaryText}>Continue with 5 free questions per day</Text>
-          </Pressable>
-        </SafeAreaView>
-      </View>
     </View>
   );
 }
@@ -254,7 +252,7 @@ const styles = StyleSheet.create({
   },
 
   safe:   { flex: 1 },
-  scroll: { paddingHorizontal: 24, paddingTop: 44, paddingBottom: 32 },
+  scroll: { paddingHorizontal: 24, paddingTop: 44 },
 
   // ── Header ──────────────────────────────────────────────────────────────────
   header:   { marginBottom: 24 },
@@ -436,16 +434,7 @@ const styles = StyleSheet.create({
   },
   reviewStars:  { fontSize: 13, letterSpacing: 2, color: '#F0C808' },
 
-  // ── Sticky footer ────────────────────────────────────────────────────────────
-  footer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingHorizontal: 24,
-    paddingTop: 16,
-    backgroundColor: `${colors.background}F5`,
-  },
+  // ── Footer ──────────────────────────────────────────────────────────────────
   trustLine: {
     fontFamily: 'NunitoSans_400Regular',
     fontSize: 12,

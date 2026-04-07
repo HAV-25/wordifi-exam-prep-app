@@ -24,8 +24,8 @@ type PreparednessBottomSheetProps = {
   overallScore: number;
   horenPct: number;
   lesenPct: number;
-  schreibenPct?: number;
-  sprechenPct?: number;
+  schreibenSessions?: number;
+  sprechenSessions?: number;
   streak: number;
   lastActiveDate: string | null;
 };
@@ -111,6 +111,45 @@ const barStyles = StyleSheet.create({
   },
 });
 
+const COMPLETION_TARGET = 5;
+
+function CompletionRow({ label, sessions, icon }: { label: string; sessions: number; icon: string }) {
+  const pct = Math.min((sessions / COMPLETION_TARGET) * 100, 100);
+  const widthAnim = useRef(new Animated.Value(0)).current;
+  const barColor = getBarColor(pct);
+
+  useEffect(() => {
+    Animated.timing(widthAnim, {
+      toValue: pct,
+      duration: 600,
+      useNativeDriver: false,
+    }).start();
+  }, [pct, widthAnim]);
+
+  const widthInterp = widthAnim.interpolate({
+    inputRange: [0, 100],
+    outputRange: ['0%', '100%'],
+    extrapolate: 'clamp',
+  });
+
+  return (
+    <View style={barStyles.row}>
+      <View style={barStyles.labelWrap}>
+        <Text style={barStyles.icon}>{icon}</Text>
+        <Text style={barStyles.label}>{label}</Text>
+      </View>
+      <View style={barStyles.trackWrap}>
+        <View style={barStyles.track}>
+          <Animated.View style={[barStyles.fill, { width: widthInterp, backgroundColor: barColor }]} />
+        </View>
+        <Text style={[barStyles.pct, { color: barColor }]}>
+          {sessions}/{COMPLETION_TARGET}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
 function getReadinessColor(pct: number): string {
   if (pct >= 70) return colors.green;
   if (pct >= 40) return colors.amber;
@@ -126,8 +165,8 @@ export const PreparednessBottomSheet = React.memo(function PreparednessBottomShe
   overallScore,
   horenPct,
   lesenPct,
-  schreibenPct = 0,
-  sprechenPct = 0,
+  schreibenSessions = 0,
+  sprechenSessions = 0,
   streak,
   lastActiveDate,
 }: PreparednessBottomSheetProps) {
@@ -210,15 +249,15 @@ export const PreparednessBottomSheet = React.memo(function PreparednessBottomShe
         <View style={styles.barsWrap}>
           <BarRow label="Hören" pct={horenPct} icon="🎧" />
           <BarRow label="Lesen" pct={lesenPct} icon="📖" />
-          <BarRow label="Schreiben" pct={schreibenPct} icon="✍️" />
-          <BarRow label="Sprechen" pct={sprechenPct} icon="🎤" />
+          <CompletionRow label="Schreiben" sessions={schreibenSessions} icon="✍️" />
+          <CompletionRow label="Sprechen" sessions={sprechenSessions} icon="🎤" />
           <View style={styles.divider} />
           <BarRow label="Overall" pct={overallScore} icon="📊" />
         </View>
 
         <View style={styles.readinessRow}>
-          <Text style={[styles.readinessText, { color: getReadinessColor(Math.round((horenPct * 0.35) + (lesenPct * 0.35) + (schreibenPct * 0.30))) }]}>
-            Estimated exam readiness: {Math.round((horenPct * 0.35) + (lesenPct * 0.35) + (schreibenPct * 0.30))}%
+          <Text style={[styles.readinessText, { color: getReadinessColor(overallScore) }]}>
+            Estimated exam readiness: {Math.round(overallScore)}%
           </Text>
         </View>
 

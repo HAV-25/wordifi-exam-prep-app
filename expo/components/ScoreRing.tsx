@@ -53,8 +53,7 @@ export function ScoreRing({ score, label, size = 104 }: ScoreRingProps) {
         )}
       </Svg>
       <View style={styles.center}>
-        <Text style={styles.score}>{Math.round(progress)}</Text>
-        <Text style={styles.percent}>/100</Text>
+        <Text style={styles.score}>{Math.round(progress)}%</Text>
       </View>
       <Text style={styles.label}>{label}</Text>
     </View>
@@ -68,18 +67,17 @@ const styles = StyleSheet.create({
   },
   center: {
     position: 'absolute',
-    top: 30,
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   score: {
-    fontSize: 28,
+    fontSize: 22,
     fontWeight: '800',
     color: Colors.primary,
-  },
-  percent: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: Colors.textMuted,
   },
   label: {
     fontSize: 13,

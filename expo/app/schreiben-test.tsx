@@ -1,5 +1,5 @@
 import { Stack, router, useLocalSearchParams } from 'expo-router';
-import { PenLine } from 'lucide-react-native';
+import { PenLine, Share2 } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -12,6 +12,7 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  Share as RNShare,
   StyleSheet,
   Text,
   View,
@@ -300,7 +301,7 @@ export default function SchreibenTestScreen() {
           questions_correct: passedCount,
           time_taken_seconds: timeTaken,
           completed_at: new Date().toISOString(),
-          retest_available_at: getRetestDate(),
+          retest_available_at: ['paid_early', 'monthly', 'quarterly', 'winback_monthly', 'winback_quarterly'].includes(profile?.subscription_tier ?? '') ? null : getRetestDate(),
         })
         .eq('id', sessionId);
 
@@ -507,6 +508,27 @@ export default function SchreibenTestScreen() {
 
       {currentState.assessment && !currentState.isLoading ? (
         <View style={[styles.footer, { bottom: insets.bottom }]}>
+          <Pressable
+            onPress={async () => {
+              const a = currentState.assessment!;
+              const passLabel = a.passed ? 'Bestanden' : 'Nicht bestanden';
+              const message = `wordifi — Schreiben ${level} Teil ${teil}\n${a.overall_score}/${a.max_score} — ${passLabel}\n\n${a.encouragement}\n\nwordifi.app`;
+              try {
+                if (Platform.OS === 'web') {
+                  if (navigator.share) await navigator.share({ text: message });
+                } else {
+                  await RNShare.share({ message });
+                }
+              } catch (err) {
+                console.log('schreiben share error', err);
+              }
+            }}
+            style={styles.shareBtn}
+            testID="schreiben-share"
+          >
+            <Share2 color={colors.blue} size={18} />
+            <Text style={styles.shareBtnText}>Ergebnis teilen</Text>
+          </Pressable>
           <CTAButton
             label={currentIndex === questions.length - 1 ? 'Test abschließen' : 'Nächste Frage →'}
             onPress={handleNext}
@@ -635,10 +657,27 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     padding: spacing.xl,
+    gap: spacing.sm,
     backgroundColor: colors.surface,
   },
   footerBtn: {
     marginHorizontal: 0,
+  },
+  shareBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.white,
+    borderRadius: radius.lg,
+    paddingVertical: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+  },
+  shareBtnText: {
+    fontSize: fontSize.bodyMd,
+    color: colors.blue,
+    fontWeight: '700' as const,
   },
   errorWrap: {
     alignItems: 'center',

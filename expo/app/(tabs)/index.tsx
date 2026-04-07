@@ -167,7 +167,14 @@ const recentStyles = StyleSheet.create({
 
 // ─── Section history row ──────────────────────────────────────────────────────
 function SectionHistoryRow({ item, onPress }: { item: SectionHistoryItem; onPress: () => void }) {
-  const rightLabel = item.progressPct > 0 ? `${Math.round(item.progressPct)}%` : '—';
+  const isCompletionBased = item.section === 'Schreiben' || item.section === 'Sprechen';
+  const rightLabel = isCompletionBased
+    ? `${item.testCount} done`
+    : item.progressPct > 0 ? `${Math.round(item.progressPct)}%` : '—';
+  const TARGET_SESSIONS = 5;
+  const barPct = isCompletionBased
+    ? Math.min((item.testCount / TARGET_SESSIONS) * 100, 100)
+    : Math.min(item.progressPct, 100);
   return (
     <Pressable style={histStyles.row} onPress={onPress}>
       <View style={histStyles.iconWrap}>
@@ -176,7 +183,7 @@ function SectionHistoryRow({ item, onPress }: { item: SectionHistoryItem; onPres
       <View style={histStyles.body}>
         <Text style={histStyles.name}>{item.section}</Text>
         <View style={histStyles.barTrack}>
-          <View style={[histStyles.barFill, { width: `${Math.min(item.progressPct, 100)}%` as any }]} />
+          <View style={[histStyles.barFill, { width: `${barPct}%` as any }]} />
         </View>
       </View>
       <Text style={histStyles.count}>{rightLabel}</Text>
@@ -460,6 +467,8 @@ export default function HomeScreen() {
         overallScore={data.preparedness}
         horenPct={data.horenAccuracy}
         lesenPct={data.lesenAccuracy}
+        schreibenSessions={data.sectionHistory.find((s) => s.section === 'Schreiben')?.testCount ?? 0}
+        sprechenSessions={data.sectionHistory.find((s) => s.section === 'Sprechen')?.testCount ?? 0}
         streak={data.streak}
         lastActiveDate={profile?.last_active_date ?? null}
       />

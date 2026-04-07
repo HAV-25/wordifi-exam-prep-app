@@ -342,7 +342,7 @@ export default function SprechenTestScreen() {
           questions_correct: completedCount,
           time_taken_seconds: timeTaken,
           completed_at: new Date().toISOString(),
-          retest_available_at: getRetestDate(),
+          retest_available_at: ['paid_early', 'monthly', 'quarterly', 'winback_monthly', 'winback_quarterly'].includes(profile?.subscription_tier ?? '') ? null : getRetestDate(),
         })
         .eq('id', sessionId);
 

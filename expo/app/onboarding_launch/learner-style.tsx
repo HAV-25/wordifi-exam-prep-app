@@ -4,12 +4,13 @@
  * Step 8 of 10
  */
 import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { ArrowLeft } from 'lucide-react-native';
 import { onboardingStore, LearnerStyleId, LEARNER_STYLE_DISPLAY } from './_store';
 import { colors } from '@/theme';
+import { ScreenLayout } from '@/components/ScreenLayout';
 
 const OPTIONS: LearnerStyleId[] = ['sprinter', 'builder', 'sniper', 'explorer'];
 
@@ -21,6 +22,22 @@ export default function LearnerStyleScreen() {
     onboardingStore.learnerStyle = selected;
     router.push('/onboarding_launch/leaderboard');
   }
+
+  const ctaFooter = (
+    <Pressable
+      onPress={handleContinue}
+      disabled={!selected}
+      style={({ pressed }) => [
+        styles.cta,
+        !selected && styles.ctaDisabled,
+        pressed && selected && styles.ctaPressed,
+      ]}
+      accessibilityRole="button"
+      accessibilityLabel="Continue"
+    >
+      <Text style={[styles.ctaText, !selected && styles.ctaTextDisabled]}>Continue →</Text>
+    </Pressable>
+  );
 
   return (
     <View style={styles.root}>
@@ -41,7 +58,7 @@ export default function LearnerStyleScreen() {
           <Text style={styles.stepLabel}>Step 8 of 10</Text>
         </View>
 
-        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        <ScreenLayout footer={ctaFooter} contentContainerStyle={styles.scroll}>
           <Text style={styles.headline}>Which style describes you best?</Text>
           <Text style={styles.subCopy}>Pick the one that feels most like you.</Text>
 
@@ -78,24 +95,7 @@ export default function LearnerStyleScreen() {
             <Text style={styles.almostTitle}>Last question done.</Text>
             <Text style={styles.almostSub}>Your plan is complete. Let's show you what's next.</Text>
           </View>
-
-          {/* CTA */}
-          <Pressable
-            onPress={handleContinue}
-            disabled={!selected}
-            style={({ pressed }) => [
-              styles.cta,
-              !selected && styles.ctaDisabled,
-              pressed && selected && styles.ctaPressed,
-            ]}
-            accessibilityRole="button"
-            accessibilityLabel="Continue"
-          >
-            <Text style={[styles.ctaText, !selected && styles.ctaTextDisabled]}>Continue →</Text>
-          </Pressable>
-
-          <SafeAreaView edges={['bottom']} />
-        </ScrollView>
+        </ScreenLayout>
       </SafeAreaView>
     </View>
   );
@@ -127,7 +127,7 @@ const styles = StyleSheet.create({
   backBtn:   { width: 40, height: 40, alignItems: 'center', justifyContent: 'flex-start' },
   stepLabel: { flex: 1, textAlign: 'center', marginRight: 40, fontFamily: 'NunitoSans_600SemiBold', fontSize: 14, color: '#94A3B8' },
 
-  scroll: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 40 },
+  scroll: { paddingHorizontal: 24, paddingTop: 16 },
 
   headline: { fontFamily: 'Outfit_800ExtraBold', fontSize: 32, lineHeight: 37, color: '#374151', marginBottom: 12, letterSpacing: -0.5 },
   subCopy:  { fontFamily: 'NunitoSans_400Regular', fontSize: 16, lineHeight: 23, color: '#94A3B8', marginBottom: 32 },

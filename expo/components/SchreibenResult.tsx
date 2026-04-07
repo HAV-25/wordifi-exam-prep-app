@@ -1,10 +1,8 @@
-import { Check, X, Share2, ChevronDown, ChevronUp } from 'lucide-react-native';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Check, X, ChevronDown, ChevronUp } from 'lucide-react-native';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Animated,
-  Platform,
   Pressable,
-  Share as RNShare,
   StyleSheet,
   Text,
   View,
@@ -33,23 +31,6 @@ export function SchreibenResult({ assessment, taskType, level, teil }: Schreiben
   const scorePct = assessment.max_score > 0
     ? Math.round((assessment.overall_score / assessment.max_score) * 100)
     : 0;
-
-  const handleShare = useCallback(async () => {
-    const passLabel = assessment.passed ? 'Bestanden' : 'Nicht bestanden';
-    const message = `wordifi — Schreiben ${level} Teil ${teil}\n${assessment.overall_score}/${assessment.max_score} — ${passLabel}\n\n${assessment.encouragement}\n\nwordifi.app`;
-
-    try {
-      if (Platform.OS === 'web') {
-        if (navigator.share) {
-          await navigator.share({ text: message });
-        }
-      } else {
-        await RNShare.share({ message });
-      }
-    } catch (err) {
-      console.log('SchreibenResult share error', err);
-    }
-  }, [assessment, level, teil]);
 
   const hasScoreDetails = assessment.score_details && assessment.score_details.length > 0;
   const hasCorrections = assessment.corrections && assessment.corrections.length > 0;
@@ -94,15 +75,6 @@ export function SchreibenResult({ assessment, taskType, level, teil }: Schreiben
           <Text style={styles.encouragementText}>💬 "{assessment.encouragement}"</Text>
         </View>
       ) : null}
-
-      <Pressable
-        onPress={handleShare}
-        style={[styles.shareBtn, shadows.card]}
-        testID="schreiben-share"
-      >
-        <Share2 color={colors.blue} size={18} />
-        <Text style={styles.shareBtnText}>Ergebnis teilen</Text>
-      </Pressable>
     </View>
   );
 }

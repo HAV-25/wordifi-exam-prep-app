@@ -18,6 +18,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { PaywallModal } from '@/components/PaywallModal';
 import Colors from '@/constants/colors';
 import { colors } from '@/theme';
+import { TEIL_NAMES } from '@/theme/constants';
 import { fetchSchreibenQuestions, fetchSchreibenTeile } from '@/lib/schreibenHelpers';
 import {
   fetchSprechenTeile,
@@ -27,7 +28,6 @@ import {
   fetchAvailableTeile,
   fetchPreviousSessionResult,
   fetchSectionalQuestions,
-  fetchSprachbausteineQuestions,
   type PreviousSessionResult,
   type RetestInfo,
   type TeilInfo,
@@ -98,7 +98,6 @@ export default function TestsScreen() {
   });
   const [schreibenStarting, setSchreibenStarting] = useState<number | null>(null);
   const [sprechenStarting, setSprechenStarting] = useState<number | null>(null);
-  const [sprachbausteineStarting, setSprachbausteineStarting] = useState<boolean>(false);
 
   const teileQuery = useQuery({
     queryKey: ['sectional-teile', targetLevel],
@@ -110,6 +109,7 @@ export default function TestsScreen() {
 
   const horenTeile = useMemo(() => deduplicateTeile(teile.filter((t) => t.section === 'Hören')), [teile]);
   const lesenTeile = useMemo(() => deduplicateTeile(teile.filter((t) => t.section === 'Lesen')), [teile]);
+  const sprachbausteineTeile = useMemo(() => deduplicateTeile(teile.filter((t) => t.section === 'Sprachbausteine')), [teile]);
 
   const schreibenQuery = useQuery({
     queryKey: ['schreiben-teile', targetLevel],
@@ -175,33 +175,6 @@ export default function TestsScreen() {
     }
   }, [targetLevel, schreibenEnabled]);
 
-  const handleStartSprachbausteine = useCallback(async () => {
-    if (!sectionalEnabled) {
-      setShowPaywall(true);
-      return;
-    }
-    setSprachbausteineStarting(true);
-    try {
-      const { t1, t2 } = await fetchSprachbausteineQuestions(targetLevel);
-      if (!t1 || !t2) {
-        setSprachbausteineStarting(false);
-        return;
-      }
-      setSprachbausteineStarting(false);
-      router.push({
-        pathname: '/sprachbausteine-test',
-        params: {
-          t1Question: JSON.stringify(t1),
-          t2Question: JSON.stringify(t2),
-          level: targetLevel,
-          examType: profile?.exam_type ?? 'TELC',
-        },
-      });
-    } catch (err) {
-      console.log('TestsScreen handleStartSprachbausteine error', err);
-      setSprachbausteineStarting(false);
-    }
-  }, [targetLevel, sectionalEnabled, profile?.exam_type]);
 
   const toggleSection = useCallback((section: string) => {
     setExpandedSections((prev) => ({ ...prev, [section]: !prev[section] }));
@@ -325,14 +298,17 @@ export default function TestsScreen() {
     }
   }, [setup.teilInfo, setup.isLoadingReview, userId, targetLevel]);
 
-  const isLocked = setup.retestInfo?.is_locked ?? false;
+  const PAID_TIERS = ['paid_early', 'monthly', 'quarterly', 'winback_monthly', 'winback_quarterly'];
+  const isPaidUser = PAID_TIERS.includes(profile?.subscription_tier ?? '');
+  const isLocked = isPaidUser ? false : (setup.retestInfo?.is_locked ?? false);
   const setupMeta = setup.teilInfo ? metaMap[setup.teilInfo.structure_type] : null;
 
   const renderTeilCard = useCallback(
     (info: TeilInfo) => {
       const m = metaMap[info.structure_type];
-      const nameEn = m?.name_en ?? info.structure_type.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-      const nameDe = m?.name_de ?? '';
+      const teilName = TEIL_NAMES[info.section]?.[info.teil];
+      const nameEn = m?.name_en ?? teilName?.en ?? info.structure_type.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+      const nameDe = m?.name_de ?? teilName?.de ?? '';
       return (
         <Pressable
           key={`${info.section}-${info.teil}-${info.structure_type}`}
@@ -440,63 +416,10 @@ export default function TestsScreen() {
             <View style={styles.sectionIconLesen}><BookOpen color="#fff" size={16} /></View>
           )}
 
-          {targetLevel === 'B1' ? (
-            <View style={styles.sectionGroup}>
-              <Pressable
-                accessibilityLabel="Toggle Sprachbausteine"
-                onPress={() => toggleSection('Sprachbausteine')}
-                style={styles.sectionHeader}
-                testID="toggle-Sprachbausteine"
-              >
-                <View style={styles.sectionHeaderLeft}>
-                  <View style={styles.sectionIconSprachbausteine}>
-                    <Puzzle color="#fff" size={16} />
-                  </View>
-                  <Text style={styles.sectionTitle}>Sprachbausteine</Text>
-                  <View style={styles.sectionBadge}>
-                    <Text style={styles.sectionBadgeText}>1 Übung</Text>
-                  </View>
-                </View>
-                {expandedSections['Sprachbausteine'] ? (
-                  <ChevronDown color={Colors.textMuted} size={20} />
-                ) : (
-                  <ChevronRight color={Colors.textMuted} size={20} />
-                )}
-              </Pressable>
-              {expandedSections['Sprachbausteine'] ? (
-                <View style={styles.teilList}>
-                  <Pressable
-                    accessibilityLabel="Sprachbausteine Teil 1 + 2"
-                    onPress={handleStartSprachbausteine}
-                    style={[styles.teilCard, !sectionalEnabled && styles.teilCardDisabled]}
-                    testID="teil-card-Sprachbausteine-combined"
-                  >
-                    <View style={styles.teilNumCol}>
-                      <Text style={styles.teilLabel}>TEIL</Text>
-                      <View style={styles.teilNumberWrap}>
-                        <Text style={styles.teilNumber}>1+2</Text>
-                      </View>
-                    </View>
-                    <View style={styles.teilNamesCol}>
-                      <Text style={styles.teilNameEn}>Word Bank + Multiple Choice</Text>
-                      <Text style={styles.teilNameDe}>Wortkasten + Mehrfachwahl</Text>
-                    </View>
-                    <View style={styles.teilCardRight}>
-                      <Text style={styles.teilCount}>18 blanks</Text>
-                      <View style={styles.teilDuration}>
-                        <Clock color={Colors.textMuted} size={12} />
-                        <Text style={styles.teilDurationText}>~15 min</Text>
-                      </View>
-                    </View>
-                    {sprachbausteineStarting ? (
-                      <ActivityIndicator color={colors.blue} size="small" />
-                    ) : (
-                      <ChevronRight color={Colors.textMuted} size={18} />
-                    )}
-                  </Pressable>
-                </View>
-              ) : null}
-            </View>
+          {targetLevel === 'B1' && sprachbausteineTeile.length > 0 ? renderSectionGroup(
+            'Sprachbausteine',
+            sprachbausteineTeile,
+            <View style={styles.sectionIconSprachbausteine}><Puzzle color="#fff" size={16} /></View>
           ) : null}
 
           {schreibenVisible ? (

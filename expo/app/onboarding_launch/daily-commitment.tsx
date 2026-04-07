@@ -4,7 +4,8 @@
  * Step 7 of 10 — defaults to 15 min (recommended) pre-selected
  */
 import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { ScreenLayout } from '@/components/ScreenLayout';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { ArrowLeft } from 'lucide-react-native';
@@ -16,6 +17,17 @@ const OPTIONS: DailyMinutes[] = [5, 15, 25, 30];
 
 export default function DailyCommitmentScreen() {
   const [selected, setSelected] = useState<DailyMinutes>(15);
+
+  const ctaFooter = (
+    <Pressable
+      onPress={() => { onboardingStore.dailyMinutes = selected; router.push('/onboarding_launch/learner-style'); }}
+      style={({ pressed }) => [styles.ctaButton, pressed && styles.ctaPressed]}
+      accessibilityRole="button"
+      accessibilityLabel="Continue"
+    >
+      <Text style={styles.ctaText}>Continue →</Text>
+    </Pressable>
+  );
 
   return (
     <View style={styles.root}>
@@ -34,7 +46,7 @@ export default function DailyCommitmentScreen() {
           <View style={styles.navSpacer} />
         </View>
 
-        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        <ScreenLayout footer={ctaFooter} contentContainerStyle={styles.scroll}>
           {/* Headline */}
           <Text style={styles.headline}>How many minutes can you practice each day?</Text>
           <Text style={styles.subCopy}>Every minute counts. Pick what works for you.</Text>
@@ -73,20 +85,9 @@ export default function DailyCommitmentScreen() {
               );
             })}
           </View>
-
-          {/* CTA */}
-          <Pressable
-            onPress={() => { onboardingStore.dailyMinutes = selected; router.push('/onboarding_launch/learner-style'); }}
-            style={({ pressed }) => [styles.ctaButton, pressed && styles.ctaPressed]}
-            accessibilityRole="button"
-            accessibilityLabel="Continue"
-          >
-            <Text style={styles.ctaText}>Continue →</Text>
-          </Pressable>
-        </ScrollView>
+        </ScreenLayout>
       </SafeAreaView>
 
-      <SafeAreaView edges={['bottom']} />
     </View>
   );
 }
@@ -100,7 +101,7 @@ const styles = StyleSheet.create({
   progressFill: { height: '100%', backgroundColor: '#2B70EF', borderTopRightRadius: 4, borderBottomRightRadius: 4 },
 
   safe: { flex: 1 },
-  scroll: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 40 },
+  scroll: { paddingHorizontal: 24, paddingTop: 16 },
 
   navRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 24, paddingTop: 16 },
   backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 20 },

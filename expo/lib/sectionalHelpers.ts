@@ -2,6 +2,8 @@ import { supabase } from '@/lib/supabaseClient';
 import { MOCK_TEST_QUESTION_COUNTS, shuffleArray, XP_RATES } from '@/theme/constants';
 import type { AppQuestion, UserProfile } from '@/types/database';
 
+const PAID_TIERS = ['paid_early', 'monthly', 'quarterly', 'winback_monthly', 'winback_quarterly'];
+
 export type TeilInfo = {
   section: string;
   teil: number;
@@ -229,7 +231,7 @@ export async function completeSectionalSession(params: {
         questions_correct: correctCount,
         time_taken_seconds: timeTakenSeconds,
         completed_at: new Date().toISOString(),
-        retest_available_at: getRetestDate(),
+        retest_available_at: PAID_TIERS.includes(params.profile?.subscription_tier ?? '') ? null : getRetestDate(),
       })
       .eq('id', sessionId);
 
@@ -358,7 +360,7 @@ export async function completeSprachbausteineSession(params: {
         questions_total: totalBlanks,
         time_taken_seconds: timeTakenSeconds,
         completed_at: new Date().toISOString(),
-        retest_available_at: getRetestDate(),
+        retest_available_at: PAID_TIERS.includes(params.profile?.subscription_tier ?? '') ? null : getRetestDate(),
       })
       .eq('id', sessionId);
 

@@ -7,11 +7,12 @@
  * Sequence: grey→blue→green for dot1, then dot2, then dot3 stays blue.
  */
 import React, { useEffect, useRef } from 'react';
-import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { ArrowRight } from 'lucide-react-native';
 import { colors } from '@/theme';
+import { ScreenLayout } from '@/components/ScreenLayout';
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 
@@ -89,13 +90,25 @@ export default function TrialTransparencyScreen() {
   const dot3Color = dot3.interpolate(DOT_COLORS);
   const dotColors = [dot1Color, dot2Color, dot3Color];
 
+  const ctaFooter = (
+    <Pressable
+      onPress={() => router.push('/onboarding_launch/paywall')}
+      style={({ pressed }) => [styles.cta, pressed && styles.ctaPressed]}
+      accessibilityRole="button"
+      accessibilityLabel="I understand — show me my plan"
+    >
+      <Text style={styles.ctaText}>I understand — show me my plan</Text>
+      <ArrowRight size={24} color="#FFFFFF" />
+    </Pressable>
+  );
+
   return (
     <View style={styles.root}>
       {/* Yellow glow top-right */}
       <View style={styles.glow} />
 
       <SafeAreaView edges={['top']} style={styles.safe}>
-        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        <ScreenLayout footer={ctaFooter} contentContainerStyle={styles.scroll} backgroundColor={colors.background}>
 
           {/* Header */}
           <View style={styles.header}>
@@ -140,19 +153,7 @@ export default function TrialTransparencyScreen() {
             We are confident that by the end of your trial you will not want to leave. But the choice is always yours.
           </Text>
 
-          {/* CTA */}
-          <Pressable
-            onPress={() => router.push('/onboarding_launch/paywall')}
-            style={({ pressed }) => [styles.cta, pressed && styles.ctaPressed]}
-            accessibilityRole="button"
-            accessibilityLabel="I understand — show me my plan"
-          >
-            <Text style={styles.ctaText}>I understand — show me my plan</Text>
-            <ArrowRight size={24} color="#FFFFFF" />
-          </Pressable>
-
-          <SafeAreaView edges={['bottom']} />
-        </ScrollView>
+        </ScreenLayout>
       </SafeAreaView>
     </View>
   );
@@ -175,7 +176,7 @@ const styles = StyleSheet.create({
   },
 
   safe:   { flex: 1 },
-  scroll: { paddingHorizontal: 24, paddingTop: 44, paddingBottom: 32 },
+  scroll: { paddingHorizontal: 24, paddingTop: 44 },
 
   // ── Header ──────────────────────────────────────────────────────────────────
   header:  { marginBottom: 36 },

@@ -9,6 +9,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { CheckCircle2 } from 'lucide-react-native';
 import { colors } from '@/theme';
+import { ScreenLayout } from '@/components/ScreenLayout';
 
 const BENEFITS = [
   { title: 'One notification per day',               sub: 'Only when your streak is at risk' },
@@ -32,82 +33,89 @@ export default function NotificationsScreen() {
     }
   };
 
+  const ctaFooter = (
+    <>
+      <Text style={styles.socialProof}>
+        Learners who keep their streak active are{' '}
+        <Text style={styles.socialProofHighlight}>3x more likely</Text>
+        {' '}to pass their exam.
+      </Text>
+
+      <Pressable
+        onPress={handleYes}
+        disabled={loading}
+        style={({ pressed }) => [styles.ctaPrimary, pressed && styles.ctaPressed]}
+        accessibilityRole="button"
+        accessibilityLabel="Yes, keep me on track"
+      >
+        {loading ? (
+          <ActivityIndicator color="#FFFFFF" />
+        ) : (
+          <Text style={styles.ctaPrimaryText}>Yes — keep me on track 🔥</Text>
+        )}
+      </Pressable>
+
+      <Pressable
+        onPress={() => router.push('/onboarding_launch/plan-summary')}
+        style={styles.ctaSecondary}
+        accessibilityRole="button"
+        accessibilityLabel="I will remember myself"
+      >
+        <Text style={styles.ctaSecondaryText}>I will remember myself</Text>
+      </Pressable>
+    </>
+  );
+
   return (
     <View style={styles.root}>
       {/* Yellow glow orb top-right */}
       <View style={styles.backgroundGlow} />
 
-      <SafeAreaView edges={['top', 'bottom']} style={styles.safe}>
-        <View style={styles.contentWrap}>
-          {/* Header */}
-          <View style={styles.header}>
-            <Text style={styles.headline}>Your streak is your most powerful weapon.</Text>
-            <Text style={styles.subCopy}>
-              The learners who pass are not always the most talented. They are the most consistent.
-            </Text>
-          </View>
-
-          {/* Notification preview card */}
-          <View style={styles.notifCard}>
-            <View style={styles.notifHeader}>
-              <View style={styles.notifAppInfo}>
-                <View style={styles.notifDot} />
-                <Text style={styles.notifAppName}>Wordifi</Text>
-              </View>
-              <Text style={styles.notifTime}>now</Text>
+      <SafeAreaView edges={['top']} style={styles.safe}>
+        <ScreenLayout
+          scrollable={false}
+          backgroundColor="transparent"
+          footer={ctaFooter}
+        >
+          <View style={styles.contentWrap}>
+            {/* Header */}
+            <View style={styles.header}>
+              <Text style={styles.headline}>Your streak is your most powerful weapon.</Text>
+              <Text style={styles.subCopy}>
+                The learners who pass are not always the most talented. They are the most consistent.
+              </Text>
             </View>
-            <Text style={styles.notifBody}>
-              "Your B1 streak is at 6 days. 5 quick questions to keep it alive. 🔥"
-            </Text>
-          </View>
 
-          {/* Benefits list */}
-          <View style={styles.benefitsList}>
-            {BENEFITS.map(({ title, sub }) => (
-              <View key={title} style={styles.benefitItem}>
-                <View style={styles.benefitIcon}>
-                  <CheckCircle2 size={20} color="#22C55E" />
+            {/* Notification preview card */}
+            <View style={styles.notifCard}>
+              <View style={styles.notifHeader}>
+                <View style={styles.notifAppInfo}>
+                  <View style={styles.notifDot} />
+                  <Text style={styles.notifAppName}>Wordifi</Text>
                 </View>
-                <Text style={styles.benefitText}>
-                  <Text style={styles.benefitBold}>{title}</Text>
-                  <Text style={styles.benefitMuted}>{` · ${sub}`}</Text>
-                </Text>
+                <Text style={styles.notifTime}>now</Text>
               </View>
-            ))}
+              <Text style={styles.notifBody}>
+                "Your B1 streak is at 6 days. 5 quick questions to keep it alive. 🔥"
+              </Text>
+            </View>
+
+            {/* Benefits list */}
+            <View style={styles.benefitsList}>
+              {BENEFITS.map(({ title, sub }) => (
+                <View key={title} style={styles.benefitItem}>
+                  <View style={styles.benefitIcon}>
+                    <CheckCircle2 size={20} color="#22C55E" />
+                  </View>
+                  <Text style={styles.benefitText}>
+                    <Text style={styles.benefitBold}>{title}</Text>
+                    <Text style={styles.benefitMuted}>{` · ${sub}`}</Text>
+                  </Text>
+                </View>
+              ))}
+            </View>
           </View>
-        </View>
-
-        {/* Footer */}
-        <View style={styles.footer}>
-          <Text style={styles.socialProof}>
-            Learners who keep their streak active are{' '}
-            <Text style={styles.socialProofHighlight}>3x more likely</Text>
-            {' '}to pass their exam.
-          </Text>
-
-          <Pressable
-            onPress={handleYes}
-            disabled={loading}
-            style={({ pressed }) => [styles.ctaPrimary, pressed && styles.ctaPressed]}
-            accessibilityRole="button"
-            accessibilityLabel="Yes, keep me on track"
-          >
-            {loading ? (
-              <ActivityIndicator color="#FFFFFF" />
-            ) : (
-              <Text style={styles.ctaPrimaryText}>Yes — keep me on track 🔥</Text>
-            )}
-          </Pressable>
-
-          <Pressable
-            onPress={() => router.push('/onboarding_launch/plan-summary')}
-            style={styles.ctaSecondary}
-            accessibilityRole="button"
-            accessibilityLabel="I will remember myself"
-          >
-            <Text style={styles.ctaSecondaryText}>I will remember myself</Text>
-          </Pressable>
-        </View>
+        </ScreenLayout>
       </SafeAreaView>
     </View>
   );
@@ -128,7 +136,7 @@ const styles = StyleSheet.create({
     opacity: 0.14,
   },
 
-  safe:        { flex: 1, paddingHorizontal: 24, paddingTop: 32, paddingBottom: 24 },
+  safe:        { flex: 1, paddingHorizontal: 24, paddingTop: 32 },
   contentWrap: { flex: 1, zIndex: 2 },
 
   // Header
@@ -167,7 +175,6 @@ const styles = StyleSheet.create({
   benefitMuted: { color: '#94A3B8' },
 
   // Footer
-  footer:               { paddingTop: 32, gap: 12, zIndex: 2 },
   socialProof:          { fontFamily: 'NunitoSans_400Regular', fontSize: 15, lineHeight: 22, color: '#374151', textAlign: 'center', marginBottom: 12, paddingHorizontal: 16 },
   socialProofHighlight: { fontFamily: 'NunitoSans_700Bold', color: colors.primary },
 

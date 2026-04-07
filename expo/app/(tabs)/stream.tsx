@@ -240,12 +240,16 @@ export default function TestStreamScreen() {
     }
   }, [userId]);
 
+  const FREE_TRIAL_SECTIONS = ['Hören', 'Lesen'];
+  const isFreeTrial = access.tier === 'free_trial';
+  const streamSections = isFreeTrial ? FREE_TRIAL_SECTIONS : undefined;
+
   const questionsQuery = useQuery({
-    queryKey: ['stream-questions', targetLevel, userId],
+    queryKey: ['stream-questions', targetLevel, userId, isFreeTrial],
     enabled: Boolean(userId) && Boolean(targetLevel),
     queryFn: async (): Promise<AppQuestion[]> => {
-      console.log('TestStream fetching questions for', targetLevel);
-      const result = await fetchStreamQuestions({ userId, targetLevel, limit: SESSION_SIZE });
+      console.log('TestStream fetching questions for', targetLevel, isFreeTrial ? '(free_trial: Hören+Lesen only)' : '');
+      const result = await fetchStreamQuestions({ userId, targetLevel, limit: SESSION_SIZE, sections: streamSections });
       if (result.isRecycled) {
         setIsRecycledBanner(true);
       }
@@ -714,6 +718,39 @@ export default function TestStreamScreen() {
           <ActivityIndicator color={Colors.accent} size="large" />
           <Text style={styles.loadingText}>Loading questions...</Text>
         </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (isStreamLimited) {
+    const dailyLimit = access.stream_questions_per_day ?? 0;
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.emptyWrap}>
+          <Text style={styles.emptyEmoji}>⏰</Text>
+          <Text style={styles.emptyTitle}>Daily limit reached</Text>
+          <Text style={styles.emptyDesc}>
+            You've answered {dailyLimit} question{dailyLimit !== 1 ? 's' : ''} today — your daily allowance.{'\n'}
+            Upgrade to practise unlimited questions every day.
+          </Text>
+          <View style={styles.emptyCtas}>
+            <Pressable
+              style={styles.ctaPrimary}
+              onPress={() => setShowPaywall(true)}
+              testID="stream-limit-upgrade-cta"
+            >
+              <Text style={styles.ctaPrimaryText}>Unlock Unlimited</Text>
+            </Pressable>
+            <Pressable
+              style={styles.ctaSecondary}
+              onPress={() => router.push('/(tabs)/tests' as never)}
+              testID="stream-limit-sectional-cta"
+            >
+              <Text style={styles.ctaSecondaryText}>Try a Sectional Test</Text>
+            </Pressable>
+          </View>
+        </View>
+        <PaywallModal visible={showPaywall} onClose={() => setShowPaywall(false)} />
       </SafeAreaView>
     );
   }

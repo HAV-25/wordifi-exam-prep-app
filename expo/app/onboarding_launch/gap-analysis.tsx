@@ -8,6 +8,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { ArrowDown, ArrowRight } from 'lucide-react-native';
+import { ScreenLayout } from '@/components/ScreenLayout';
 import {
   onboardingStore,
   CERT_SHORT,
@@ -53,72 +54,79 @@ export default function GapAnalysisScreen() {
   const readinessInfo = readiness ? READINESS_DISPLAY[readiness] : { emoji: '😐', label: 'Getting there' };
   const hardestInfo   = hardest ? HARDEST_DISPLAY[hardest] : { emoji: '📊', label: 'All sections' };
 
+  const ctaFooter = (
+    <Pressable
+      onPress={() => router.push('/onboarding_launch/notifications')}
+      style={styles.cta}
+      accessibilityRole="button"
+      accessibilityLabel="Show me how"
+    >
+      <Text style={styles.ctaText}>Show me how</Text>
+      <ArrowRight size={22} color="#FFFFFF" />
+    </Pressable>
+  );
+
   return (
     <View style={styles.root}>
       {/* Decorative blurred orbs */}
       <View style={[styles.orb, styles.orbTopRight]} />
       <View style={[styles.orb, styles.orbBottomLeft]} />
 
-      <SafeAreaView edges={['top', 'bottom']} style={styles.safe}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.headline}>Here is where you{'\n'}stand today.</Text>
-          <Text style={styles.subCopy}>Honest. Clear. No guessing.</Text>
-        </View>
-
-        {/* Cards stack */}
-        <View style={styles.cardsStack}>
-          {/* BEFORE card */}
-          <View style={styles.beforeCard}>
-            <View style={styles.labelBefore}>
-              <Text style={styles.labelBeforeText}>BEFORE</Text>
-            </View>
-            <View style={styles.rowList}>
-              <InfoRow emoji="📍"               strong={`${certShort} ${levelLabel}`} descriptor="your target"      variant="before" />
-              <InfoRow emoji={readinessInfo.emoji} strong={readinessInfo.label}        descriptor="your confidence"  variant="before" />
-              <InfoRow emoji={hardestInfo.emoji}   strong={hardestInfo.label}          descriptor="your biggest gap" variant="before" />
-              <InfoRow emoji="⏱️"               strong={timelineLabel}               descriptor="your window"      variant="before" />
-            </View>
-          </View>
-
-          {/* Bridge */}
-          <View style={styles.bridge}>
-            <Text style={styles.bridgeGap}>GAP</Text>
-            <View style={styles.bridgeArrow}>
-              <ArrowDown size={22} color={colors.primary} />
-            </View>
-            <Text style={styles.bridgeHighlight}>WORDIFI CLOSES IT</Text>
-          </View>
-
-          {/* CERTIFIED card */}
-          <View style={styles.certCard}>
-            <View style={styles.celebrationDots}>
-              <View style={[styles.dot, styles.dotYellow]} />
-              <View style={[styles.dot, styles.dotWhite]} />
-              <View style={[styles.dot, styles.dotBlue]} />
-            </View>
-            <View style={styles.labelCert}>
-              <Text style={styles.labelCertText}>CERTIFIED</Text>
-            </View>
-            <View style={styles.rowList}>
-              <InfoRow emoji="🎓" strong={`${certShort} ${levelLabel}`} descriptor="achieved"   variant="goal" />
-              <InfoRow emoji="💪" strong="Fully confident"               descriptor="your state" variant="goal" />
-              <InfoRow emoji="✅" strong="All sections"                  descriptor="mastered"   variant="goal" />
-              <InfoRow emoji="🏆" strong="On exam day"                   descriptor="ready"      variant="goal" />
-            </View>
-          </View>
-        </View>
-
-        {/* CTA */}
-        <Pressable
-          onPress={() => router.push('/onboarding_launch/notifications')}
-          style={styles.cta}
-          accessibilityRole="button"
-          accessibilityLabel="Show me how"
+      <SafeAreaView edges={['top']} style={styles.safe}>
+        <ScreenLayout
+          scrollable={false}
+          backgroundColor="transparent"
+          footer={ctaFooter}
         >
-          <Text style={styles.ctaText}>Show me how</Text>
-          <ArrowRight size={22} color="#FFFFFF" />
-        </Pressable>
+          {/* Header */}
+          <View style={styles.header}>
+            <Text style={styles.headline}>Here is where you{'\n'}stand today.</Text>
+            <Text style={styles.subCopy}>Honest. Clear. No guessing.</Text>
+          </View>
+
+          {/* Cards stack */}
+          <View style={styles.cardsStack}>
+            {/* BEFORE card */}
+            <View style={styles.beforeCard}>
+              <View style={styles.labelBefore}>
+                <Text style={styles.labelBeforeText}>BEFORE</Text>
+              </View>
+              <View style={styles.rowList}>
+                <InfoRow emoji="📍"               strong={`${certShort} ${levelLabel}`} descriptor="your target"      variant="before" />
+                <InfoRow emoji={readinessInfo.emoji} strong={readinessInfo.label}        descriptor="your confidence"  variant="before" />
+                <InfoRow emoji={hardestInfo.emoji}   strong={hardestInfo.label}          descriptor="your biggest gap" variant="before" />
+                <InfoRow emoji="⏱️"               strong={timelineLabel}               descriptor="your window"      variant="before" />
+              </View>
+            </View>
+
+            {/* Bridge */}
+            <View style={styles.bridge}>
+              <Text style={styles.bridgeGap}>GAP</Text>
+              <View style={styles.bridgeArrow}>
+                <ArrowDown size={22} color={colors.primary} />
+              </View>
+              <Text style={styles.bridgeHighlight}>WORDIFI CLOSES IT</Text>
+            </View>
+
+            {/* CERTIFIED card */}
+            <View style={styles.certCard}>
+              <View style={styles.celebrationDots}>
+                <View style={[styles.dot, styles.dotYellow]} />
+                <View style={[styles.dot, styles.dotWhite]} />
+                <View style={[styles.dot, styles.dotBlue]} />
+              </View>
+              <View style={styles.labelCert}>
+                <Text style={styles.labelCertText}>CERTIFIED</Text>
+              </View>
+              <View style={styles.rowList}>
+                <InfoRow emoji="🎓" strong={`${certShort} ${levelLabel}`} descriptor="achieved"   variant="goal" />
+                <InfoRow emoji="💪" strong="Fully confident"               descriptor="your state" variant="goal" />
+                <InfoRow emoji="✅" strong="All sections"                  descriptor="mastered"   variant="goal" />
+                <InfoRow emoji="🏆" strong="On exam day"                   descriptor="ready"      variant="goal" />
+              </View>
+            </View>
+          </View>
+        </ScreenLayout>
       </SafeAreaView>
     </View>
   );
@@ -135,7 +143,7 @@ const styles = StyleSheet.create({
   orbBottomLeft: { width: 220, height: 220, backgroundColor: colors.primary, bottom: -110, left: -80 },
 
   // ── Layout ──────────────────────────────────────────────────────────────────
-  safe:       { flex: 1, paddingHorizontal: 24, paddingTop: 28, paddingBottom: 24 },
+  safe:       { flex: 1, paddingHorizontal: 24, paddingTop: 28 },
   header:     { marginBottom: 28 },
   headline:   { fontFamily: 'Outfit_800ExtraBold', fontSize: 36, lineHeight: 38, color: '#374151', letterSpacing: -1.4, marginBottom: 14 },
   subCopy:    { fontFamily: 'NunitoSans_600SemiBold', fontSize: 15, lineHeight: 22, color: '#94A3B8' },
@@ -232,7 +240,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
-    marginTop: 18,
     shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 16 },
     shadowOpacity: 0.24,

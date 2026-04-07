@@ -7,7 +7,6 @@ import React from 'react';
 import {
   Image,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -15,6 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import Svg, { Path } from 'react-native-svg';
+import { ScreenLayout } from '@/components/ScreenLayout';
 
 const LOGO_URI =
   'https://firebasestorage.googleapis.com/v0/b/banani-prod.appspot.com/o/reference-images%2F1cf9115c-bc87-4683-bfd4-0670f0875c39?alt=media&token=c560f38f-1cf6-46fa-9a2e-f86edac2a035';
@@ -37,13 +37,38 @@ function ArrowIcon() {
 }
 
 export default function AppIntroPolished() {
-  return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
-      <ScrollView
-        contentContainerStyle={styles.screen}
-        showsVerticalScrollIndicator={false}
-        bounces={false}
+  const ctaFooter = (
+    <View style={styles.ctaContainer}>
+      <Pressable
+        onPress={() => router.push('/onboarding_launch/cert')}
+        style={({ pressed }) => [styles.ctaButton, pressed && styles.ctaPressed]}
+        accessibilityRole="button"
+        accessibilityLabel="Start my plan"
       >
+        <Text style={styles.ctaText}>Start my plan</Text>
+        <View style={styles.ctaIcon}>
+          <ArrowIcon />
+        </View>
+      </Pressable>
+
+      {/* Returning user link */}
+      <Pressable
+        onPress={() => { router.dismissAll(); router.replace('/auth'); }}
+        accessibilityRole="button"
+        accessibilityLabel="Sign in"
+        style={styles.signInLink}
+      >
+        <Text style={styles.signInText}>
+          Already a Wordifi user?{' '}
+          <Text style={styles.signInLinkText}>Jump straight in</Text>
+        </Text>
+      </Pressable>
+    </View>
+  );
+
+  return (
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      <ScreenLayout footer={ctaFooter} contentContainerStyle={styles.screen} backgroundColor="#F8FAFF">
         {/* Top nav — centered logo */}
         <View style={styles.topNav}>
           <Image source={{ uri: LOGO_URI }} style={styles.logoImg} resizeMode="contain" />
@@ -81,35 +106,7 @@ export default function AppIntroPolished() {
             resizeMode="contain"
           />
         </View>
-
-        {/* CTA */}
-        <View style={styles.ctaContainer}>
-          <Pressable
-            onPress={() => router.push('/onboarding_launch/cert')}
-            style={({ pressed }) => [styles.ctaButton, pressed && styles.ctaPressed]}
-            accessibilityRole="button"
-            accessibilityLabel="Start my plan"
-          >
-            <Text style={styles.ctaText}>Start my plan</Text>
-            <View style={styles.ctaIcon}>
-              <ArrowIcon />
-            </View>
-          </Pressable>
-
-          {/* Returning user link */}
-          <Pressable
-            onPress={() => { router.dismissAll(); router.replace('/auth'); }}
-            accessibilityRole="button"
-            accessibilityLabel="Sign in"
-            style={styles.signInLink}
-          >
-            <Text style={styles.signInText}>
-              Already a Wordifi user?{' '}
-              <Text style={styles.signInLinkText}>Jump straight in</Text>
-            </Text>
-          </Pressable>
-        </View>
-      </ScrollView>
+      </ScreenLayout>
     </SafeAreaView>
   );
 }
@@ -122,7 +119,6 @@ const styles = StyleSheet.create({
   screen: {
     flexGrow: 1,
     paddingHorizontal: 24,
-    paddingBottom: 40,
     backgroundColor: '#F8FAFF',
   },
 

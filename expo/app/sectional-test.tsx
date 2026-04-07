@@ -438,9 +438,6 @@ export default function SectionalTestScreen() {
           ) : null}
 
           <View style={styles.questionCard}>
-            <Text style={styles.questionType}>
-              {currentQuestion.question_type.replace('_', ' ').toUpperCase()}
-            </Text>
             {currentQuestion.question_text ? (
               <Text style={styles.questionText}>{currentQuestion.question_text}</Text>
             ) : null}

@@ -4,12 +4,13 @@
  * Step 6 of 10 — "How ready are you for your exam today?" (confirmation/refinement)
  */
 import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import { ArrowLeft, ArrowRight, CheckCircle } from 'lucide-react-native';
 import { colors } from '@/theme';
+import { ScreenLayout } from '@/components/ScreenLayout';
 
 // ─── Readiness options (same set, re-confirmed) ───────────────────────────────
 
@@ -30,6 +31,23 @@ export default function ReadinessCheckScreen() {
   const params = useLocalSearchParams<{ readiness?: ReadinessId }>();
   const [selected, setSelected] = useState<ReadinessId | null>(params.readiness ?? null);
 
+  const ctaFooter = (
+    <Pressable
+      onPress={() => selected && router.push('/onboarding_launch/hardest')}
+      disabled={!selected}
+      style={[styles.ctaWrap, !selected && styles.ctaDisabled]}
+    >
+      <LinearGradient
+        colors={selected ? [colors.primary, colors.primaryContainer] : [colors.surfaceContainerHigh, colors.surfaceContainerHigh]}
+        start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+        style={styles.cta}
+      >
+        <Text style={[styles.ctaText, !selected && styles.ctaTextDisabled]}>Continue</Text>
+        <ArrowRight size={20} color={selected ? colors.onPrimary : colors.outline} />
+      </LinearGradient>
+    </Pressable>
+  );
+
   return (
     <View style={styles.root}>
       {/* Header */}
@@ -49,7 +67,7 @@ export default function ReadinessCheckScreen() {
         </View>
       </SafeAreaView>
 
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+      <ScreenLayout footer={ctaFooter} contentContainerStyle={styles.scroll}>
         {/* Headline */}
         <Text style={styles.headline}>How ready are you for your exam today?</Text>
         <Text style={styles.subhead}>Be honest. There are no wrong answers here.</Text>
@@ -82,29 +100,7 @@ export default function ReadinessCheckScreen() {
             </Pressable>
           );
         })}
-
-        <View style={{ height: 120 }} />
-      </ScrollView>
-
-      {/* Sticky CTA */}
-      <View style={styles.footer}>
-        <SafeAreaView edges={['bottom']}>
-          <Pressable
-            onPress={() => selected && router.push('/onboarding_launch/hardest')}
-            disabled={!selected}
-            style={[styles.ctaWrap, !selected && styles.ctaDisabled]}
-          >
-            <LinearGradient
-              colors={selected ? [colors.primary, colors.primaryContainer] : [colors.surfaceContainerHigh, colors.surfaceContainerHigh]}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-              style={styles.cta}
-            >
-              <Text style={[styles.ctaText, !selected && styles.ctaTextDisabled]}>Continue</Text>
-              <ArrowRight size={20} color={selected ? colors.onPrimary : colors.outline} />
-            </LinearGradient>
-          </Pressable>
-        </SafeAreaView>
-      </View>
+      </ScreenLayout>
     </View>
   );
 }
@@ -138,7 +134,6 @@ const styles = StyleSheet.create({
   checkIcon: { marginLeft: 4 },
   cardSubtitle: { fontFamily: 'NunitoSans_400Regular', fontSize: 14, color: colors.onSurfaceVariant },
 
-  footer: { position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 24, paddingTop: 16, backgroundColor: `${colors.background}F0`, shadowColor: colors.onSurface, shadowOffset: { width: 0, height: -8 }, shadowOpacity: 0.08, shadowRadius: 24 },
   ctaWrap: { borderRadius: 16, overflow: 'hidden', shadowColor: colors.blueShadow, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 1, shadowRadius: 16, elevation: 8, marginBottom: 8 },
   ctaDisabled: { shadowOpacity: 0, elevation: 0 },
   cta: { paddingVertical: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, borderRadius: 16 },

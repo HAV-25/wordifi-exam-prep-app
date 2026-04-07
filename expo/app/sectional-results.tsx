@@ -209,9 +209,6 @@ export default function SectionalResultsScreen() {
           </Text>
           <View style={styles.heroRow}>
             <View style={styles.heroTextWrap}>
-              <Text style={[styles.scoreLine, { color: sColor }]}>
-                {Math.round(scorePct)}%
-              </Text>
               <Text style={[styles.performance, { color: perf.color }]}>{perf.text}</Text>
               {isTimed && timeTaken > 0 ? (
                 <Text style={styles.timeLine}>⏱ {formatDuration(timeTaken)}</Text>
@@ -226,11 +223,13 @@ export default function SectionalResultsScreen() {
           </View>
         </View>
 
-        <View style={styles.retestNotice}>
-          <Text style={styles.retestText}>
-            You can retest this section in 7 days — {retestDate}
-          </Text>
-        </View>
+        {!['paid_early', 'monthly', 'quarterly', 'winback_monthly', 'winback_quarterly'].includes(profile?.subscription_tier ?? '') ? (
+          <View style={styles.retestNotice}>
+            <Text style={styles.retestText}>
+              You can retest this section in 7 days — {retestDate}
+            </Text>
+          </View>
+        ) : null}
 
         <View style={styles.reviewWrap}>
           {questions.map((question, index) => {

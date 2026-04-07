@@ -4,12 +4,13 @@
  * Social proof screen — worldwide learners motivational card
  */
 import React from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { ArrowRight } from 'lucide-react-native';
 import { onboardingStore } from './_store';
 import { colors } from '@/theme';
+import { ScreenLayout } from '@/components/ScreenLayout';
 
 // ─── Types & data ─────────────────────────────────────────────────────────────
 
@@ -77,6 +78,21 @@ export default function LeaderboardTeaserScreen() {
 
   const allRows = [...BASE_ROWS, userRow];
 
+  const ctaFooter = (
+    <>
+      <Text style={styles.footerNote}>Thousands of learners worldwide</Text>
+      <Pressable
+        onPress={() => router.push('/onboarding_launch/plan-builder')}
+        style={({ pressed }) => [styles.cta, pressed && styles.ctaPressed]}
+        accessibilityRole="button"
+        accessibilityLabel="Show me how"
+      >
+        <Text style={styles.ctaText}>Show me how</Text>
+        <ArrowRight size={22} color="#FFFFFF" />
+      </Pressable>
+    </>
+  );
+
   return (
     <View style={styles.root}>
       {/* Decorative orbs */}
@@ -84,7 +100,11 @@ export default function LeaderboardTeaserScreen() {
       <View style={[styles.orb, styles.orbBottomLeft]} />
 
       <SafeAreaView edges={['top']} style={styles.safe}>
-        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        <ScreenLayout
+          backgroundColor="transparent"
+          footer={ctaFooter}
+          contentContainerStyle={styles.scroll}
+        >
           {/* Header */}
           <View style={styles.header}>
             <Text style={styles.headline}>You are not the only one on this journey.</Text>
@@ -123,25 +143,7 @@ export default function LeaderboardTeaserScreen() {
           <View style={styles.closeBlock}>
             <Text style={styles.closeLine}>Your name belongs on this list.{'\n'}Let's put it there.</Text>
           </View>
-
-          <View style={{ height: 120 }} />
-        </ScrollView>
-
-        {/* Sticky footer */}
-        <View style={styles.footer}>
-          <SafeAreaView edges={['bottom']}>
-            <Text style={styles.footerNote}>Thousands of learners worldwide</Text>
-            <Pressable
-              onPress={() => router.push('/onboarding_launch/plan-builder')}
-              style={({ pressed }) => [styles.cta, pressed && styles.ctaPressed]}
-              accessibilityRole="button"
-              accessibilityLabel="Show me how"
-            >
-              <Text style={styles.ctaText}>Show me how</Text>
-              <ArrowRight size={22} color="#FFFFFF" />
-            </Pressable>
-          </SafeAreaView>
-        </View>
+        </ScreenLayout>
       </SafeAreaView>
     </View>
   );
@@ -227,15 +229,6 @@ const styles = StyleSheet.create({
   closeLine:  { fontFamily: 'Outfit_800ExtraBold', fontSize: 24, lineHeight: 30, color: '#374151', textAlign: 'center', letterSpacing: -0.5 },
 
   // Footer
-  footer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingHorizontal: 24,
-    paddingTop: 16,
-    backgroundColor: `${colors.background}F5`,
-  },
   footerNote: { fontFamily: 'Outfit_800ExtraBold', fontSize: 13, color: '#94A3B8', textAlign: 'center', marginBottom: 16 },
 
   cta: {

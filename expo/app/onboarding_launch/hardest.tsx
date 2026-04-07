@@ -4,7 +4,8 @@
  * Step 6 of 10
  */
 import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { ScreenLayout } from '@/components/ScreenLayout';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { ArrowLeft } from 'lucide-react-native';
@@ -32,6 +33,22 @@ export default function HardestScreen() {
     router.push('/onboarding_launch/daily-commitment');
   }
 
+  const ctaFooter = (
+    <Pressable
+      onPress={handleContinue}
+      disabled={!selected}
+      style={({ pressed }) => [
+        styles.ctaButton,
+        !selected && styles.ctaDisabled,
+        pressed && selected && styles.ctaPressed,
+      ]}
+      accessibilityRole="button"
+      accessibilityLabel="Continue"
+    >
+      <Text style={[styles.ctaText, !selected && styles.ctaTextDisabled]}>Continue →</Text>
+    </Pressable>
+  );
+
   return (
     <View style={styles.root}>
       {/* Progress bar */}
@@ -49,7 +66,7 @@ export default function HardestScreen() {
           <View style={styles.navSpacer} />
         </View>
 
-        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        <ScreenLayout footer={ctaFooter} contentContainerStyle={styles.scroll}>
           {/* Headline */}
           <Text style={styles.headline}>Which part of the exam do you find hardest?</Text>
           <Text style={styles.subCopy}>Pick your biggest challenge. This shapes your entire plan.</Text>
@@ -80,25 +97,9 @@ export default function HardestScreen() {
               </Pressable>
             ))}
           </View>
-
-          {/* CTA */}
-          <Pressable
-            onPress={handleContinue}
-            disabled={!selected}
-            style={({ pressed }) => [
-              styles.ctaButton,
-              !selected && styles.ctaDisabled,
-              pressed && selected && styles.ctaPressed,
-            ]}
-            accessibilityRole="button"
-            accessibilityLabel="Continue"
-          >
-            <Text style={[styles.ctaText, !selected && styles.ctaTextDisabled]}>Continue →</Text>
-          </Pressable>
-        </ScrollView>
+        </ScreenLayout>
       </SafeAreaView>
 
-      <SafeAreaView edges={['bottom']} />
     </View>
   );
 }
@@ -112,7 +113,7 @@ const styles = StyleSheet.create({
   progressFill: { height: '100%', backgroundColor: '#2B70EF', borderTopRightRadius: 4, borderBottomRightRadius: 4 },
 
   safe: { flex: 1 },
-  scroll: { paddingHorizontal: 24, paddingTop: 32, paddingBottom: 40 },
+  scroll: { paddingHorizontal: 24, paddingTop: 32 },
 
   navRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 24, paddingTop: 16 },
   backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 20 },

@@ -8,6 +8,7 @@ import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { ArrowRight } from 'lucide-react-native';
+import { ScreenLayout } from '@/components/ScreenLayout';
 import {
   onboardingStore,
   CERT_SHORT,
@@ -92,6 +93,21 @@ export default function PlanBuilderScreen() {
     { label: 'Your Daily Commitment', value: dailyMinutes ? DAILY_MINUTES_DISPLAY[dailyMinutes].label : '—' },
   ];
 
+  const ctaFooter = (
+    <Animated.View style={{ opacity: ctaOpacity }}>
+      <Text style={styles.footerText}>No one else has a plan exactly like this one.</Text>
+      <Pressable
+        onPress={() => done && router.push('/onboarding_launch/gap-analysis')}
+        style={styles.cta}
+        accessibilityRole="button"
+        accessibilityLabel="See my plan"
+      >
+        <Text style={styles.ctaText}>See my plan</Text>
+        <ArrowRight size={24} color={colors.primary} />
+      </Pressable>
+    </Animated.View>
+  );
+
   return (
     <View style={styles.root}>
       {/* Decorative orbs */}
@@ -100,74 +116,62 @@ export default function PlanBuilderScreen() {
       <View style={[styles.orb, styles.orbThree]} />
 
       <SafeAreaView edges={['top']} style={styles.safe}>
-        {/* Spark dots — top right */}
-        <View style={styles.sparkRow}>
-          <View style={styles.sparks}>
-            <View style={[styles.spark, styles.sparkA]} />
-            <View style={[styles.spark, styles.sparkB]} />
-            <View style={[styles.spark, styles.sparkC]} />
-          </View>
-        </View>
-
-        {/* Headline + sub-copy */}
-        <Text style={styles.headline}>Your Wordifi plan is ready.</Text>
-        <Text style={styles.subCopy}>Built around everything you just told us.</Text>
-
-        {/* Plan card with pill badge */}
-        <View style={styles.cardWrap}>
-          <View style={styles.pill}>
-            <Text style={styles.pillText}>Personalised for you ✨</Text>
+        <ScreenLayout
+          scrollable={false}
+          backgroundColor="transparent"
+          footer={ctaFooter}
+        >
+          {/* Spark dots — top right */}
+          <View style={styles.sparkRow}>
+            <View style={styles.sparks}>
+              <View style={[styles.spark, styles.sparkA]} />
+              <View style={[styles.spark, styles.sparkB]} />
+              <View style={[styles.spark, styles.sparkC]} />
+            </View>
           </View>
 
-          <View style={styles.card}>
-            {rows.map((row, i) => (
-              <Animated.View
-                key={row.label}
-                style={[
-                  styles.planRow,
-                  i === 0 && styles.planRowFirst,
-                  i === rows.length - 1 && styles.planRowLast,
-                  i < rows.length - 1 && styles.planRowDivider,
-                  {
-                    opacity:   rowAnims[i].opacity,
-                    transform: [{ translateY: rowAnims[i].translateY }],
-                  },
-                ]}
-              >
-                <Text style={styles.planLabel}>{row.label}</Text>
-                <Text style={styles.planValue}>{row.value}</Text>
+          {/* Headline + sub-copy */}
+          <Text style={styles.headline}>Your Wordifi plan is ready.</Text>
+          <Text style={styles.subCopy}>Built around everything you just told us.</Text>
+
+          {/* Plan card with pill badge */}
+          <View style={styles.cardWrap}>
+            <View style={styles.pill}>
+              <Text style={styles.pillText}>Personalised for you ✨</Text>
+            </View>
+
+            <View style={styles.card}>
+              {rows.map((row, i) => (
+                <Animated.View
+                  key={row.label}
+                  style={[
+                    styles.planRow,
+                    i === 0 && styles.planRowFirst,
+                    i === rows.length - 1 && styles.planRowLast,
+                    i < rows.length - 1 && styles.planRowDivider,
+                    {
+                      opacity:   rowAnims[i].opacity,
+                      transform: [{ translateY: rowAnims[i].translateY }],
+                    },
+                  ]}
+                >
+                  <Text style={styles.planLabel}>{row.label}</Text>
+                  <Text style={styles.planValue}>{row.value}</Text>
+                </Animated.View>
+              ))}
+
+              {/* Progress section — appears after all rows */}
+              <Animated.View style={[styles.progressSection, { opacity: progressOpacity }]}>
+                <Animated.Text style={[styles.progressText, { opacity: buildingOpacity }]}>
+                  Building your plan...
+                </Animated.Text>
+                <View style={styles.progressTrack}>
+                  <Animated.View style={[styles.progressFill, { width: barWidth }]} />
+                </View>
               </Animated.View>
-            ))}
-
-            {/* Progress section — appears after all rows */}
-            <Animated.View style={[styles.progressSection, { opacity: progressOpacity }]}>
-              <Animated.Text style={[styles.progressText, { opacity: buildingOpacity }]}>
-                Building your plan...
-              </Animated.Text>
-              <View style={styles.progressTrack}>
-                <Animated.View style={[styles.progressFill, { width: barWidth }]} />
-              </View>
-            </Animated.View>
+            </View>
           </View>
-        </View>
-
-        <View style={styles.spacer} />
-
-        {/* Footer text + CTA — fade in together after progress completes */}
-        <Animated.View style={{ opacity: ctaOpacity }}>
-          <Text style={styles.footerText}>No one else has a plan exactly like this one.</Text>
-          <SafeAreaView edges={['bottom']}>
-            <Pressable
-              onPress={() => done && router.push('/onboarding_launch/gap-analysis')}
-              style={styles.cta}
-              accessibilityRole="button"
-              accessibilityLabel="See my plan"
-            >
-              <Text style={styles.ctaText}>See my plan</Text>
-              <ArrowRight size={24} color={colors.primary} />
-            </Pressable>
-          </SafeAreaView>
-        </Animated.View>
+        </ScreenLayout>
       </SafeAreaView>
     </View>
   );
@@ -177,7 +181,7 @@ export default function PlanBuilderScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.primary, overflow: 'hidden' },
-  safe: { flex: 1, paddingHorizontal: 24, paddingTop: 28, paddingBottom: 24 },
+  safe: { flex: 1, paddingHorizontal: 24, paddingTop: 28 },
 
   // ── Decorative orbs ─────────────────────────────────────────────────────────
   orb:      { position: 'absolute', borderRadius: 999 },
@@ -243,7 +247,6 @@ const styles = StyleSheet.create({
   progressFill:    { position: 'absolute', left: 0, top: 0, height: '100%', backgroundColor: colors.primary, borderRadius: 999 },
 
   // ── Footer ──────────────────────────────────────────────────────────────────
-  spacer:     { flex: 1, minHeight: 24 },
   footerText: { fontFamily: 'NunitoSans_400Regular', fontSize: 15, color: 'rgba(255,255,255,0.84)', textAlign: 'center', marginBottom: 20 },
 
   cta: {

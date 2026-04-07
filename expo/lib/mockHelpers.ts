@@ -355,6 +355,8 @@ export async function completeMockTest(params: {
 
   const studyPlan = generateStudyPlan(horen.pct, lesen.pct, sprachbausteinePct, overallPct);
 
+  const isPaidUser = ['paid_early', 'monthly', 'quarterly', 'winback_monthly', 'winback_quarterly']
+    .includes(profile?.subscription_tier ?? '');
   const retestDate = new Date();
   retestDate.setDate(retestDate.getDate() + 7);
   const retestStr = retestDate.toISOString().split('T')[0] ?? '';
@@ -379,7 +381,7 @@ export async function completeMockTest(params: {
           is_timed: isTimed,
           completed_at: new Date().toISOString(),
           mock_test_id: mockTestId,
-          retest_available_at: retestStr,
+          retest_available_at: isPaidUser ? null : retestStr,
         })
         .select('id')
         .single();
@@ -408,7 +410,7 @@ export async function completeMockTest(params: {
           is_timed: isTimed,
           completed_at: new Date().toISOString(),
           mock_test_id: mockTestId,
-          retest_available_at: retestStr,
+          retest_available_at: isPaidUser ? null : retestStr,
         })
         .select('id')
         .single();
@@ -438,7 +440,7 @@ export async function completeMockTest(params: {
           is_timed: isTimed,
           completed_at: new Date().toISOString(),
           mock_test_id: mockTestId,
-          retest_available_at: retestStr,
+          retest_available_at: isPaidUser ? null : retestStr,
         })
         .select('id')
         .single();
@@ -504,7 +506,7 @@ export async function completeMockTest(params: {
         time_taken_seconds: timeTakenSeconds,
         section_session_ids: sessionIds,
         study_plan: studyPlan,
-        retest_available_at: retestStr,
+        retest_available_at: isPaidUser ? null : retestStr,
       })
       .eq('id', mockTestId);
 
