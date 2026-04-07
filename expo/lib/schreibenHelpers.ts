@@ -15,6 +15,22 @@ export const assessSchreiben = async (
 ): Promise<AssessmentResult> => {
   console.log('schreibenHelpers assessSchreiben', { questionId: question.id, taskType, wordCount });
 
+  // Client-side cache check — skip Edge Function if already assessed
+  try {
+    const { data: cached } = await supabase
+      .from('schreiben_submissions')
+      .select('assessment_json, score, passed')
+      .eq('question_id', question.id)
+      .maybeSingle();
+
+    if (cached?.assessment_json) {
+      console.log('schreibenHelpers assessSchreiben: returning cached result, score:', cached.score);
+      return cached.assessment_json as AssessmentResult;
+    }
+  } catch (cacheErr) {
+    console.log('schreibenHelpers assessSchreiben: cache check failed, proceeding to edge function', cacheErr);
+  }
+
   const requiredPoints = taskType === 'form_fill'
     ? []
     : (question.options as Array<{ key?: string; text?: string }>).map((o) => o.text ?? '');
@@ -163,7 +179,7 @@ export async function fetchSchreibenQuestions(
 
   const { data, error } = await supabase
     .from('app_questions')
-    .select('*')
+    .select('id, question_text, task_description, task_subtype, source_structure_type, options, correct_answer, level, section, teil, rubric_card, model_answer_script, explanation_en, explanation_de, stimulus_text, is_active')
     .eq('level', level)
     .eq('section', 'Schreiben')
     .eq('teil', teil)

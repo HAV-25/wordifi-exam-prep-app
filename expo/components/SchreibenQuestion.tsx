@@ -492,8 +492,16 @@ function RequiredPointsList({ points }: { points: string[] }) {
   );
 }
 
+const ASSESSMENT_STAGES = [
+  'Deine Antwort wird bewertet…',
+  'Grammatik wird überprüft…',
+  'Feedback wird vorbereitet…',
+  'Fast fertig…',
+];
+
 function LoadingIndicator() {
   const pulseAnim = useRef(new Animated.Value(1)).current;
+  const [stageIndex, setStageIndex] = useState(0);
 
   useEffect(() => {
     const loop = Animated.loop(
@@ -506,10 +514,17 @@ function LoadingIndicator() {
     return () => loop.stop();
   }, [pulseAnim]);
 
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setStageIndex((prev) => Math.min(prev + 1, ASSESSMENT_STAGES.length - 1));
+    }, 3000);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <Animated.View style={[styles.loadingWrap, { opacity: pulseAnim }]}>
       <Text style={styles.loadingEmoji}>✍️</Text>
-      <Text style={styles.loadingTitle}>Wir prüfen deine Antwort…</Text>
+      <Text style={styles.loadingTitle}>{ASSESSMENT_STAGES[stageIndex]}</Text>
       <Text style={styles.loadingSub}>Das dauert nur einen Moment</Text>
     </Animated.View>
   );
