@@ -21,6 +21,7 @@ import { AppConfigProvider } from '@/providers/AppConfigProvider';
 import { AuthProvider, useAuth } from '@/providers/AuthProvider';
 import { QuestionTypeMetaProvider, useQuestionTypeMetaContext } from '@/lib/useQuestionTypeMeta';
 import * as Sentry from '@sentry/react-native';
+import { adapty } from 'react-native-adapty';
 
 Sentry.init({
   dsn: 'https://108675a38db2e4a51c253936dcaf84aa@o4510781679992832.ingest.de.sentry.io/4511166563483728',
@@ -42,6 +43,8 @@ Sentry.init({
 });
 
 void SplashScreen.preventAutoHideAsync();
+
+adapty.activate('public_live_PsXzPNln.zSOwZEDaKjadnp341RBT');
 
 const queryClient = new QueryClient();
 

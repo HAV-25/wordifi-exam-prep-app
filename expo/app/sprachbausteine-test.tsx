@@ -89,6 +89,7 @@ export default function SprachbausteineTestScreen() {
     level?: string;
     examType?: string;
     isTimed?: string;
+    startPhase?: string;
   }>();
 
   const { user, profile, refreshProfile } = useAuth();
@@ -108,7 +109,8 @@ export default function SprachbausteineTestScreen() {
   }, [params.t2Question]);
 
   // Phase: 't1' → 't2' → 'submitting'
-  const [phase, setPhase] = useState<'t1' | 't2' | 'submitting'>('t1');
+  const initialPhase = params.startPhase === 't2' ? 't2' : 't1';
+  const [phase, setPhase] = useState<'t1' | 't2' | 'submitting'>(initialPhase);
   const [t1Answers, setT1Answers] = useState<BlankAnswers>({});
   const [t2Answers, setT2Answers] = useState<BlankAnswers>({});
   const [t1SelectedBlank, setT1SelectedBlank] = useState<string | null>(null);
@@ -210,7 +212,7 @@ export default function SprachbausteineTestScreen() {
   // ─── Navigation ─────────────────────────────────────────────────────────────
 
   const handleBack = useCallback(() => {
-    if (phase === 't2') {
+    if (phase === 't2' && t1Question) {
       setPhase('t1');
       return;
     }
@@ -218,27 +220,37 @@ export default function SprachbausteineTestScreen() {
       { text: 'Stay', style: 'cancel' },
       { text: 'Leave', style: 'destructive', onPress: () => router.back() },
     ]);
-  }, [phase]);
+  }, [phase, t1Question]);
 
   const handleContinueToT2 = useCallback(() => {
+    if (!t2Question) {
+      // Single-teil mode: skip t2, go directly to submit
+      void handleSubmit();
+      return;
+    }
     Animated.timing(progressAnim, { toValue: 50, duration: 300, useNativeDriver: false }).start();
     setPhase('t2');
-  }, [progressAnim]);
+  }, [progressAnim, t2Question, handleSubmit]);
 
   const handleSubmit = useCallback(async () => {
-    if (isSubmitting || !sessionId || !t1Question || !t2Question) return;
+    if (isSubmitting || !sessionId) return;
+    // Need at least one question
+    if (!t1Question && !t2Question) return;
     setIsSubmitting(true);
     setPhase('submitting');
 
     try {
       const timeTaken = Math.max(1, Math.round((Date.now() - sessionStartTimeRef.current) / 1000));
+      // Use dummy empty question for the missing teil in single-teil mode
+      const effectiveT1 = t1Question ?? t2Question!;
+      const effectiveT2 = t2Question ?? t1Question!;
       const result = await completeSprachbausteineSession({
         sessionId,
         userId,
-        t1Question,
-        t2Question,
-        t1Answers,
-        t2Answers,
+        t1Question: effectiveT1,
+        t2Question: effectiveT2,
+        t1Answers: t1Question ? t1Answers : {},
+        t2Answers: t2Question ? t2Answers : {},
         timeTakenSeconds: timeTaken,
         profile,
       });
@@ -251,8 +263,8 @@ export default function SprachbausteineTestScreen() {
           sessionId,
           t1Question: JSON.stringify(t1Question),
           t2Question: JSON.stringify(t2Question),
-          t1Answers: JSON.stringify(t1Answers),
-          t2Answers: JSON.stringify(t2Answers),
+          t1Answers: JSON.stringify(t1Question ? t1Answers : {}),
+          t2Answers: JSON.stringify(t2Question ? t2Answers : {}),
           scorePct: String(result.scorePct),
           totalCorrect: String(result.totalCorrect),
           totalBlanks: String(result.totalBlanks),
@@ -263,7 +275,7 @@ export default function SprachbausteineTestScreen() {
     } catch (err) {
       console.log('SprachbausteineTest handleSubmit error', err);
       setIsSubmitting(false);
-      setPhase('t2');
+      setPhase(t2Question ? 't2' : 't1');
     }
   }, [isSubmitting, sessionId, t1Question, t2Question, t1Answers, t2Answers, userId, profile, refreshProfile, level]);
 
@@ -271,7 +283,9 @@ export default function SprachbausteineTestScreen() {
 
   // ─── Empty guard ─────────────────────────────────────────────────────────────
 
-  if (!t1Question || !t2Question) {
+  const isSingleTeil = !t1Question || !t2Question;
+
+  if (!t1Question && !t2Question) {
     return (
       <View style={styles.screen}>
         <Stack.Screen options={{ title: 'Sprachbausteine', headerShown: false }} />

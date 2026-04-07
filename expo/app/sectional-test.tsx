@@ -3,7 +3,7 @@ import { Headphones, BookOpenText, HelpCircle, CheckCircle, XCircle, ThumbsUp, T
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const CTA_BUTTON_HEIGHT = 56;    // primary CTA / footer height
+const CTA_BUTTON_HEIGHT = 94;    // footer: 20px pad + 54px button + 20px pad
 const BOTTOM_CONTENT_BUFFER = 24; // breathing room below last content item
 import {
   Alert,
@@ -334,20 +334,26 @@ export default function SectionalTestScreen() {
     }
 
     // Default (multiple choice, etc.)
+    const isTrueFalse = currentQuestion.question_type === 'true_false';
     const opts = currentQuestion.options?.length > 0
       ? currentQuestion.options
-      : currentQuestion.question_type === 'true_false'
+      : isTrueFalse
       ? [{ key: 'a', text: 'Richtig' }, { key: 'b', text: 'Falsch' }]
       : [];
 
-    return opts.map((option) => {
+    return opts.map((option, idx) => {
       const normalizedKey = option.key.toLowerCase();
       const isSelected = selectedAnswer === normalizedKey;
+      const leadingNode = isTrueFalse
+        ? idx === 0
+          ? <CheckCircle color={colors.answerCorrect} size={24} />
+          : <XCircle color={colors.answerIncorrect} size={24} />
+        : undefined;
       return (
         <OptionButton
           key={`${currentQuestion.id}-${option.key}`}
           label={option.text}
-          leading={option.key}
+          {...(leadingNode ? { leadingNode } : { leading: option.key })}
           selected={isSelected}
           onPress={() =>
             setAnswers((prev) => ({

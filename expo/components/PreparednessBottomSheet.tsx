@@ -15,7 +15,7 @@ import Colors from '@/constants/colors';
 import { colors } from '@/theme';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
-const SHEET_HEIGHT = SCREEN_HEIGHT * 0.52;
+const SHEET_HEIGHT = SCREEN_HEIGHT * 0.65;
 
 type PreparednessBottomSheetProps = {
   visible: boolean;
@@ -156,7 +156,7 @@ function getReadinessColor(pct: number): string {
   return colors.red;
 }
 
-const BOTTOM_CONTENT_BUFFER = 24;
+const BOTTOM_CONTENT_BUFFER = 48;
 
 export const PreparednessBottomSheet = React.memo(function PreparednessBottomSheet({
   visible,

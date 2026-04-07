@@ -28,6 +28,7 @@ import {
   fetchAvailableTeile,
   fetchPreviousSessionResult,
   fetchSectionalQuestions,
+  fetchSprachbausteineQuestions,
   type PreviousSessionResult,
   type RetestInfo,
   type TeilInfo,
@@ -220,6 +221,29 @@ export default function TestsScreen() {
     setSetup((prev) => ({ ...prev, isStarting: true }));
 
     try {
+      // Sprachbausteine uses its own dedicated screen
+      if (setup.teilInfo.section === 'Sprachbausteine') {
+        const { t1, t2 } = await fetchSprachbausteineQuestions(targetLevel);
+        const teil = setup.teilInfo.teil;
+        const question = teil === 1 ? t1 : t2;
+        if (!question) {
+          setSetup((prev) => ({ ...prev, isStarting: false, visible: false }));
+          return;
+        }
+        setSetup((prev) => ({ ...prev, visible: false, isStarting: false }));
+        router.push({
+          pathname: '/sprachbausteine-test',
+          params: {
+            t1Question: teil === 1 ? JSON.stringify(question) : 'null',
+            t2Question: teil === 2 ? JSON.stringify(question) : 'null',
+            level: targetLevel,
+            examType: profile?.exam_type ?? 'TELC',
+            startPhase: teil === 1 ? 't1' : 't2',
+          },
+        });
+        return;
+      }
+
       const questions = await fetchSectionalQuestions(
         targetLevel,
         setup.teilInfo.section,

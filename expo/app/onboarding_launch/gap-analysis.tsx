@@ -74,7 +74,6 @@ export default function GapAnalysisScreen() {
 
       <SafeAreaView edges={['top']} style={styles.safe}>
         <ScreenLayout
-          scrollable={false}
           backgroundColor="transparent"
           footer={ctaFooter}
         >

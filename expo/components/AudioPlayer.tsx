@@ -29,9 +29,10 @@ const WAVEFORM_SEED = Array.from({ length: WAVEFORM_BAR_COUNT }, (_, i) => {
 type AudioPlayerProps = {
   audioUrl: string;
   onFirstPlay?: () => void;
+  onPlaybackComplete?: () => void;
 };
 
-export function AudioPlayer({ audioUrl, onFirstPlay }: AudioPlayerProps) {
+export function AudioPlayer({ audioUrl, onFirstPlay, onPlaybackComplete }: AudioPlayerProps) {
   const soundRef = useRef<Audio.Sound | null>(null);
   const [isLoaded, setIsLoaded] = useState<boolean>(false);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
@@ -138,6 +139,7 @@ export function AudioPlayer({ audioUrl, onFirstPlay }: AudioPlayerProps) {
           if (status.didJustFinish) {
             setIsFinished(true);
             setIsPlaying(false);
+            onPlaybackComplete?.();
           }
         });
 

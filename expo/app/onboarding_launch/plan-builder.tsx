@@ -67,18 +67,20 @@ export default function PlanBuilderScreen() {
       ])
     );
 
+    // Native-driver animations (opacity + translateY)
     Animated.parallel([
       ...rowSeq,
       // Progress section fades in
       Animated.timing(progressOpacity,  { toValue: 1, duration: 300,      delay: PROG_DELAY,         useNativeDriver: true }),
       Animated.timing(buildingOpacity,  { toValue: 1, duration: 300,      delay: PROG_DELAY + 150,   useNativeDriver: true }),
-      // Bar fills left→right
-      Animated.timing(progressWidth,    { toValue: 1, duration: PROG_DUR, delay: PROG_DELAY + 300,   useNativeDriver: false }),
       // "Building…" fades out just as CTA arrives
       Animated.timing(buildingOpacity,  { toValue: 0, duration: 300,      delay: CTA_DELAY - 200,    useNativeDriver: true }),
       // CTA + footer fade in
       Animated.timing(ctaOpacity,       { toValue: 1, duration: 400,      delay: CTA_DELAY,          useNativeDriver: true }),
     ]).start(() => setDone(true));
+
+    // Bar fill uses width (non-native) — must run separately
+    Animated.timing(progressWidth, { toValue: 1, duration: PROG_DUR, delay: PROG_DELAY + 300, useNativeDriver: false }).start();
   }, []);
 
   const barWidth = progressWidth.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] });

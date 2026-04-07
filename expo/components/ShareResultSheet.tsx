@@ -1,4 +1,5 @@
 import * as Clipboard from 'expo-clipboard';
+import * as Sharing from 'expo-sharing';
 import { Copy, Image as ImageIcon, Share2 } from 'lucide-react-native';
 import React, { useCallback, useRef, useState } from 'react';
 import {
@@ -107,7 +108,10 @@ export default function ShareResultSheet({
       if (Platform.OS === 'ios') {
         await Share.share({ message: shareText, url: uri });
       } else {
-        await Share.share({ message: shareText });
+        await Sharing.shareAsync(uri, {
+          mimeType: 'image/png',
+          dialogTitle: shareText,
+        });
       }
       onClose();
     } catch (e) {
