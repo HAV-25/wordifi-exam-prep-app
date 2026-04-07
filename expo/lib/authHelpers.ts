@@ -41,8 +41,9 @@ export async function signUpWithEmail(email: string, password: string): Promise<
   }
 
   // Confirmation email sent — not an error
+  // Profile will be created after email confirmation when the user signs in
+  // (ensureUserProfile is called from AuthProvider once a session exists)
   if (data.user && !data.session) {
-    await ensureUserProfile(data.user); // create profile row immediately so upsert has something to update
     return { status: 'confirmation_pending', email, userId: data.user.id };
   }
 
