@@ -35,9 +35,15 @@ import {
   fetchStreamQuestions,
   updatePreparednessScore,
   updateXpAndStreak,
-  writeStreamAnswer,
   type BadgeType,
 } from '@/lib/streamHelpers';
+import {
+  advanceSession,
+  fetchQuestionsByIds,
+  getOrCreateStreamSession,
+  saveStreamAnswer,
+  type StreamSession,
+} from '@/lib/streamSessionHelpers';
 import { useAccess } from '@/providers/AccessProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import type { AppQuestion } from '@/types/database';
@@ -242,90 +248,62 @@ export default function TestStreamScreen() {
 
   const FREE_TRIAL_SECTIONS = ['Hören', 'Lesen'];
   const isFreeTrial = access.tier === 'free_trial';
-  const streamSections = isFreeTrial ? FREE_TRIAL_SECTIONS : undefined;
+  const streamSections = isFreeTrial ? FREE_TRIAL_SECTIONS : ['Hören', 'Lesen'];
 
-  const questionsQuery = useQuery({
-    queryKey: ['stream-questions', targetLevel, userId, isFreeTrial],
+  // ── DB-backed session query ────────────────────────────────────────────────
+  const sessionQuery = useQuery({
+    queryKey: ['stream-session', targetLevel, userId, today],
     enabled: Boolean(userId) && Boolean(targetLevel),
-    queryFn: async (): Promise<AppQuestion[]> => {
-      console.log('TestStream fetching questions for', targetLevel, isFreeTrial ? '(free_trial: Hören+Lesen only)' : '');
-      const result = await fetchStreamQuestions({ userId, targetLevel, limit: SESSION_SIZE, sections: streamSections });
-      if (result.isRecycled) {
+    queryFn: async () => {
+      console.log('TestStream getOrCreateStreamSession', targetLevel, today);
+      const result = await getOrCreateStreamSession(userId, targetLevel, today, streamSections);
+      if (result.status === 'created' && result.isRecycled) {
         setIsRecycledBanner(true);
       }
-      return result.questions;
+      // Fetch full question data for all IDs in the session
+      const questions = await fetchQuestionsByIds(result.session.question_ids);
+      return { sessionResult: result, questions };
     },
-    staleTime: 1000 * 60 * 60,     // 1 hour — questions stay stable for a full session
+    staleTime: 1000 * 60 * 60,
     gcTime: 1000 * 60 * 60 * 2,
   });
 
-  const questions = useMemo(() => questionsQuery.data ?? [], [questionsQuery.data]);
+  const streamSession = sessionQuery.data?.sessionResult?.session ?? null;
+  const isSessionComplete = streamSession?.is_complete ?? false;
+  const questions = useMemo(() => sessionQuery.data?.questions ?? [], [sessionQuery.data?.questions]);
   const currentQuestion = previousIndex !== null ? questions[previousIndex] ?? null : questions[currentIndex] ?? null;
   const isReviewMode = previousIndex !== null;
+  const [questionLoadError, setQuestionLoadError] = useState<boolean>(false);
 
-  // Bug 4: restore day-session state from AsyncStorage once questions are available
+  // Resume from DB session — restore current_index and completed_count
   useEffect(() => {
-    if (!userId || !targetLevel || hasRestoredSession.current) return;
-    if (questionsQuery.isLoading) return;
+    if (!streamSession || hasRestoredSession.current) return;
     if (questions.length === 0) return;
 
     hasRestoredSession.current = true;
 
-    async function restoreSession() {
-      try {
-        // Clean up yesterday's key
-        const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
-        AsyncStorage.removeItem(`wordifi_stream_${targetLevel}_${yesterday}`).catch(() => {});
-
-        const saved = await AsyncStorage.getItem(SESSION_KEY);
-        if (!saved) return;
-
-        const parsed = JSON.parse(saved) as {
-          date: string;
-          currentIndex?: number;
-          answeredMap?: Record<string, string>;
-          sessionAnsweredCount?: number;
-          correctStreak?: number;
-        };
-        if (parsed.date !== today) return;
-
-        if (typeof parsed.currentIndex === 'number' && parsed.currentIndex > 0) {
-          setCurrentIndex(parsed.currentIndex);
-          currentIndexRef.current = parsed.currentIndex;
-        }
-        if (parsed.answeredMap && Object.keys(parsed.answeredMap).length > 0) {
-          setAnsweredMap(parsed.answeredMap);
-          answeredMapRef.current = parsed.answeredMap;
-        }
-        if (typeof parsed.sessionAnsweredCount === 'number') {
-          answeredCountRef.current = parsed.sessionAnsweredCount;
-          setSessionAnsweredCount(parsed.sessionAnsweredCount);
-        }
-        if (typeof parsed.correctStreak === 'number') {
-          setCorrectStreak(parsed.correctStreak);
-        }
-      } catch {
-        // Silent fail — start fresh
-      }
+    const resumeIndex = streamSession.current_index;
+    const resumeCount = streamSession.completed_count;
+    if (resumeIndex > 0) {
+      setCurrentIndex(resumeIndex);
+      currentIndexRef.current = resumeIndex;
     }
+    if (resumeCount > 0) {
+      answeredCountRef.current = resumeCount;
+      setSessionAnsweredCount(resumeCount);
+    }
+    // Store session ID for answer writes
+    sessionIdRef.current = streamSession.id;
 
-    restoreSession().catch(() => {});
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId, targetLevel, questions.length, questionsQuery.isLoading]);
+    console.log('[StreamSession] Restored: index', resumeIndex, 'completed', resumeCount);
+  }, [streamSession, questions.length]);
 
   const ensureSession = useCallback(async () => {
-    if (!sessionIdRef.current || sessionIdRef.current === 'placeholder-session') {
-      const id = await createStreamSession({
-        userId,
-        level: targetLevel,
-        questionsTotal: 0,
-        questionsCorrect: 0,
-        timeTakenSeconds: 0,
-      });
-      sessionIdRef.current = id;
-      blockStartTimeRef.current = Date.now();
+    // Session is created by getOrCreateStreamSession — just ensure the ref is set
+    if (!sessionIdRef.current && streamSession) {
+      sessionIdRef.current = streamSession.id;
     }
-  }, [userId, targetLevel]);
+  }, [streamSession]);
 
   const fetchMoreQuestions = useCallback(async () => {
     console.log('TestStream prefetching more questions');
@@ -455,13 +433,13 @@ export default function TestStreamScreen() {
 
       await ensureSession();
 
-      writeStreamAnswer({
-        userId,
+      saveStreamAnswer({
         sessionId: sessionIdRef.current,
+        userId,
         questionId,
         selectedAnswer: selectedKey,
         isCorrect,
-      }).catch((err) => console.log('TestStream writeAnswer error', err));
+      }).catch((err) => console.error('TestStream writeAnswer error', err));
 
       updatePreparednessScore(userId, 1).then((newScore) => {
         setLocalPreparedness(newScore);
@@ -501,26 +479,20 @@ export default function TestStreamScreen() {
         refreshProfile().catch(() => {});
       }
 
-      const remaining = questions.length - (currentIndex + 1);
-      if (remaining <= 5) {
-        fetchMoreQuestions().catch(() => {});
+      // Persist session progress to DB so user can resume after leaving the app
+      if (sessionIdRef.current) {
+        advanceSession(
+          sessionIdRef.current,
+          currentIndexRef.current + 1,
+          questions.length,
+        ).catch((err) => console.error('TestStream advanceSession error', err));
       }
-
-      // Persist session progress so user can resume after leaving the app
-      const sessionSnapshot = {
-        date: today,
-        currentIndex: currentIndexRef.current,
-        answeredMap: { ...answeredMapRef.current, [questionId]: selectedKey },
-        sessionAnsweredCount: answeredCountRef.current,
-        correctStreak: isCorrect ? correctStreak + 1 : 0,
-      };
-      AsyncStorage.setItem(SESSION_KEY, JSON.stringify(sessionSnapshot)).catch(() => {});
     },
     [
       userId, localXp, localStreak, profile, totalAnswered,
       correctStreak, firstCorrectToday, midSessionShown,
       ensureSession, writeBlockSession, targetLevel, questions.length,
-      currentIndex, fetchMoreQuestions, refreshProfile, checkMilestones, animateGaugePulse,
+      currentIndex, refreshProfile, checkMilestones, animateGaugePulse,
       showStreakToastBanner, showComboToastBanner, decrementStreamRemaining, incrementDailyStreamCount, triggerXpBurst,
       SESSION_KEY, today,
     ]
@@ -556,18 +528,6 @@ export default function TestStreamScreen() {
       setCurrentIndex((prev) => {
         const next = prev + 1;
         currentIndexRef.current = next;
-
-        // Persist the advanced index immediately
-        AsyncStorage.getItem(SESSION_KEY).then((saved) => {
-          if (saved) {
-            try {
-              const parsed = JSON.parse(saved) as Record<string, unknown>;
-              parsed.currentIndex = next;
-              AsyncStorage.setItem(SESSION_KEY, JSON.stringify(parsed)).catch(() => {});
-            } catch { /* silent */ }
-          }
-        }).catch(() => {});
-
         return next;
       });
       translateY.setValue(0);
@@ -711,12 +671,45 @@ export default function TestStreamScreen() {
     return Object.keys(answeredMap).length === 0 && totalAnswered === 0 && questions.length > 0;
   }, [answeredMap, totalAnswered, questions.length]);
 
-  if (questionsQuery.isLoading) {
+  if (sessionQuery.isLoading) {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.loadingWrap}>
           <ActivityIndicator color={Colors.accent} size="large" />
           <Text style={styles.loadingText}>Loading questions...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (sessionQuery.isError) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.emptyWrap}>
+          <Text style={styles.emptyEmoji}>⚠️</Text>
+          <Text style={styles.emptyTitle}>Couldn't load questions</Text>
+          <Text style={styles.emptyDesc}>Check your connection and try again.</Text>
+          <Pressable style={styles.ctaPrimary} onPress={() => sessionQuery.refetch()}>
+            <Text style={styles.ctaPrimaryText}>Try Again</Text>
+          </Pressable>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (isSessionComplete) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.emptyWrap}>
+          <Text style={styles.emptyEmoji}>🎉</Text>
+          <Text style={styles.emptyTitle}>Today's stream complete!</Text>
+          <Text style={styles.emptyDesc}>
+            You answered {streamSession?.completed_count ?? 0} questions today.{'\n'}
+            Come back tomorrow for your next stream.
+          </Text>
+          <Pressable style={styles.ctaSecondary} onPress={() => router.push('/(tabs)/tests' as never)}>
+            <Text style={styles.ctaSecondaryText}>Try a Sectional Test</Text>
+          </Pressable>
         </View>
       </SafeAreaView>
     );
@@ -859,7 +852,27 @@ export default function TestStreamScreen() {
               reviewMode={isReviewMode}
             />
           </Animated.View>
-        ) : null}
+        ) : (
+          <View style={styles.skipErrorWrap}>
+            <Text style={styles.skipErrorEmoji}>⚠️</Text>
+            <Text style={styles.skipErrorTitle}>Couldn't load this question</Text>
+            <Pressable
+              style={styles.ctaPrimary}
+              onPress={() => {
+                const nextIdx = currentIndex + 1;
+                if (nextIdx < questions.length) {
+                  setCurrentIndex(nextIdx);
+                  currentIndexRef.current = nextIdx;
+                  if (sessionIdRef.current) {
+                    advanceSession(sessionIdRef.current, nextIdx, questions.length).catch(() => {});
+                  }
+                }
+              }}
+            >
+              <Text style={styles.ctaPrimaryText}>Skip to next</Text>
+            </Pressable>
+          </View>
+        )}
       </View>
 
       {/* Next button — appears once the question is answered */}
@@ -1012,6 +1025,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 32,
     gap: 12,
+  },
+  skipErrorWrap: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+    gap: 16,
+  },
+  skipErrorEmoji: { fontSize: 40 },
+  skipErrorTitle: {
+    fontSize: 16,
+    fontWeight: '600' as const,
+    color: Colors.textMuted,
+    textAlign: 'center' as const,
   },
   emptyEmoji: {
     fontSize: 48,
