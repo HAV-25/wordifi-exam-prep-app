@@ -108,7 +108,6 @@ export default function PaywallScreen() {
       <Pressable
         onPress={async () => {
           await savePendingOnboarding(onboardingStore, onboardingSessionNonce);
-          router.dismissAll();
           router.replace('/auth');
         }}
         style={({ pressed }) => [styles.cta, pressed && styles.ctaPressed]}

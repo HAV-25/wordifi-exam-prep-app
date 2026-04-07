@@ -53,7 +53,7 @@ export default function AppIntroPolished() {
 
       {/* Returning user link */}
       <Pressable
-        onPress={() => { router.dismissAll(); router.replace('/auth'); }}
+        onPress={() => { router.replace('/auth'); }}
         accessibilityRole="button"
         accessibilityLabel="Sign in"
         style={styles.signInLink}

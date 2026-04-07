@@ -254,6 +254,7 @@ export default function ProfileScreen() {
 
   const handleSignOut = useCallback(async () => {
     await signOut();
+    router.replace('/onboarding_launch');
   }, [signOut]);
 
   const navigateUpgrade = useCallback(() => {

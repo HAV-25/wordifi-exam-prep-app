@@ -271,6 +271,7 @@ export default function TestStreamScreen() {
   const streamSession = sessionQuery.data?.sessionResult?.session ?? null;
   const isSessionComplete = streamSession?.is_complete ?? false;
   const questions = useMemo(() => sessionQuery.data?.questions ?? [], [sessionQuery.data?.questions]);
+  questionsRef.current = questions; // Sync ref immediately so PanResponder always sees latest
   const currentQuestion = previousIndex !== null ? questions[previousIndex] ?? null : questions[currentIndex] ?? null;
   const isReviewMode = previousIndex !== null;
   const [questionLoadError, setQuestionLoadError] = useState<boolean>(false);
@@ -433,13 +434,22 @@ export default function TestStreamScreen() {
 
       await ensureSession();
 
-      saveStreamAnswer({
-        sessionId: sessionIdRef.current,
-        userId,
-        questionId,
-        selectedAnswer: selectedKey,
-        isCorrect,
-      }).catch((err) => console.error('TestStream writeAnswer error', err));
+      // Resolve session ID from query data if ref is still empty
+      if (!sessionIdRef.current && streamSession?.id) {
+        sessionIdRef.current = streamSession.id;
+      }
+
+      if (sessionIdRef.current) {
+        saveStreamAnswer({
+          sessionId: sessionIdRef.current,
+          userId,
+          questionId,
+          selectedAnswer: selectedKey,
+          isCorrect,
+        }).catch((err) => console.error('TestStream writeAnswer error', err));
+      } else {
+        console.error('[StreamSession] No session ID available, skipping answer save');
+      }
 
       updatePreparednessScore(userId, 1).then((newScore) => {
         setLocalPreparedness(newScore);
@@ -491,7 +501,7 @@ export default function TestStreamScreen() {
     [
       userId, localXp, localStreak, profile, totalAnswered,
       correctStreak, firstCorrectToday, midSessionShown,
-      ensureSession, writeBlockSession, targetLevel, questions.length,
+      ensureSession, writeBlockSession, targetLevel, questions.length, streamSession,
       currentIndex, refreshProfile, checkMilestones, animateGaugePulse,
       showStreakToastBanner, showComboToastBanner, decrementStreamRemaining, incrementDailyStreamCount, triggerXpBurst,
       SESSION_KEY, today,

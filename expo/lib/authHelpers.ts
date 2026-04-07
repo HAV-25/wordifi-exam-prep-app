@@ -115,7 +115,7 @@ async function signInWithGoogleNative() {
 
   const redirectTo = isExpoGo
     ? makeRedirectUri()
-    : makeRedirectUri({ scheme: 'rork-app' });
+    : makeRedirectUri({ scheme: 'wordifi' });
 
   console.log('[Auth] Google OAuth native redirectTo:', redirectTo);
   console.log('[Auth] Google OAuth native isExpoGo:', isExpoGo);
