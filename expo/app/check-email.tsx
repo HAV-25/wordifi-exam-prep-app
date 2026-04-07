@@ -12,7 +12,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { supabase } from '@/lib/supabaseClient';
-import { colors, fontFamily } from '@/theme';
 
 const RESEND_COOLDOWN = 30;
 
@@ -57,10 +56,10 @@ export default function CheckEmailScreen() {
 
   return (
     <SafeAreaView style={styles.screen}>
-      <StatusBar style="light" />
+      <StatusBar style="dark" />
       <View style={styles.content}>
         <View style={styles.iconWrap}>
-          <Mail size={56} color={colors.accentTeal} />
+          <Mail size={48} color="#2B70EF" />
         </View>
 
         <Text style={styles.title}>Check your inbox</Text>
@@ -76,9 +75,9 @@ export default function CheckEmailScreen() {
         <Pressable
           onPress={handleResend}
           disabled={cooldown > 0}
-          style={{ opacity: cooldown > 0 ? 0.5 : 1, marginBottom: 16 }}
+          style={[styles.resendBtn, cooldown > 0 && styles.resendBtnDisabled]}
         >
-          <Text style={styles.resendText}>
+          <Text style={[styles.resendText, cooldown > 0 && styles.resendTextDisabled]}>
             {cooldown > 0 ? `Resend in ${cooldown}s` : "Didn't get it? Resend email"}
           </Text>
         </Pressable>
@@ -100,7 +99,7 @@ export default function CheckEmailScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: colors.darkNavy,
+    backgroundColor: '#F8FAFF',
   },
   content: {
     flex: 1,
@@ -109,63 +108,83 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
   },
   iconWrap: {
-    marginBottom: 24,
+    width: 80,
+    height: 80,
+    borderRadius: 24,
+    backgroundColor: '#EBF1FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 28,
   },
   title: {
-    fontFamily: fontFamily.display,
+    fontFamily: 'Outfit_800ExtraBold',
     fontSize: 28,
-    color: colors.white,
+    color: '#374151',
     textAlign: 'center',
     marginBottom: 12,
+    letterSpacing: -0.5,
   },
   bodyWrap: {
     alignItems: 'center',
     paddingHorizontal: 8,
-    marginBottom: 48,
+    marginBottom: 40,
   },
   body: {
-    fontFamily: fontFamily.bodyRegular,
+    fontFamily: 'NunitoSans_400Regular',
     fontSize: 15,
-    color: 'rgba(255,255,255,0.7)',
+    color: '#94A3B8',
     textAlign: 'center',
   },
   emailText: {
-    fontFamily: fontFamily.bodySemiBold,
-    fontSize: 15,
-    color: colors.accentTeal,
+    fontFamily: 'NunitoSans_700Bold',
+    fontSize: 16,
+    color: '#2B70EF',
     textAlign: 'center',
-    marginBottom: 8,
+    marginVertical: 8,
   },
   subtext: {
-    fontFamily: fontFamily.bodyRegular,
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.5)',
+    fontFamily: 'NunitoSans_400Regular',
+    fontSize: 14,
+    color: '#94A3B8',
     textAlign: 'center',
     paddingHorizontal: 8,
-    lineHeight: 19,
+    lineHeight: 20,
+  },
+  resendBtn: {
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    backgroundColor: '#EBF1FF',
+    marginBottom: 16,
+  },
+  resendBtnDisabled: {
+    opacity: 0.5,
   },
   resendText: {
-    fontFamily: fontFamily.bodySemiBold,
+    fontFamily: 'NunitoSans_600SemiBold',
     fontSize: 14,
-    color: colors.accentTeal,
+    color: '#2B70EF',
+  },
+  resendTextDisabled: {
+    color: '#94A3B8',
   },
   backText: {
-    fontFamily: fontFamily.bodyRegular,
+    fontFamily: 'NunitoSans_400Regular',
     fontSize: 14,
-    color: 'rgba(255,255,255,0.5)',
+    color: '#94A3B8',
   },
   toast: {
     position: 'absolute',
     bottom: 48,
     alignSelf: 'center',
-    backgroundColor: colors.accentTeal,
+    backgroundColor: '#2B70EF',
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 24,
   },
   toastText: {
-    fontFamily: fontFamily.bodySemiBold,
+    fontFamily: 'NunitoSans_600SemiBold',
     fontSize: 14,
-    color: colors.darkNavy,
+    color: '#FFFFFF',
   },
 });

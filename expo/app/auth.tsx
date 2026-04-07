@@ -1,6 +1,5 @@
-import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { CheckSquare, Eye, EyeOff, Lock, Mail, Sparkles, Square, X } from 'lucide-react-native';
+import { CheckSquare, Eye, EyeOff, Lock, Mail, Square, X } from 'lucide-react-native';
 import React, { useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -172,13 +171,10 @@ export default function AuthScreen() {
   };
 
   return (
-    <LinearGradient colors={[colors.navy, colors.navy, '#16325D']} style={styles.screen}>
+    <View style={styles.screen}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.flex}>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           <View style={styles.hero}>
-            <View style={styles.logoWrap}>
-              <Sparkles color={Colors.accent} size={26} />
-            </View>
             <Text style={styles.brand}>wordifi</Text>
             <Text style={styles.tagline}>Ace your German exam</Text>
           </View>
@@ -405,36 +401,42 @@ export default function AuthScreen() {
           </View>
         </Animated.View>
       </Modal>
-    </LinearGradient>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  screen: { flex: 1 },
+  screen: { flex: 1, backgroundColor: '#F8FAFF' },
   content: {
     flexGrow: 1,
     justifyContent: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
     paddingVertical: 28,
     gap: 24,
   },
-  hero: { gap: 8 },
-  logoWrap: {
-    width: 60,
-    height: 60,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    alignItems: 'center',
-    justifyContent: 'center',
+  hero: { gap: 6, alignItems: 'center' as const, marginBottom: 8 },
+  brand: {
+    fontFamily: 'Outfit_800ExtraBold',
+    fontSize: 36,
+    color: '#0A0E1A',
+    letterSpacing: -1,
   },
-  brand: { fontSize: 34, fontWeight: '800' as const, color: colors.white },
-  tagline: { fontSize: 16, color: 'rgba(255,255,255,0.78)' },
+  tagline: {
+    fontFamily: 'NunitoSans_400Regular',
+    fontSize: 16,
+    color: '#94A3B8',
+  },
   card: {
-    borderRadius: 28,
-    backgroundColor: Colors.surface,
-    padding: 18,
+    borderRadius: 24,
+    backgroundColor: '#FFFFFF',
+    padding: 20,
     gap: 16,
+    shadowColor: '#374151',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.06,
+    shadowRadius: 24,
+    elevation: 4,
   },
   tcRow: {
     flexDirection: 'row',
@@ -460,10 +462,10 @@ const styles = StyleSheet.create({
   },
   googleButton: {
     minHeight: 52,
-    borderRadius: 26,
-    borderWidth: 1.5,
-    borderColor: Colors.border,
-    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#FFFFFF',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -482,44 +484,45 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '800' as const,
   },
-  googleButtonText: { color: Colors.primary, fontWeight: '800' as const, fontSize: 16 },
+  googleButtonText: { fontFamily: 'NunitoSans_600SemiBold', color: '#374151', fontSize: 16 },
   dividerRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  divider: { flex: 1, height: 1, backgroundColor: Colors.border },
-  dividerText: { color: Colors.textMuted, fontWeight: '600' as const, fontSize: 13 },
+  divider: { flex: 1, height: 1, backgroundColor: '#E2E8F0' },
+  dividerText: { fontFamily: 'NunitoSans_400Regular', color: '#94A3B8', fontSize: 13 },
   segment: {
     flexDirection: 'row',
-    backgroundColor: Colors.surfaceMuted,
-    borderRadius: 18,
+    backgroundColor: '#F1F5F9',
+    borderRadius: 16,
     padding: 4,
   },
-  segmentButton: { flex: 1, minHeight: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  segmentButtonActive: { backgroundColor: Colors.surface },
-  segmentText: { color: Colors.textMuted, fontWeight: '700' as const, fontSize: 14 },
-  segmentTextActive: { color: Colors.primary },
+  segmentButton: { flex: 1, minHeight: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  segmentButtonActive: { backgroundColor: '#FFFFFF' },
+  segmentText: { fontFamily: 'NunitoSans_600SemiBold', color: '#94A3B8', fontSize: 14 },
+  segmentTextActive: { color: '#2B70EF' },
   inputWrap: { gap: 6 },
   inputShell: {
     minHeight: 52,
-    borderRadius: 16,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#F8FAFF',
     paddingHorizontal: 14,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
   },
-  input: { flex: 1, fontSize: 15, color: Colors.text },
-  errorText: { color: Colors.danger, fontSize: 13, fontWeight: '600' as const },
+  input: { flex: 1, fontFamily: 'NunitoSans_400Regular', fontSize: 15, color: '#374151' },
+  errorText: { fontFamily: 'NunitoSans_600SemiBold', color: '#EF4444', fontSize: 13 },
   forgotLink: { alignSelf: 'flex-end' as const, paddingVertical: 2 },
-  forgotLinkText: { color: Colors.textMuted, fontSize: 13, fontWeight: '600' as const },
+  forgotLinkText: { fontFamily: 'NunitoSans_600SemiBold', color: '#2B70EF', fontSize: 13 },
   primaryButton: {
-    minHeight: 52,
-    borderRadius: 26,
-    backgroundColor: Colors.primary,
+    minHeight: 56,
+    borderRadius: 16,
+    backgroundColor: '#2B70EF',
     alignItems: 'center',
     justifyContent: 'center',
   },
   buttonDisabled: { opacity: 0.45 },
-  primaryButtonText: { color: Colors.surface, fontWeight: '800' as const, fontSize: 16 },
+  primaryButtonText: { fontFamily: 'Outfit_800ExtraBold', color: '#FFFFFF', fontSize: 17 },
 
   modalOverlay: {
     flex: 1,
