@@ -1,11 +1,11 @@
 import createContextHook from '@nkzw/create-context-hook';
 import type { Session, User } from '@supabase/supabase-js';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as Sentry from '@sentry/react-native';
 
 import { signOutUser } from '@/lib/authHelpers';
-import { ensureUserProfile, loadAndClearPendingOnboarding, saveOnboardingAnswers } from '@/lib/profileHelpers';
+import { ensureUserProfile, reconcilePendingOnboarding } from '@/lib/profileHelpers';
 import { supabase } from '@/lib/supabaseClient';
 import type { UserProfile } from '@/types/database';
 
@@ -60,19 +60,26 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     },
   });
 
-  // Safety net: apply any AsyncStorage-persisted onboarding data that wasn't saved to DB yet
-  // (handles the case where email confirmation link opens a fresh app instance)
+  // Reconcile pending onboarding answers once an authenticated session exists.
+  // Handles email confirmation handoff, app restarts, and retries after failed writes.
+  const reconcilingRef = useRef(false);
   useEffect(() => {
     const uid = session?.user?.id;
     const profile = profileQuery.data;
-    if (!uid || !profile || profile.onboarding_completed_at) return;
+    if (!uid || !profile || reconcilingRef.current) return;
 
-    void loadAndClearPendingOnboarding().then(async (pending) => {
-      if (!pending) return;
-      await saveOnboardingAnswers(uid, pending).catch(() => {});
-      await profileQuery.refetch();
-    });
-  }, [session?.user?.id, profileQuery.data?.onboarding_completed_at]);
+    reconcilingRef.current = true;
+    void reconcilePendingOnboarding(uid, profile)
+      .then((applied) => {
+        if (applied) void profileQuery.refetch();
+      })
+      .catch((err) => {
+        Sentry.captureException(err, { tags: { context: 'onboarding_reconcile' } });
+      })
+      .finally(() => {
+        reconcilingRef.current = false;
+      });
+  }, [session?.user?.id, profileQuery.data]);
 
   const signOutMutation = useMutation({
     mutationFn: async () => signOutUser(),

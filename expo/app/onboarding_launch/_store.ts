@@ -32,6 +32,14 @@ export const onboardingStore: OnboardingAnswers = {
   learnerStyle: null,
 };
 
+/**
+ * Random nonce generated once per app session (module load).
+ * Embedded in AsyncStorage by savePendingOnboarding, checked by tagPendingOnboardingForUser.
+ * Prevents a new app session from tagging stale data left by a previous session.
+ */
+export const onboardingSessionNonce: string =
+  Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+
 // ─── Display helpers ──────────────────────────────────────────────────────────
 
 export const CERT_LABELS: Record<CertId, string> = {

@@ -14,6 +14,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { CheckCircle2, ArrowRight } from 'lucide-react-native';
 import { colors } from '@/theme';
+import { savePendingOnboarding } from '@/lib/profileHelpers';
+import { onboardingStore, onboardingSessionNonce } from './_store';
 
 // ─── Timing ──────────────────────────────────────────────────────────────────
 
@@ -205,7 +207,8 @@ export default function PaywallScreen() {
           </Text>
 
           <Pressable
-            onPress={() => {
+            onPress={async () => {
+              await savePendingOnboarding(onboardingStore, onboardingSessionNonce);
               router.dismissAll();
               router.replace('/auth');
             }}
@@ -218,7 +221,10 @@ export default function PaywallScreen() {
           </Pressable>
 
           <Pressable
-            onPress={() => router.replace('/auth')}
+            onPress={async () => {
+              await savePendingOnboarding(onboardingStore, onboardingSessionNonce);
+              router.replace('/auth');
+            }}
             style={styles.secondary}
             accessibilityRole="button"
             accessibilityLabel="Continue with 5 free questions per day"

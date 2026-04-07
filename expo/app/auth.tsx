@@ -21,8 +21,8 @@ import {
 import Colors from '@/constants/colors';
 import { colors, fontFamily } from '@/theme';
 import { resetPassword, signInWithEmail, signInWithGoogle, signUpWithEmail, updateTcAccepted } from '@/lib/authHelpers';
-import { loadAndClearPendingOnboarding, saveOnboardingAnswers, savePendingOnboarding } from '@/lib/profileHelpers';
-import { onboardingStore } from '@/app/onboarding_launch/_store';
+import { tagPendingOnboardingForUser } from '@/lib/profileHelpers';
+import { onboardingSessionNonce } from '@/app/onboarding_launch/_store';
 import { useAppConfig } from '@/providers/AppConfigProvider';
 import { supabase } from '@/lib/supabaseClient';
 
@@ -83,27 +83,23 @@ export default function AuthScreen() {
         const data = await signInWithEmail(email.trim(), password.trim());
         if (data?.user) {
           await updateTcAccepted(data.user.id, config.tc_version).catch(() => {});
-          // Apply pending onboarding if it was saved before email confirmation
-          const pending = await loadAndClearPendingOnboarding();
-          if (pending) {
-            await saveOnboardingAnswers(data.user.id, pending).catch(() => {});
-          }
         }
+        // Pending onboarding reconciliation handled by AuthProvider after session established
         router.replace('/');
       } else {
         const result = await signUpWithEmail(email.trim(), password);
         if (result.status === 'confirmation_pending') {
-          // Save onboarding data now (profile row already created by signUpWithEmail)
-          await saveOnboardingAnswers(result.userId, onboardingStore).catch(() => {});
-          // Also persist to AsyncStorage as backup in case the DB write fails or app restarts
-          await savePendingOnboarding(onboardingStore).catch(() => {});
+          // Onboarding data already persisted to AsyncStorage in paywall.tsx.
+          // Tag it with the new userId so reconciliation is scoped to this user only.
+          await tagPendingOnboardingForUser(result.userId, onboardingSessionNonce);
           await updateTcAccepted(result.userId, config.tc_version).catch(() => {});
           router.push({ pathname: '/check-email', params: { email: result.email } });
           return;
         }
         // Immediately signed in (email confirmation disabled)
+        // Tag pending data and let AuthProvider handle reconciliation
         if (result.data?.user?.id) {
-          await saveOnboardingAnswers(result.data.user.id, onboardingStore).catch(() => {});
+          await tagPendingOnboardingForUser(result.data.user.id, onboardingSessionNonce);
           await updateTcAccepted(result.data.user.id, config.tc_version).catch(() => {});
         }
         router.replace('/');
@@ -125,10 +121,12 @@ export default function AuthScreen() {
     setIsLoading(true);
     try {
       await signInWithGoogle();
-      // Update tc_accepted and save onboarding answers after successful Google sign-in
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        await saveOnboardingAnswers(user.id, onboardingStore).catch(() => {});
+        // Only tag pending onboarding for new signups — don't stamp stale data onto existing users
+        if (mode === 'signUp') {
+          await tagPendingOnboardingForUser(user.id, onboardingSessionNonce);
+        }
         await updateTcAccepted(user.id, config.tc_version).catch(() => {});
       }
       router.replace('/');

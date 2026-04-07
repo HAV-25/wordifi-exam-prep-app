@@ -320,18 +320,123 @@ export async function saveOnboardingAnswers(
 
 const PENDING_ONBOARDING_KEY = 'wordifi_pending_onboarding';
 
-export async function savePendingOnboarding(answers: OnboardingAnswers): Promise<void> {
-  await AsyncStorage.setItem(PENDING_ONBOARDING_KEY, JSON.stringify(answers));
+// Storage envelope: wraps OnboardingAnswers with a userId tag and session nonce.
+// forUserId is stamped after signup so reconciliation only applies to the intended user.
+// sessionNonce ensures tagging only works within the same app session that saved the data.
+type PendingOnboardingEnvelope = OnboardingAnswers & {
+  forUserId?: string;
+  sessionNonce?: string;
+};
+
+export async function savePendingOnboarding(
+  answers: OnboardingAnswers,
+  sessionNonce: string
+): Promise<void> {
+  const envelope: PendingOnboardingEnvelope = { ...answers, sessionNonce };
+  await AsyncStorage.setItem(PENDING_ONBOARDING_KEY, JSON.stringify(envelope));
 }
 
-export async function loadAndClearPendingOnboarding(): Promise<OnboardingAnswers | null> {
+/**
+ * Tag existing pending onboarding data with the userId it was created for.
+ * Only stamps if the session nonce matches — prevents a new app session from
+ * adopting stale data written by a previous session.
+ */
+export async function tagPendingOnboardingForUser(
+  userId: string,
+  sessionNonce: string
+): Promise<void> {
+  try {
+    const raw = await AsyncStorage.getItem(PENDING_ONBOARDING_KEY);
+    if (!raw) return;
+    const envelope = JSON.parse(raw) as PendingOnboardingEnvelope;
+    // Refuse to tag if the data was written by a different app session
+    if (envelope.sessionNonce !== sessionNonce) return;
+    envelope.forUserId = userId;
+    await AsyncStorage.setItem(PENDING_ONBOARDING_KEY, JSON.stringify(envelope));
+  } catch {
+    // Non-critical — untagged data will be discarded by reconcile
+  }
+}
+
+export async function loadPendingOnboarding(): Promise<PendingOnboardingEnvelope | null> {
   try {
     const raw = await AsyncStorage.getItem(PENDING_ONBOARDING_KEY);
     if (!raw) return null;
-    await AsyncStorage.removeItem(PENDING_ONBOARDING_KEY);
-    return JSON.parse(raw) as OnboardingAnswers;
+    return JSON.parse(raw) as PendingOnboardingEnvelope;
   } catch {
     return null;
+  }
+}
+
+export async function clearPendingOnboarding(): Promise<void> {
+  try {
+    await AsyncStorage.removeItem(PENDING_ONBOARDING_KEY);
+  } catch {
+    // Non-critical — worst case is a redundant reconcile on next launch
+  }
+}
+
+export async function reconcilePendingOnboarding(
+  userId: string,
+  profile: UserProfile
+): Promise<boolean> {
+  const pending = await loadPendingOnboarding();
+  if (!pending) return false;
+
+  // Untagged data cannot be trusted — we don't know which user it was meant for.
+  // This covers stale AsyncStorage from abandoned onboarding or a different user's session.
+  // Tagged data that was saved by paywall.tsx gets stamped in auth.tsx after signup.
+  if (!pending.forUserId) {
+    await clearPendingOnboarding();
+    return false;
+  }
+
+  // Pending data is tagged for a different user — not ours, discard
+  if (pending.forUserId !== userId) {
+    await clearPendingOnboarding();
+    return false;
+  }
+
+  // Profile already has substantive onboarding/profile data — don't overwrite.
+  // Includes target_level and exam_type to protect legacy users who have those
+  // set but don't have the newer onboarding_* columns populated.
+  const hasExistingAnswers =
+    profile.target_level != null ||
+    profile.exam_type != null ||
+    profile.onboarding_cert != null ||
+    profile.onboarding_readiness != null ||
+    profile.onboarding_hardest != null ||
+    profile.onboarding_daily_minutes != null ||
+    profile.onboarding_learner_style != null;
+
+  if (hasExistingAnswers) {
+    await clearPendingOnboarding();
+    return false;
+  }
+
+  // Pending payload is empty (abandoned onboarding) — discard
+  const hasAnyAnswer =
+    pending.cert != null ||
+    pending.level != null ||
+    pending.readiness != null ||
+    pending.hardest != null ||
+    pending.dailyMinutes != null ||
+    pending.learnerStyle != null;
+
+  if (!hasAnyAnswer) {
+    await clearPendingOnboarding();
+    return false;
+  }
+
+  // Write onboarding answers to DB — let errors propagate
+  try {
+    await saveOnboardingAnswers(userId, pending);
+    await clearPendingOnboarding();
+    console.log('[Onboarding] reconcile succeeded for', userId);
+    return true;
+  } catch (err) {
+    console.error('[Onboarding] reconcile failed — pending data retained for retry', userId, err);
+    throw err;
   }
 }
 
