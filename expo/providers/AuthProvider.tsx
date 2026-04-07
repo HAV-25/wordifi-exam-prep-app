@@ -2,6 +2,7 @@ import createContextHook from '@nkzw/create-context-hook';
 import type { Session, User } from '@supabase/supabase-js';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import * as Linking from 'expo-linking';
 import * as Sentry from '@sentry/react-native';
 
 import { signOutUser } from '@/lib/authHelpers';
@@ -45,6 +46,42 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       isMounted = false;
       listener.subscription.unsubscribe();
     };
+  }, []);
+
+  // ── Deep link handler for email confirmation / auth redirects ────────────
+  useEffect(() => {
+    async function handleDeepLink({ url }: { url: string }) {
+      if (!url.includes('auth/confirm')) return;
+
+      // Tokens may be in hash (#) or query (?) part
+      const hashPart = url.includes('#') ? url.split('#')[1] : url.split('?')[1];
+      if (!hashPart) return;
+
+      const params = new URLSearchParams(hashPart);
+      const accessToken = params.get('access_token');
+      const refreshToken = params.get('refresh_token');
+
+      if (!accessToken || !refreshToken) return;
+
+      console.log('[Auth] Deep link received, setting session...');
+      const { error } = await supabase.auth.setSession({
+        access_token: accessToken,
+        refresh_token: refreshToken,
+      });
+
+      if (error) {
+        console.error('[Auth] Deep link session error:', error.message);
+        Sentry.captureException(error, { tags: { context: 'deep_link_auth' } });
+      }
+    }
+
+    const subscription = Linking.addEventListener('url', handleDeepLink);
+    // Handle cold start — app opened via deep link
+    void Linking.getInitialURL().then((url) => {
+      if (url) handleDeepLink({ url });
+    });
+
+    return () => subscription.remove();
   }, []);
 
   const user = useMemo<User | null>(() => session?.user ?? null, [session]);

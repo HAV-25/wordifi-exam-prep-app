@@ -30,7 +30,14 @@ export type SignUpResult =
   | { status: 'signed_in'; data: Awaited<ReturnType<typeof supabase.auth.signUp>>['data'] };
 
 export async function signUpWithEmail(email: string, password: string): Promise<SignUpResult> {
-  const { data, error } = await supabase.auth.signUp({ email, password });
+  const emailRedirectTo = process.env.EXPO_PUBLIC_AUTH_REDIRECT_URL
+    ?? 'https://2ydqsq98wysdgr153a9qi.rork.app';
+
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: { emailRedirectTo },
+  });
 
   if (error) {
     console.log('signUpWithEmail error', error);

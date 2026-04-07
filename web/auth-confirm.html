@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Wordifi — Confirming your account</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #F8FAFF;
+      color: #374151;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .container {
+      max-width: 400px;
+      width: 100%;
+      text-align: center;
+    }
+
+    .logo {
+      font-size: 28px;
+      font-weight: 800;
+      color: #0D1B4B;
+      letter-spacing: -0.5px;
+      margin-bottom: 40px;
+    }
+
+    .logo span { color: #2B70EF; }
+
+    .card {
+      background: #FFFFFF;
+      border-radius: 24px;
+      padding: 40px 28px;
+      box-shadow: 0 8px 32px rgba(55, 65, 81, 0.08);
+    }
+
+    .icon {
+      width: 64px;
+      height: 64px;
+      border-radius: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 24px;
+      font-size: 28px;
+    }
+
+    .icon-loading { background: #EBF1FF; }
+    .icon-success { background: #DDF8EA; }
+    .icon-error   { background: #FCE3E3; }
+
+    h1 {
+      font-size: 22px;
+      font-weight: 800;
+      color: #374151;
+      margin-bottom: 12px;
+      line-height: 1.3;
+    }
+
+    p {
+      font-size: 15px;
+      color: #94A3B8;
+      line-height: 1.6;
+      margin-bottom: 8px;
+    }
+
+    .btn {
+      display: inline-block;
+      width: 100%;
+      padding: 16px 24px;
+      border-radius: 16px;
+      font-size: 16px;
+      font-weight: 700;
+      text-decoration: none;
+      cursor: pointer;
+      border: none;
+      margin-top: 24px;
+      transition: opacity 0.15s;
+    }
+
+    .btn:hover { opacity: 0.88; }
+
+    .btn-primary {
+      background: #2B70EF;
+      color: #FFFFFF;
+    }
+
+    .btn-secondary {
+      background: transparent;
+      color: #2B70EF;
+      border: 1.5px solid #2B70EF;
+      margin-top: 12px;
+    }
+
+    .spinner {
+      width: 32px;
+      height: 32px;
+      border: 3px solid #EBF1FF;
+      border-top-color: #2B70EF;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 24px;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .section { display: none; }
+    .section.active { display: block; }
+
+    .email-highlight {
+      color: #2B70EF;
+      font-weight: 600;
+    }
+
+    .store-links {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      margin-top: 16px;
+    }
+
+    .store-link {
+      font-size: 13px;
+      color: #94A3B8;
+      text-decoration: underline;
+    }
+
+    .footer {
+      margin-top: 32px;
+      font-size: 13px;
+      color: #94A3B8;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="logo">wordifi</div>
+
+    <div class="card">
+      <!-- Loading state -->
+      <div id="state-loading" class="section active">
+        <div class="spinner"></div>
+        <h1>Confirming your account...</h1>
+        <p>Hang tight, we're setting things up.</p>
+      </div>
+
+      <!-- Mobile retry -->
+      <div id="state-mobile" class="section">
+        <div class="icon icon-success">&#10003;</div>
+        <h1>Account confirmed!</h1>
+        <p>Tap the button below to open Wordifi and start learning.</p>
+        <a id="open-app-btn" class="btn btn-primary" href="#">Open Wordifi</a>
+        <div class="store-links">
+          <a class="store-link" href="https://apps.apple.com/app/wordifi" target="_blank">App Store</a>
+          <a class="store-link" href="https://play.google.com/store/apps/details?id=com.wordifi" target="_blank">Play Store</a>
+        </div>
+      </div>
+
+      <!-- Desktop message -->
+      <div id="state-desktop" class="section">
+        <div class="icon icon-success">&#10003;</div>
+        <h1>Account confirmed!</h1>
+        <p>Your email has been verified successfully.</p>
+        <p style="margin-top: 16px; color: #374151; font-weight: 600;">
+          Open the Wordifi app on your phone to sign in and start learning.
+        </p>
+        <p style="margin-top: 8px;">Wordifi is a mobile app — sign in on your phone with the email and password you just created.</p>
+      </div>
+
+      <!-- Error state -->
+      <div id="state-error" class="section">
+        <div class="icon icon-error">!</div>
+        <h1>Invalid link</h1>
+        <p>This confirmation link is missing or expired. Please request a new one from the app.</p>
+      </div>
+    </div>
+
+    <div class="footer">wordifi.app</div>
+  </div>
+
+  <script>
+    (function() {
+      var hash = window.location.hash.substring(1);
+      var params = new URLSearchParams(hash);
+      var accessToken = params.get('access_token');
+      var refreshToken = params.get('refresh_token');
+      var type = params.get('type');
+
+      function showState(id) {
+        var sections = document.querySelectorAll('.section');
+        for (var i = 0; i < sections.length; i++) {
+          sections[i].classList.remove('active');
+        }
+        document.getElementById(id).classList.add('active');
+      }
+
+      if (!accessToken) {
+        showState('state-error');
+        return;
+      }
+
+      // Build deep link with tokens
+      var deepLink = 'wordifi://auth/confirm#access_token=' + encodeURIComponent(accessToken);
+      if (refreshToken) deepLink += '&refresh_token=' + encodeURIComponent(refreshToken);
+      if (type) deepLink += '&type=' + encodeURIComponent(type);
+
+      // Set the retry button href
+      document.getElementById('open-app-btn').href = deepLink;
+
+      // Attempt to open the app immediately
+      window.location.href = deepLink;
+
+      // Fallback after 2 seconds
+      setTimeout(function() {
+        var isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+        if (isMobile) {
+          showState('state-mobile');
+        } else {
+          showState('state-desktop');
+        }
+      }, 2000);
+    })();
+  </script>
+</body>
+</html>
