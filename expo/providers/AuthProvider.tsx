@@ -6,7 +6,7 @@ import * as Linking from 'expo-linking';
 import * as Sentry from '@sentry/react-native';
 
 import { signOutUser } from '@/lib/authHelpers';
-import { ensureUserProfile, loadPendingOnboarding, reconcilePendingOnboarding } from '@/lib/profileHelpers';
+import { ensureUserProfile, reconcilePendingOnboarding } from '@/lib/profileHelpers';
 import { supabase } from '@/lib/supabaseClient';
 import type { UserProfile } from '@/types/database';
 
@@ -118,18 +118,24 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       });
   }, [session?.user?.id, profileQuery.data]);
 
-  // Fallback: if profile exists with no onboarding_completed_at and no pending data
-  // in AsyncStorage, backfill the timestamp so the user isn't stuck in the onboarding loop.
-  // This handles edge cases where AsyncStorage was wiped (reinstall, cross-device, etc.).
+  // Fallback: if profile exists with no onboarding_completed_at after reconcile has had
+  // a chance to run, backfill the timestamp so the user isn't stuck in the onboarding loop.
+  // This handles: AsyncStorage wiped, reconcile RLS failure, cross-device confirmation, etc.
+  const backfillAttemptedRef = useRef(false);
   useEffect(() => {
     const uid = session?.user?.id;
     const profile = profileQuery.data;
-    if (!uid || !profile) return;
+    if (!uid || !profile || backfillAttemptedRef.current) return;
     if (profile.onboarding_completed_at || profile.target_level) return;
 
-    void loadPendingOnboarding().then(async (pending) => {
-      if (pending) return; // Reconcile effect will handle it
-      console.log('[Onboarding] No pending data and no onboarding fields — backfilling timestamp');
+    // Give reconcile 3 seconds to complete before backfilling
+    const timer = setTimeout(async () => {
+      // Re-check in case reconcile succeeded in the meantime
+      const freshProfile = profileQuery.data;
+      if (freshProfile?.onboarding_completed_at || freshProfile?.target_level) return;
+
+      backfillAttemptedRef.current = true;
+      console.log('[Onboarding] Reconcile did not complete — backfilling onboarding_completed_at');
       const { error } = await supabase
         .from('user_profiles')
         .update({
@@ -139,11 +145,14 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
         .eq('id', uid);
       if (error) {
         console.error('[Onboarding] Backfill failed:', error.message);
+        Sentry.captureException(error, { tags: { context: 'onboarding_backfill' } });
       } else {
         console.log('[Onboarding] Backfilled onboarding_completed_at for', uid);
         void profileQuery.refetch();
       }
-    });
+    }, 3000);
+
+    return () => clearTimeout(timer);
   }, [session?.user?.id, profileQuery.data?.onboarding_completed_at]);
 
   const signOutMutation = useMutation({

@@ -293,6 +293,15 @@ export async function fetchRecentIncorrect(userId: string): Promise<RecentIncorr
   }
 }
 
+// Map onboarding cert IDs to the DB exam_type CHECK constraint values:
+// DB allows: 'TELC', 'GOETHE', 'OSD', 'BOTH' (uppercase)
+const CERT_TO_EXAM_TYPE: Record<string, string | null> = {
+  goethe: 'GOETHE',
+  telc: 'TELC',
+  osd: 'OSD',
+  not_sure: null,
+};
+
 export async function saveOnboardingAnswers(
   userId: string,
   answers: OnboardingAnswers
@@ -302,7 +311,7 @@ export async function saveOnboardingAnswers(
     .upsert({
       id: userId,
       target_level: answers.level ?? null,
-      exam_type: answers.cert !== 'not_sure' ? answers.cert : null,
+      exam_type: answers.cert ? (CERT_TO_EXAM_TYPE[answers.cert] ?? null) : null,
       onboarding_cert: answers.cert,
       onboarding_readiness: answers.readiness,
       onboarding_hardest: answers.hardest,
