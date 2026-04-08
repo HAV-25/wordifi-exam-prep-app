@@ -98,6 +98,7 @@ export function AudioPlayer({ audioUrl, onFirstPlay, onPlaybackComplete }: Audio
       setDurationMillis(1);
       setReplayCount(0);
       setPlaybackSpeed(1);
+      hasPlayedRef.current = false;
 
       if (soundRef.current) {
         try {
