@@ -1,22 +1,25 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+/**
+ * Stream Screen — simplified question flow
+ * Questions fetched upfront into useState array.
+ * No PanResponder, no swipe gestures, no ref-syncing.
+ * Progression: answer → see explanation → tap Next → next question.
+ */
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
-import { ChevronUp, Headphones, BookOpenText } from 'lucide-react-native';
+import { Headphones, BookOpenText } from 'lucide-react-native';
+import * as Sentry from '@sentry/react-native';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
-  Dimensions,
-  Easing,
-  PanResponder,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CelebrationOverlay } from '@/components/CelebrationOverlay';
 import { PaywallModal } from '@/components/PaywallModal';
@@ -30,9 +33,7 @@ import { TEIL_NAMES } from '@/theme/constants';
 import { didCrossBadgeThreshold, formatXp, getBadgeTier } from '@/lib/badgeHelpers';
 import {
   checkAndAwardBadges,
-  createStreamSession,
   fetchSectionAccuracy,
-  fetchStreamQuestions,
   updatePreparednessScore,
   updateXpAndStreak,
   type BadgeType,
@@ -42,34 +43,21 @@ import {
   fetchQuestionsByIds,
   getOrCreateStreamSession,
   saveStreamAnswer,
-  type StreamSession,
+  type SessionResult,
 } from '@/lib/streamSessionHelpers';
 import { useAccess } from '@/providers/AccessProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import type { AppQuestion } from '@/types/database';
 
-const SCREEN_HEIGHT = Dimensions.get('window').height;
-const SWIPE_THRESHOLD = SCREEN_HEIGHT * 0.15;
-const SWIPE_VELOCITY = 800;
-const SWIPE_HINT_KEY = 'wordifi_total_answered';
 const SESSION_SIZE = 20;
 
-type AnswerRecord = {
-  questionId: string;
-  selectedAnswer: string;
-  isCorrect: boolean;
-};
+// ─── Progress bar (reused from before) ──────────────────────────────────────
 
 function SessionProgressBar({ answered, total }: { answered: number; total: number }) {
   const progressAnim = useRef(new Animated.Value(0)).current;
-
   useEffect(() => {
-    if (answered > 0 && total > 0) {
-      Animated.timing(progressAnim, {
-        toValue: answered / total,
-        duration: 400,
-        useNativeDriver: false,
-      }).start();
+    if (total > 0) {
+      Animated.timing(progressAnim, { toValue: answered / total, duration: 400, useNativeDriver: false }).start();
     }
   }, [answered, total, progressAnim]);
 
@@ -78,15 +66,9 @@ function SessionProgressBar({ answered, total }: { answered: number; total: numb
       <View style={progressStyles.container}>
         {answered > 0 && (
           <Animated.View
-            style={[
-              progressStyles.fill,
-              {
-                width: progressAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: ['0%', '100%'],
-                }),
-              },
-            ]}
+            style={[progressStyles.fill, {
+              width: progressAnim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }),
+            }]}
           />
         )}
       </View>
@@ -96,132 +78,74 @@ function SessionProgressBar({ answered, total }: { answered: number; total: numb
 }
 
 const progressStyles = StyleSheet.create({
-  wrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    gap: 10,
-    paddingVertical: 6,
-    backgroundColor: Colors.primaryDeep,
-  },
-  container: {
-    flex: 1,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    overflow: 'hidden',
-    shadowColor: Colors.primaryDeep,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  fill: {
-    height: '100%',
-    borderRadius: 4,
-    backgroundColor: colors.blue,
-    shadowColor: colors.blue,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.4,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  counter: {
-    color: 'rgba(255,255,255,0.85)',
-    fontSize: 12,
-    fontWeight: '700' as const,
-    minWidth: 40,
-    textAlign: 'right' as const,
-  },
+  wrapper: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, gap: 10, paddingVertical: 6, backgroundColor: Colors.primaryDeep },
+  container: { flex: 1, height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.12)', overflow: 'hidden' },
+  fill: { height: '100%', borderRadius: 4, backgroundColor: colors.blue },
+  counter: { color: 'rgba(255,255,255,0.85)', fontSize: 12, fontWeight: '700' as const, minWidth: 40, textAlign: 'right' as const },
 });
+
+// ─── Main screen ─────────────────────────────────────────────────────────────
 
 export default function TestStreamScreen() {
   const { profile, user, refreshProfile } = useAuth();
   const { access, isStreamLimited, decrementStreamRemaining, incrementDailyStreamCount } = useAccess();
-  const queryClient = useQueryClient();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const userId = user?.id ?? '';
   const targetLevel = profile?.target_level ?? 'A1';
   const today = new Date().toISOString().slice(0, 10);
-  const SESSION_KEY = `wordifi_stream_${targetLevel}_${today}`;
-  const [showPaywall, setShowPaywall] = useState<boolean>(false);
 
+  // ── Core question state (simple, no refs) ──────────────────────────────────
+  const [questions, setQuestions] = useState<AppQuestion[]>([]);
   const [currentIndex, setCurrentIndex] = useState<number>(0);
-  const [answeredMap, setAnsweredMap] = useState<Record<string, string>>({});
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [isAnswered, setIsAnswered] = useState<boolean>(false);
+  const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isComplete, setIsComplete] = useState<boolean>(false);
+  const [initError, setInitError] = useState<string | null>(null);
+  const [isRecycledBanner, setIsRecycledBanner] = useState<boolean>(false);
   const [audioUnlockedMap, setAudioUnlockedMap] = useState<Record<string, boolean>>({});
+
+  // ── Gamification state ─────────────────────────────────────────────────────
+  const [showPaywall, setShowPaywall] = useState<boolean>(false);
   const [localPreparedness, setLocalPreparedness] = useState<number>(profile?.preparedness_score ?? 0);
   const [localXp, setLocalXp] = useState<number>(profile?.xp_total ?? 0);
   const [localStreak, setLocalStreak] = useState<number>(profile?.streak_count ?? 0);
-  const [isRecycledBanner, setIsRecycledBanner] = useState<boolean>(false);
   const [celebrationBadge, setCelebrationBadge] = useState<BadgeType | null>(null);
   const [streakToast, setStreakToast] = useState<string | null>(null);
   const [showBottomSheet, setShowBottomSheet] = useState<boolean>(false);
   const [reportQuestionId, setReportQuestionId] = useState<string | null>(null);
-  const [totalAnswered, setTotalAnswered] = useState<number>(0);
-  const [showSwipeHint, setShowSwipeHint] = useState<boolean>(false);
-  const [horenPct, setHorenPct] = useState<number>(0);
-  const [lesenPct, setLesenPct] = useState<number>(0);
-  const [previousIndex, setPreviousIndex] = useState<number | null>(null);
   const [sessionAnsweredCount, setSessionAnsweredCount] = useState<number>(0);
   const [correctStreak, setCorrectStreak] = useState<number>(0);
   const [comboToast, setComboToast] = useState<string | null>(null);
-  const [midSessionShown, setMidSessionShown] = useState<boolean>(false);
-  const [firstCorrectToday, setFirstCorrectToday] = useState<boolean>(false);
+  const [horenPct, setHorenPct] = useState<number>(0);
+  const [lesenPct, setLesenPct] = useState<number>(0);
   const [xpBurstVisible, setXpBurstVisible] = useState<boolean>(false);
   const [xpBurstValue, setXpBurstValue] = useState<number>(0);
+
   const xpBurstOpacity = useRef(new Animated.Value(0)).current;
   const xpBurstTranslateY = useRef(new Animated.Value(0)).current;
   const xpBurstScale = useRef(new Animated.Value(0.8)).current;
-
-  const blockAnswersRef = useRef<AnswerRecord[]>([]);
-  const blockStartTimeRef = useRef<number>(Date.now());
-  const sessionIdRef = useRef<string>('');
-  const answeredCountRef = useRef<number>(0);
-  const hasUpdatedStreakRef = useRef<boolean>(false);
-  const isAnimatingRef = useRef<boolean>(false);
-  const hasRestoredSession = useRef(false);
-
-  const translateY = useRef(new Animated.Value(0)).current;
   const streakToastAnim = useRef(new Animated.Value(-80)).current;
-  const swipeHintPulse = useRef(new Animated.Value(1)).current;
   const gaugeScaleAnim = useRef(new Animated.Value(1)).current;
   const comboToastAnim = useRef(new Animated.Value(0)).current;
 
-  // Refs for PanResponder — always hold the latest values so the handler
-  // doesn't need to be recreated on each render (which breaks gestures after Q2).
-  const currentIndexRef = useRef(currentIndex);
-  const answeredMapRef = useRef(answeredMap);
-  const questionsRef = useRef<AppQuestion[]>([]);
-  const isReviewModeRef = useRef<boolean>(false);
-  const previousIndexRef = useRef(previousIndex);
+  const XP_PER_LEVEL: Record<string, number> = useMemo(() => ({ A1: 5, A2: 10, B1: 15 }), []);
+  const streamSections = ['Hören', 'Lesen'];
 
-  const XP_PER_LEVEL: Record<string, number> = useMemo(() => ({
-    A1: 5,
-    A2: 10,
-    B1: 15,
-  }), []);
+  // ── Derived values ─────────────────────────────────────────────────────────
+  const currentQuestion = questions[currentIndex] ?? null;
+  const totalQuestions = questions.length;
+  const gaugeColor = useMemo(() => {
+    if (localPreparedness < 40) return colors.red;
+    if (localPreparedness < 70) return colors.amber;
+    return colors.green;
+  }, [localPreparedness]);
+  const badgeTier = useMemo(() => getBadgeTier(localXp), [localXp]);
+  const formattedXp = useMemo(() => formatXp(localXp), [localXp]);
 
-  const triggerXpBurst = useCallback((level: string) => {
-    const xpVal = XP_PER_LEVEL[level] ?? 5;
-    setXpBurstValue(xpVal);
-    setXpBurstVisible(true);
-    xpBurstOpacity.setValue(0);
-    xpBurstTranslateY.setValue(0);
-    xpBurstScale.setValue(0.8);
-
-    Animated.parallel([
-      Animated.timing(xpBurstOpacity, { toValue: 1, duration: 150, useNativeDriver: true }),
-      Animated.timing(xpBurstScale, { toValue: 1, duration: 150, useNativeDriver: true }),
-    ]).start(() => {
-      Animated.parallel([
-        Animated.timing(xpBurstTranslateY, { toValue: -30, duration: 450, useNativeDriver: true }),
-        Animated.timing(xpBurstOpacity, { toValue: 0, duration: 450, delay: 150, useNativeDriver: true }),
-      ]).start(() => {
-        setXpBurstVisible(false);
-      });
-    });
-  }, [XP_PER_LEVEL, xpBurstOpacity, xpBurstTranslateY, xpBurstScale]);
-
+  // ── Sync profile values ────────────────────────────────────────────────────
   useEffect(() => {
     if (profile) {
       setLocalPreparedness(profile.preparedness_score ?? 0);
@@ -229,13 +153,6 @@ export default function TestStreamScreen() {
       setLocalStreak(profile.streak_count ?? 0);
     }
   }, [profile]);
-
-  useEffect(() => {
-    AsyncStorage.getItem(SWIPE_HINT_KEY).then((val) => {
-      const count = val ? parseInt(val, 10) : 0;
-      setTotalAnswered(isNaN(count) ? 0 : count);
-    }).catch(() => {});
-  }, []);
 
   useEffect(() => {
     if (userId) {
@@ -246,136 +163,73 @@ export default function TestStreamScreen() {
     }
   }, [userId]);
 
-  const FREE_TRIAL_SECTIONS = ['Hören', 'Lesen'];
-  const isFreeTrial = access.tier === 'free_trial';
-  const streamSections = isFreeTrial ? FREE_TRIAL_SECTIONS : ['Hören', 'Lesen'];
-
-  // ── DB-backed session query ────────────────────────────────────────────────
-  const sessionQuery = useQuery({
-    queryKey: ['stream-session', targetLevel, userId, today],
-    enabled: Boolean(userId) && Boolean(targetLevel),
-    queryFn: async () => {
-      console.log('TestStream getOrCreateStreamSession', targetLevel, today);
-      const result = await getOrCreateStreamSession(userId, targetLevel, today, streamSections);
-      if (result.status === 'created' && result.isRecycled) {
-        setIsRecycledBanner(true);
-      }
-      // Fetch full question data for all IDs in the session
-      const questions = await fetchQuestionsByIds(result.session.question_ids);
-      return { sessionResult: result, questions };
-    },
-    staleTime: 1000 * 60 * 60,
-    gcTime: 1000 * 60 * 60 * 2,
-  });
-
-  const streamSession = sessionQuery.data?.sessionResult?.session ?? null;
-  const isSessionComplete = streamSession?.is_complete ?? false;
-  const questions = useMemo(() => sessionQuery.data?.questions ?? [], [sessionQuery.data?.questions]);
-  questionsRef.current = questions; // Sync ref immediately so PanResponder always sees latest
-  const currentQuestion = previousIndex !== null ? questions[previousIndex] ?? null : questions[currentIndex] ?? null;
-  const isReviewMode = previousIndex !== null;
-  const [questionLoadError, setQuestionLoadError] = useState<boolean>(false);
-
-  // Resume from DB session — restore current_index and completed_count
+  // ── Session init (2 DB calls total, then zero for questions) ───────────────
   useEffect(() => {
-    if (!streamSession || hasRestoredSession.current) return;
-    if (questions.length === 0) return;
+    if (!userId || !targetLevel) return;
+    let cancelled = false;
 
-    hasRestoredSession.current = true;
+    async function initSession() {
+      setIsLoading(true);
+      setInitError(null);
+      try {
+        const result: SessionResult = await getOrCreateStreamSession(userId, targetLevel, today, streamSections);
 
-    const resumeIndex = streamSession.current_index;
-    const resumeCount = streamSession.completed_count;
-    if (resumeIndex > 0) {
-      setCurrentIndex(resumeIndex);
-      currentIndexRef.current = resumeIndex;
-    }
-    if (resumeCount > 0) {
-      answeredCountRef.current = resumeCount;
-      setSessionAnsweredCount(resumeCount);
-    }
-    // Store session ID for answer writes
-    sessionIdRef.current = streamSession.id;
+        if (cancelled) return;
 
-    console.log('[StreamSession] Restored: index', resumeIndex, 'completed', resumeCount);
-  }, [streamSession, questions.length]);
+        if (result.status === 'complete') {
+          setIsComplete(true);
+          setSessionId(result.session.id);
+          setSessionAnsweredCount(result.session.completed_count);
+          setIsLoading(false);
+          return;
+        }
 
-  const ensureSession = useCallback(async () => {
-    // Session is created by getOrCreateStreamSession — just ensure the ref is set
-    if (!sessionIdRef.current && streamSession) {
-      sessionIdRef.current = streamSession.id;
-    }
-  }, [streamSession]);
+        if (result.status === 'created' && 'isRecycled' in result && result.isRecycled) {
+          setIsRecycledBanner(true);
+        }
 
-  const fetchMoreQuestions = useCallback(async () => {
-    console.log('TestStream prefetching more questions');
-    try {
-      const result = await fetchStreamQuestions({ userId, targetLevel, limit: SESSION_SIZE });
-      if (result.isRecycled) {
-        setIsRecycledBanner(true);
+        const session = result.session;
+        // Fetch all questions upfront — single DB call
+        const questionData = await fetchQuestionsByIds(session.question_ids);
+
+        if (cancelled) return;
+
+        setSessionId(session.id);
+        setQuestions(questionData);
+        setCurrentIndex(session.current_index);
+        setSessionAnsweredCount(session.completed_count);
+        setIsComplete(session.is_complete);
+      } catch (err) {
+        console.error('[Stream] Init failed:', err);
+        Sentry.captureException(err, { tags: { context: 'stream_init' } });
+        if (!cancelled) setInitError('Failed to load questions. Please try again.');
+      } finally {
+        if (!cancelled) setIsLoading(false);
       }
-      queryClient.setQueryData<AppQuestion[]>(
-        ['stream-questions', targetLevel, userId],
-        (old) => [...(old ?? []), ...result.questions]
-      );
-    } catch (err) {
-      console.log('TestStream prefetch error', err);
     }
-  }, [userId, targetLevel, queryClient]);
 
-  const writeBlockSession = useCallback(async () => {
-    const answers = blockAnswersRef.current;
-    if (answers.length === 0) return;
-    const correct = answers.filter((a) => a.isCorrect).length;
-    const timeTaken = Math.round((Date.now() - blockStartTimeRef.current) / 1000);
-    try {
-      await createStreamSession({
-        userId,
-        level: targetLevel,
-        questionsTotal: answers.length,
-        questionsCorrect: correct,
-        timeTakenSeconds: timeTaken,
-      });
-    } catch (err) {
-      console.log('TestStream writeBlockSession error', err);
-    }
-    blockAnswersRef.current = [];
-    blockStartTimeRef.current = Date.now();
-  }, [userId, targetLevel]);
+    void initSession();
+    return () => { cancelled = true; };
+  }, [userId, targetLevel, today]);
 
-  const showStreakToastBanner = useCallback(
-    (message: string) => {
-      setStreakToast(message);
-      Animated.sequence([
-        Animated.timing(streakToastAnim, { toValue: 0, duration: 250, useNativeDriver: true }),
-        Animated.delay(2500),
-        Animated.timing(streakToastAnim, { toValue: -80, duration: 300, useNativeDriver: true }),
-      ]).start(() => setStreakToast(null));
-    },
-    [streakToastAnim]
-  );
-
-  const showComboToastBanner = useCallback(
-    (message: string) => {
-      setComboToast(message);
-      Animated.sequence([
-        Animated.timing(comboToastAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
-        Animated.delay(1500),
-        Animated.timing(comboToastAnim, { toValue: 0, duration: 200, useNativeDriver: true }),
-      ]).start(() => setComboToast(null));
-    },
-    [comboToastAnim]
-  );
-
-  const checkMilestones = useCallback(
-    (streak: number, xp: number) => {
-      if ([7, 30, 60, 100].includes(streak)) {
-        showStreakToastBanner(`🔥 ${streak}-day streak!`);
-      } else if (xp > 0 && xp % 100 === 0) {
-        showStreakToastBanner(`⭐ ${xp} XP total`);
-      }
-    },
-    [showStreakToastBanner]
-  );
+  // ── Animation helpers ──────────────────────────────────────────────────────
+  const triggerXpBurst = useCallback((level: string) => {
+    const xpVal = XP_PER_LEVEL[level] ?? 5;
+    setXpBurstValue(xpVal);
+    setXpBurstVisible(true);
+    xpBurstOpacity.setValue(0);
+    xpBurstTranslateY.setValue(0);
+    xpBurstScale.setValue(0.8);
+    Animated.parallel([
+      Animated.timing(xpBurstOpacity, { toValue: 1, duration: 150, useNativeDriver: true }),
+      Animated.timing(xpBurstScale, { toValue: 1, duration: 150, useNativeDriver: true }),
+    ]).start(() => {
+      Animated.parallel([
+        Animated.timing(xpBurstTranslateY, { toValue: -30, duration: 450, useNativeDriver: true }),
+        Animated.timing(xpBurstOpacity, { toValue: 0, duration: 450, delay: 150, useNativeDriver: true }),
+      ]).start(() => setXpBurstVisible(false));
+    });
+  }, [XP_PER_LEVEL, xpBurstOpacity, xpBurstTranslateY, xpBurstScale]);
 
   const animateGaugePulse = useCallback(() => {
     Animated.sequence([
@@ -384,47 +238,50 @@ export default function TestStreamScreen() {
     ]).start();
   }, [gaugeScaleAnim]);
 
+  const showStreakToastBanner = useCallback((text: string) => {
+    setStreakToast(text);
+    Animated.sequence([
+      Animated.timing(streakToastAnim, { toValue: 60, duration: 300, useNativeDriver: true }),
+      Animated.delay(2000),
+      Animated.timing(streakToastAnim, { toValue: -80, duration: 300, useNativeDriver: true }),
+    ]).start(() => setStreakToast(null));
+  }, [streakToastAnim]);
+
+  const showComboToastBanner = useCallback((text: string) => {
+    setComboToast(text);
+    Animated.sequence([
+      Animated.timing(comboToastAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
+      Animated.delay(1500),
+      Animated.timing(comboToastAnim, { toValue: 0, duration: 200, useNativeDriver: true }),
+    ]).start(() => setComboToast(null));
+  }, [comboToastAnim]);
+
+  // ── Handle answer ──────────────────────────────────────────────────────────
   const handleAnswer = useCallback(
     async (questionId: string, selectedKey: string, isCorrect: boolean) => {
-      setAnsweredMap((prev) => ({ ...prev, [questionId]: selectedKey }));
-      answeredCountRef.current += 1;
-      const newSessionCount = answeredCountRef.current;
-      setSessionAnsweredCount(newSessionCount);
+      setSelectedAnswer(selectedKey);
+      setIsAnswered(true);
+
+      const newCount = sessionAnsweredCount + 1;
+      setSessionAnsweredCount(newCount);
 
       decrementStreamRemaining();
       incrementDailyStreamCount().catch(() => {});
-
-      const newTotal = totalAnswered + 1;
-      setTotalAnswered(newTotal);
-      AsyncStorage.setItem(SWIPE_HINT_KEY, String(newTotal)).catch(() => {});
-
-      if (newTotal <= 10) {
-        setShowSwipeHint(true);
-      }
 
       if (isCorrect) {
         triggerXpBurst(targetLevel);
         const newStrk = correctStreak + 1;
         setCorrectStreak(newStrk);
-
-        if (newStrk === 1 && !firstCorrectToday && newSessionCount === 1) {
-          setFirstCorrectToday(true);
-          showComboToastBanner('First correct today! ✦');
-        } else if (newStrk === 3) {
-          showComboToastBanner('3 in a row! 🔥');
-        } else if (newStrk === 5) {
-          showComboToastBanner('5 in a row! ⚡');
-        }
+        if (newStrk === 3) showComboToastBanner('3 in a row! 🔥');
+        else if (newStrk === 5) showComboToastBanner('5 in a row! ⚡');
       } else {
         setCorrectStreak(0);
       }
 
-      if (newSessionCount === Math.ceil(SESSION_SIZE / 2) && !midSessionShown && answeredCountRef.current === Math.ceil(SESSION_SIZE / 2)) {
-        setMidSessionShown(true);
+      if (newCount === Math.ceil(SESSION_SIZE / 2)) {
         showStreakToastBanner('Halfway there — you\'re doing great 🔥');
       }
-
-      if (newSessionCount === 10) {
+      if (newCount === 10) {
         showComboToastBanner('10 questions done! 💪');
       }
 
@@ -432,256 +289,91 @@ export default function TestStreamScreen() {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
       }
 
-      await ensureSession();
+      animateGaugePulse();
 
-      // Resolve session ID from query data if ref is still empty
-      if (!sessionIdRef.current && streamSession?.id) {
-        sessionIdRef.current = streamSession.id;
-      }
-
-      if (sessionIdRef.current) {
+      // Save answer — non-blocking
+      if (sessionId) {
         saveStreamAnswer({
-          sessionId: sessionIdRef.current,
+          sessionId,
           userId,
           questionId,
           selectedAnswer: selectedKey,
           isCorrect,
-        }).catch((err) => console.error('TestStream writeAnswer error', err));
-      } else {
-        console.error('[StreamSession] No session ID available, skipping answer save');
+        }).catch((err) => console.error('[Stream] Save answer error:', err));
       }
 
+      // Update preparedness — non-blocking
       updatePreparednessScore(userId, 1).then((newScore) => {
         setLocalPreparedness(newScore);
-      }).catch((err) => console.log('TestStream updatePreparedness error', err));
-      animateGaugePulse();
+      }).catch(() => {});
 
+      // Update XP + streak — non-blocking
       if (isCorrect && profile) {
-        const oldXp = localXp;
-        const { newXp, newStreak } = await updateXpAndStreak(userId, {
-          ...profile,
-          xp_total: localXp,
-          streak_count: localStreak,
-          last_active_date: profile.last_active_date,
-        });
-        setLocalXp(newXp);
-
-        const crossedBadge = didCrossBadgeThreshold(oldXp, newXp);
-        if (crossedBadge) {
-          showStreakToastBanner(`🏅 You reached ${crossedBadge.label}!`);
-        }
-
-        if (newStreak !== localStreak) {
-          setLocalStreak(newStreak);
-          if (!hasUpdatedStreakRef.current) {
-            hasUpdatedStreakRef.current = true;
-            checkMilestones(newStreak, newXp);
-          }
-        }
+        try {
+          const oldXp = localXp;
+          const { newXp, newStreak } = await updateXpAndStreak(userId, {
+            ...profile,
+            xp_total: localXp,
+            streak_count: localStreak,
+            last_active_date: profile.last_active_date,
+          });
+          setLocalXp(newXp);
+          const crossedBadge = didCrossBadgeThreshold(oldXp, newXp);
+          if (crossedBadge) showStreakToastBanner(`🏅 You reached ${crossedBadge.label}!`);
+          if (newStreak !== localStreak) setLocalStreak(newStreak);
+        } catch { /* silent */ }
       }
 
-      blockAnswersRef.current.push({ questionId, selectedAnswer: selectedKey, isCorrect });
-
-      if (answeredCountRef.current % 5 === 0) {
-        writeBlockSession().catch(() => {});
-        const badge = await checkAndAwardBadges(userId, targetLevel, localXp);
-        if (badge) setCelebrationBadge(badge);
+      // Check badges every 5 answers
+      if (newCount % 5 === 0) {
+        checkAndAwardBadges(userId, targetLevel, localXp).then((badge) => {
+          if (badge) setCelebrationBadge(badge);
+        }).catch(() => {});
         refreshProfile().catch(() => {});
       }
-
-      // Persist session progress to DB so user can resume after leaving the app
-      if (sessionIdRef.current) {
-        advanceSession(
-          sessionIdRef.current,
-          currentIndexRef.current + 1,
-          questions.length,
-        ).catch((err) => console.error('TestStream advanceSession error', err));
-      }
     },
-    [
-      userId, localXp, localStreak, profile, totalAnswered,
-      correctStreak, firstCorrectToday, midSessionShown,
-      ensureSession, writeBlockSession, targetLevel, questions.length, streamSession,
-      currentIndex, refreshProfile, checkMilestones, animateGaugePulse,
-      showStreakToastBanner, showComboToastBanner, decrementStreamRemaining, incrementDailyStreamCount, triggerXpBurst,
-      SESSION_KEY, today,
-    ]
+    [sessionId, userId, profile, localXp, localStreak, targetLevel, sessionAnsweredCount,
+     correctStreak, decrementStreamRemaining, incrementDailyStreamCount, triggerXpBurst,
+     animateGaugePulse, showStreakToastBanner, showComboToastBanner, refreshProfile]
   );
 
-  const handleAudioPlayed = useCallback((questionId: string) => {
-    setAudioUnlockedMap((prev) => ({ ...prev, [questionId]: true }));
-  }, []);
-
-  const advanceToNext = useCallback(() => {
-    if (isAnimatingRef.current) return;
-
-    // Use refs — not closure values — so the guard is never stale
-    const latestIndex = currentIndexRef.current;
-    const latestQuestions = questionsRef.current;
-    if (latestIndex >= latestQuestions.length - 1) return;
-
+  // ── Handle Next (advance to next question) ─────────────────────────────────
+  const handleNext = useCallback(() => {
     if (isStreamLimited) {
       setShowPaywall(true);
       return;
     }
 
-    isAnimatingRef.current = true;
-    setPreviousIndex(null);
-    setShowSwipeHint(false);
+    const newIndex = currentIndex + 1;
+    const isNowComplete = newIndex >= totalQuestions;
 
-    Animated.timing(translateY, {
-      toValue: -SCREEN_HEIGHT,
-      duration: 280,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
-    }).start(() => {
-      setCurrentIndex((prev) => {
-        const next = prev + 1;
-        currentIndexRef.current = next;
-        return next;
-      });
-      translateY.setValue(0);
-      isAnimatingRef.current = false;
-    });
-  }, [translateY, isStreamLimited, SESSION_KEY]);
-
-  const goToPrevious = useCallback(() => {
-    if (isAnimatingRef.current) return;
-    if (currentIndex <= 0) return;
-
-    isAnimatingRef.current = true;
-    setPreviousIndex(currentIndex - 1);
-
-    Animated.timing(translateY, {
-      toValue: SCREEN_HEIGHT,
-      duration: 280,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
-    }).start(() => {
-      translateY.setValue(0);
-      isAnimatingRef.current = false;
-    });
-  }, [currentIndex, translateY]);
-
-  const returnFromReview = useCallback(() => {
-    if (isAnimatingRef.current) return;
-    isAnimatingRef.current = true;
-
-    Animated.timing(translateY, {
-      toValue: -SCREEN_HEIGHT,
-      duration: 280,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
-    }).start(() => {
-      setPreviousIndex(null);
-      translateY.setValue(0);
-      isAnimatingRef.current = false;
-    });
-  }, [translateY]);
-
-  const bounceCard = useCallback(() => {
-    Animated.sequence([
-      Animated.timing(translateY, { toValue: -16, duration: 80, useNativeDriver: true }),
-      Animated.spring(translateY, { toValue: 0, friction: 6, useNativeDriver: true }),
-    ]).start();
-  }, [translateY]);
-
-  // Keep refs in sync with latest state/callbacks so panResponder can read them
-  // without needing to be recreated on every render.
-  useEffect(() => { currentIndexRef.current = currentIndex; }, [currentIndex]);
-  useEffect(() => { answeredMapRef.current = answeredMap; }, [answeredMap]);
-  useEffect(() => { questionsRef.current = questions; }, [questions]);
-  useEffect(() => { isReviewModeRef.current = isReviewMode; }, [isReviewMode]);
-  useEffect(() => { previousIndexRef.current = previousIndex; }, [previousIndex]);
-
-  const advanceToNextRef = useRef(advanceToNext);
-  const goToPreviousRef = useRef(goToPrevious);
-  const returnFromReviewRef = useRef(returnFromReview);
-  const bounceCardRef = useRef(bounceCard);
-  useEffect(() => { advanceToNextRef.current = advanceToNext; }, [advanceToNext]);
-  useEffect(() => { goToPreviousRef.current = goToPrevious; }, [goToPrevious]);
-  useEffect(() => { returnFromReviewRef.current = returnFromReview; }, [returnFromReview]);
-  useEffect(() => { bounceCardRef.current = bounceCard; }, [bounceCard]);
-
-  // Stable PanResponder — created once, reads latest values through refs.
-  // Recreating it on every render (useMemo) causes gesture handling to break after Q2.
-  const panResponder = useRef(
-    PanResponder.create({
-      onMoveShouldSetPanResponder: (_, g) => {
-        return Math.abs(g.dy) > 12 && Math.abs(g.dy) > Math.abs(g.dx) * 1.5;
-      },
-      onPanResponderMove: (_, g) => {
-        if (isAnimatingRef.current) return;
-        translateY.setValue(g.dy * 0.6);
-      },
-      onPanResponderRelease: (_, g) => {
-        if (isAnimatingRef.current) return;
-        const curIdx = currentIndexRef.current;
-        const curAnsweredMap = answeredMapRef.current;
-        const curQuestions = questionsRef.current;
-        const curIsReviewMode = isReviewModeRef.current;
-        const curPreviousIndex = previousIndexRef.current;
-
-        const activeQ = curIsReviewMode
-          ? curQuestions[curPreviousIndex ?? 0]
-          : curQuestions[curIdx];
-        const questionAnswered = activeQ ? Boolean(curAnsweredMap[activeQ.id]) : false;
-
-        if (g.dy < -SWIPE_THRESHOLD || g.vy < -SWIPE_VELOCITY / 1000) {
-          if (curIsReviewMode) {
-            returnFromReviewRef.current();
-          } else if (questionAnswered) {
-            advanceToNextRef.current();
-          } else {
-            bounceCardRef.current();
-          }
-        } else if (g.dy > SWIPE_THRESHOLD || g.vy > SWIPE_VELOCITY / 1000) {
-          if (curIsReviewMode) {
-            Animated.spring(translateY, { toValue: 0, friction: 8, useNativeDriver: true }).start();
-          } else if (curIdx > 0 && !curIsReviewMode) {
-            goToPreviousRef.current();
-          } else {
-            Animated.spring(translateY, { toValue: 0, friction: 8, useNativeDriver: true }).start();
-          }
-        } else {
-          Animated.spring(translateY, { toValue: 0, friction: 8, useNativeDriver: true }).start();
-        }
-      },
-    })
-  ).current;
-
-  useEffect(() => {
-    if (showSwipeHint && totalAnswered <= 10) {
-      const timeout = setTimeout(() => {
-        Animated.sequence([
-          Animated.timing(swipeHintPulse, { toValue: 0.5, duration: 400, useNativeDriver: true }),
-          Animated.timing(swipeHintPulse, { toValue: 1, duration: 400, useNativeDriver: true }),
-        ]).start();
-      }, 3000);
-      return () => clearTimeout(timeout);
+    // Advance session in DB — non-blocking
+    if (sessionId) {
+      advanceSession(sessionId, newIndex, totalQuestions)
+        .catch((err) => console.error('[Stream] Advance error:', err));
     }
-  }, [showSwipeHint, totalAnswered, swipeHintPulse]);
 
-  const isCurrentAnswered = currentQuestion ? Boolean(answeredMap[currentQuestion.id]) : false;
+    if (isNowComplete) {
+      setIsComplete(true);
+      return;
+    }
 
-  const gaugeColor = useMemo(() => {
-    if (localPreparedness < 40) return colors.red;
-    if (localPreparedness < 70) return colors.amber;
-    return colors.green;
-  }, [localPreparedness]);
+    // Reset answer state and advance
+    setIsAnswered(false);
+    setSelectedAnswer(null);
+    setCurrentIndex(newIndex);
+  }, [currentIndex, totalQuestions, sessionId, isStreamLimited]);
 
-  const badgeTier = useMemo(() => getBadgeTier(localXp), [localXp]);
-  const formattedXp = useMemo(() => formatXp(localXp), [localXp]);
+  const handleAudioPlayed = useCallback((questionId: string) => {
+    setAudioUnlockedMap((prev) => ({ ...prev, [questionId]: true }));
+  }, []);
 
   const handleReportPress = useCallback((qId: string) => {
     setReportQuestionId(qId);
   }, []);
 
-  const isFirstLaunch = useMemo(() => {
-    return Object.keys(answeredMap).length === 0 && totalAnswered === 0 && questions.length > 0;
-  }, [answeredMap, totalAnswered, questions.length]);
-
-  if (sessionQuery.isLoading) {
+  // ── Render: Loading ────────────────────────────────────────────────────────
+  if (isLoading) {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.loadingWrap}>
@@ -692,14 +384,15 @@ export default function TestStreamScreen() {
     );
   }
 
-  if (sessionQuery.isError) {
+  // ── Render: Init error ─────────────────────────────────────────────────────
+  if (initError) {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.emptyWrap}>
           <Text style={styles.emptyEmoji}>⚠️</Text>
           <Text style={styles.emptyTitle}>Couldn't load questions</Text>
-          <Text style={styles.emptyDesc}>Check your connection and try again.</Text>
-          <Pressable style={styles.ctaPrimary} onPress={() => sessionQuery.refetch()}>
+          <Text style={styles.emptyDesc}>{initError}</Text>
+          <Pressable style={styles.ctaPrimary} onPress={() => { setInitError(null); setIsLoading(true); }}>
             <Text style={styles.ctaPrimaryText}>Try Again</Text>
           </Pressable>
         </View>
@@ -707,14 +400,15 @@ export default function TestStreamScreen() {
     );
   }
 
-  if (isSessionComplete) {
+  // ── Render: Session complete ───────────────────────────────────────────────
+  if (isComplete) {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.emptyWrap}>
           <Text style={styles.emptyEmoji}>🎉</Text>
           <Text style={styles.emptyTitle}>Today's stream complete!</Text>
           <Text style={styles.emptyDesc}>
-            You answered {streamSession?.completed_count ?? 0} questions today.{'\n'}
+            You answered {sessionAnsweredCount} questions today.{'\n'}
             Come back tomorrow for your next stream.
           </Text>
           <Pressable style={styles.ctaSecondary} onPress={() => router.push('/(tabs)/tests' as never)}>
@@ -725,7 +419,8 @@ export default function TestStreamScreen() {
     );
   }
 
-  if (isStreamLimited) {
+  // ── Render: Daily limit reached ────────────────────────────────────────────
+  if (isStreamLimited && !isAnswered) {
     const dailyLimit = access.stream_questions_per_day ?? 0;
     return (
       <SafeAreaView style={styles.safeArea}>
@@ -737,18 +432,10 @@ export default function TestStreamScreen() {
             Upgrade to practise unlimited questions every day.
           </Text>
           <View style={styles.emptyCtas}>
-            <Pressable
-              style={styles.ctaPrimary}
-              onPress={() => setShowPaywall(true)}
-              testID="stream-limit-upgrade-cta"
-            >
+            <Pressable style={styles.ctaPrimary} onPress={() => setShowPaywall(true)}>
               <Text style={styles.ctaPrimaryText}>Unlock Unlimited</Text>
             </Pressable>
-            <Pressable
-              style={styles.ctaSecondary}
-              onPress={() => router.push('/(tabs)/tests' as never)}
-              testID="stream-limit-sectional-cta"
-            >
+            <Pressable style={styles.ctaSecondary} onPress={() => router.push('/(tabs)/tests' as never)}>
               <Text style={styles.ctaSecondaryText}>Try a Sectional Test</Text>
             </Pressable>
           </View>
@@ -758,46 +445,30 @@ export default function TestStreamScreen() {
     );
   }
 
+  // ── Render: No questions ───────────────────────────────────────────────────
   if (questions.length === 0) {
     return (
       <SafeAreaView style={styles.safeArea}>
-        <View style={styles.statusBar}>
-          <View style={styles.statusLeft}>
-            <Text style={styles.statusLabelText}>No questions</Text>
-          </View>
-          <Animated.View style={[styles.gaugePill, { backgroundColor: gaugeColor, transform: [{ scale: gaugeScaleAnim }] }]}>
-            <Text style={styles.gaugeText}>{targetLevel} · {Math.round(localPreparedness)}%</Text>
-          </Animated.View>
-        </View>
         <View style={styles.emptyWrap}>
           <Text style={styles.emptyEmoji}>🏆</Text>
-          <Text style={styles.emptyTitle}>You've completed all available questions!</Text>
-          <Text style={styles.emptyDesc}>Come back tomorrow or try a Sectional Test for deeper practice.</Text>
-          <View style={styles.emptyCtas}>
-            <Pressable
-              style={styles.ctaPrimary}
-              onPress={() => router.push('/(tabs)/tests' as never)}
-              testID="empty-sectional-cta"
-            >
-              <Text style={styles.ctaPrimaryText}>Try Sectional Test</Text>
-            </Pressable>
-            <Pressable style={styles.ctaSecondary} testID="empty-tomorrow-cta">
-              <Text style={styles.ctaSecondaryText}>Come back tomorrow</Text>
-            </Pressable>
-          </View>
+          <Text style={styles.emptyTitle}>No questions available</Text>
+          <Text style={styles.emptyDesc}>Come back tomorrow or try a Sectional Test.</Text>
+          <Pressable style={styles.ctaPrimary} onPress={() => router.push('/(tabs)/tests' as never)}>
+            <Text style={styles.ctaPrimaryText}>Try Sectional Test</Text>
+          </Pressable>
         </View>
       </SafeAreaView>
     );
   }
 
+  // ── Render: Main stream ────────────────────────────────────────────────────
   return (
     <SafeAreaView style={styles.safeArea}>
       {access.trial_hours_remaining !== null ? (
-        <TrialBanner
-          hoursRemaining={access.trial_hours_remaining}
-          onUpgrade={() => setShowPaywall(true)}
-        />
+        <TrialBanner hoursRemaining={access.trial_hours_remaining} onUpgrade={() => setShowPaywall(true)} />
       ) : null}
+
+      {/* Status bar */}
       <View style={styles.statusBar}>
         <View style={styles.statusLeft}>
           {currentQuestion ? (
@@ -818,12 +489,12 @@ export default function TestStreamScreen() {
         </View>
         <Pressable onPress={() => setShowBottomSheet(true)} testID="gauge-pill">
           <Animated.View style={[styles.gaugePill, { backgroundColor: gaugeColor, transform: [{ scale: gaugeScaleAnim }] }]}>
-            <Text style={styles.gaugeText}>{sessionAnsweredCount}/{SESSION_SIZE}</Text>
+            <Text style={styles.gaugeText}>{currentIndex + 1}/{totalQuestions}</Text>
           </Animated.View>
         </Pressable>
       </View>
 
-      <SessionProgressBar answered={sessionAnsweredCount} total={SESSION_SIZE} />
+      <SessionProgressBar answered={sessionAnsweredCount} total={totalQuestions} />
 
       {isRecycledBanner ? (
         <View style={styles.recycledBanner}>
@@ -834,86 +505,49 @@ export default function TestStreamScreen() {
         </View>
       ) : null}
 
-      {isFirstLaunch && currentQuestion ? (
-        <View style={styles.welcomeBanner}>
-          <Text style={styles.welcomeText}>
-            Your first {targetLevel} question. Answer to continue.
-          </Text>
-        </View>
-      ) : null}
-
-      {isReviewMode ? (
-        <View style={styles.reviewBanner}>
-          <Text style={styles.reviewText}>← Review · Read only</Text>
-        </View>
-      ) : null}
-
+      {/* Question card — uses ScrollView for long content */}
       <View style={styles.cardContainer}>
         {currentQuestion ? (
-          <Animated.View style={[styles.animatedCard, { transform: [{ translateY }] }]}>
-            <StreamCard
-              question={currentQuestion}
-              onAnswer={handleAnswer}
-              isAnswered={Boolean(answeredMap[currentQuestion.id])}
-              selectedAnswer={answeredMap[currentQuestion.id] ?? null}
-              audioUnlocked={audioUnlockedMap[currentQuestion.id] ?? false}
-              onAudioPlayed={() => handleAudioPlayed(currentQuestion.id)}
-              onReportPress={handleReportPress}
-              reviewMode={isReviewMode}
-            />
-          </Animated.View>
+          <StreamCard
+            question={currentQuestion}
+            onAnswer={handleAnswer}
+            isAnswered={isAnswered}
+            selectedAnswer={selectedAnswer}
+            audioUnlocked={audioUnlockedMap[currentQuestion.id] ?? false}
+            onAudioPlayed={() => handleAudioPlayed(currentQuestion.id)}
+            onReportPress={handleReportPress}
+            reviewMode={false}
+          />
         ) : (
           <View style={styles.skipErrorWrap}>
             <Text style={styles.skipErrorEmoji}>⚠️</Text>
             <Text style={styles.skipErrorTitle}>Couldn't load this question</Text>
-            <Pressable
-              style={styles.ctaPrimary}
-              onPress={() => {
-                const nextIdx = currentIndex + 1;
-                if (nextIdx < questions.length) {
-                  setCurrentIndex(nextIdx);
-                  currentIndexRef.current = nextIdx;
-                  if (sessionIdRef.current) {
-                    advanceSession(sessionIdRef.current, nextIdx, questions.length).catch(() => {});
-                  }
-                }
-              }}
-            >
+            <Pressable style={styles.ctaPrimary} onPress={() => {
+              if (currentIndex + 1 < totalQuestions) {
+                setIsAnswered(false);
+                setSelectedAnswer(null);
+                setCurrentIndex(currentIndex + 1);
+                if (sessionId) advanceSession(sessionId, currentIndex + 1, totalQuestions).catch(() => {});
+              }
+            }}>
               <Text style={styles.ctaPrimaryText}>Skip to next</Text>
             </Pressable>
           </View>
         )}
       </View>
 
-      {/* Next button — appears once the question is answered */}
-      {isCurrentAnswered && !isReviewMode ? (
-        <Pressable
-          onPress={advanceToNext}
-          style={styles.nextBtn}
-          accessibilityRole="button"
-          accessibilityLabel="Next question"
-        >
-          <Text style={styles.nextBtnText}>Next</Text>
-          <ChevronUp
-            color={Colors.white}
-            size={20}
-            style={{ transform: [{ rotate: '90deg' }] }}
-          />
-        </Pressable>
+      {/* Next button — shown after answering */}
+      {isAnswered ? (
+        <View style={[styles.footer, { paddingBottom: insets.bottom + 12 }]}>
+          <Pressable onPress={handleNext} style={styles.nextBtn} testID="stream-next-btn">
+            <Text style={styles.nextBtnText}>
+              {currentIndex + 1 >= totalQuestions ? 'Fertig' : 'Weiter →'}
+            </Text>
+          </Pressable>
+        </View>
       ) : null}
 
-      {/* Exit review mode */}
-      {isReviewMode ? (
-        <Pressable
-          onPress={returnFromReview}
-          style={styles.reviewExitBtn}
-          accessibilityRole="button"
-          accessibilityLabel="Back to current question"
-        >
-          <Text style={styles.reviewExitText}>Back to current →</Text>
-        </Pressable>
-      ) : null}
-
+      {/* Stats row */}
       <View style={styles.progressRow}>
         <View style={styles.statsRow}>
           <Text style={styles.statText}>🔥 {localStreak}</Text>
@@ -926,6 +560,7 @@ export default function TestStreamScreen() {
         </View>
       </View>
 
+      {/* Toasts and overlays */}
       {comboToast ? (
         <Animated.View style={[styles.comboPill, { opacity: comboToastAnim, transform: [{ scale: comboToastAnim.interpolate({ inputRange: [0, 1], outputRange: [0.8, 1] }) }] }]}>
           <Text style={styles.comboPillText}>{comboToast}</Text>
@@ -933,20 +568,13 @@ export default function TestStreamScreen() {
       ) : null}
 
       {xpBurstVisible ? (
-        <Animated.View
-          pointerEvents="none"
-          style={[styles.xpBurst, { opacity: xpBurstOpacity, transform: [{ translateY: xpBurstTranslateY }, { scale: xpBurstScale }] }]}
-        >
+        <Animated.View pointerEvents="none" style={[styles.xpBurst, { opacity: xpBurstOpacity, transform: [{ translateY: xpBurstTranslateY }, { scale: xpBurstScale }] }]}>
           <Text style={styles.xpBurstText}>+{xpBurstValue} XP</Text>
         </Animated.View>
       ) : null}
 
       {celebrationBadge ? (
-        <CelebrationOverlay
-          badgeType={celebrationBadge}
-          level={targetLevel}
-          onDismiss={() => setCelebrationBadge(null)}
-        />
+        <CelebrationOverlay badgeType={celebrationBadge} level={targetLevel} onDismiss={() => setCelebrationBadge(null)} />
       ) : null}
 
       {streakToast ? (
@@ -976,289 +604,59 @@ export default function TestStreamScreen() {
       <PaywallModal
         visible={showPaywall}
         variant="stream_limit"
-        onUpgrade={() => {
-          setShowPaywall(false);
-        }}
+        onUpgrade={() => setShowPaywall(false)}
         onDismiss={() => setShowPaywall(false)}
       />
     </SafeAreaView>
   );
 }
 
+// ─── Styles ──────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
+  safeArea: { flex: 1, backgroundColor: Colors.background },
   statusBar: {
-    height: 52,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    backgroundColor: Colors.primaryDeep,
+    height: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 16, backgroundColor: Colors.primaryDeep,
   },
-  statusLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  statusLabelText: {
-    fontSize: 12,
-    fontWeight: '600' as const,
-    color: 'rgba(255,255,255,0.7)',
-  },
-  gaugePill: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 99,
-  },
-  gaugeText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '700' as const,
-  },
-  loadingWrap: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-  },
-  loadingText: {
-    color: Colors.textMuted,
-    fontSize: 15,
-    fontWeight: '600' as const,
-  },
-  emptyWrap: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 32,
-    gap: 12,
-  },
-  skipErrorWrap: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 32,
-    gap: 16,
-  },
+  statusLeft: { flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 },
+  statusLabelText: { fontSize: 12, fontWeight: '600' as const, color: 'rgba(255,255,255,0.7)' },
+  gaugePill: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 99 },
+  gaugeText: { color: '#fff', fontSize: 12, fontWeight: '700' as const },
+  loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
+  loadingText: { color: Colors.textMuted, fontSize: 15, fontWeight: '600' as const },
+  emptyWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, gap: 12 },
+  emptyEmoji: { fontSize: 48 },
+  emptyTitle: { fontSize: 20, fontWeight: '700' as const, color: Colors.text, textAlign: 'center' },
+  emptyDesc: { fontSize: 14, color: Colors.textMuted, textAlign: 'center', lineHeight: 22 },
+  emptyCtas: { gap: 10, width: '100%', marginTop: 16 },
+  ctaPrimary: { backgroundColor: Colors.accent, paddingVertical: 14, borderRadius: 14, alignItems: 'center' },
+  ctaPrimaryText: { color: '#fff', fontSize: 15, fontWeight: '700' as const },
+  ctaSecondary: { backgroundColor: Colors.surfaceMuted, paddingVertical: 14, borderRadius: 14, alignItems: 'center' },
+  ctaSecondaryText: { color: Colors.text, fontSize: 15, fontWeight: '600' as const },
+  recycledBanner: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF3E0', paddingHorizontal: 16, paddingVertical: 10, gap: 10 },
+  recycledText: { flex: 1, color: '#E65100', fontSize: 13, fontWeight: '600' as const, lineHeight: 18 },
+  recycledClose: { color: '#E65100', fontWeight: '700' as const, fontSize: 16 },
+  cardContainer: { flex: 1, overflow: 'hidden' },
+  skipErrorWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, gap: 16 },
   skipErrorEmoji: { fontSize: 40 },
-  skipErrorTitle: {
-    fontSize: 16,
-    fontWeight: '600' as const,
-    color: Colors.textMuted,
-    textAlign: 'center' as const,
-  },
-  emptyEmoji: {
-    fontSize: 48,
-  },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: '700' as const,
-    color: Colors.text,
-    textAlign: 'center',
-  },
-  emptyDesc: {
-    fontSize: 14,
-    color: Colors.textMuted,
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-  emptyCtas: {
-    gap: 10,
-    width: '100%',
-    marginTop: 16,
-  },
-  ctaPrimary: {
-    backgroundColor: Colors.accent,
-    paddingVertical: 14,
-    borderRadius: 14,
-    alignItems: 'center',
-  },
-  ctaPrimaryText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '700' as const,
-  },
-  ctaSecondary: {
-    backgroundColor: Colors.surfaceMuted,
-    paddingVertical: 14,
-    borderRadius: 14,
-    alignItems: 'center',
-  },
-  ctaSecondaryText: {
-    color: Colors.text,
-    fontSize: 15,
-    fontWeight: '600' as const,
-  },
-  recycledBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFF3E0',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    gap: 10,
-  },
-  recycledText: {
-    flex: 1,
-    color: '#E65100',
-    fontSize: 13,
-    fontWeight: '600' as const,
-    lineHeight: 18,
-  },
-  recycledClose: {
-    color: '#E65100',
-    fontWeight: '700' as const,
-    fontSize: 16,
-  },
-  welcomeBanner: {
-    backgroundColor: Colors.primarySoft,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-  },
-  welcomeText: {
-    color: Colors.primary,
-    fontSize: 13,
-    fontWeight: '600' as const,
-    textAlign: 'center',
-  },
-  reviewBanner: {
-    backgroundColor: Colors.surfaceMuted,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
-  reviewText: {
-    color: Colors.textMuted,
-    fontSize: 12,
-    fontWeight: '600' as const,
-    textAlign: 'center',
-  },
-  cardContainer: {
-    flex: 1,
-    overflow: 'hidden',
-  },
-  animatedCard: {
-    flex: 1,
-  },
-  swipeHint: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    paddingVertical: 6,
-  },
-  swipeHintText: {
-    color: Colors.textMuted,
-    fontSize: 12,
-    fontWeight: '600' as const,
-  },
-  progressRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: Colors.background,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  statText: {
-    color: Colors.textMuted,
-    fontSize: 12,
-    fontWeight: '700' as const,
-  },
-  xpRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  badgePill: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 99,
-  },
-  badgePillText: {
-    fontSize: 10,
-    fontWeight: '800' as const,
-    color: colors.text,
-  },
-  comboPill: {
-    position: 'absolute',
-    top: 110,
-    alignSelf: 'center',
-    backgroundColor: colors.amber,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 99,
-    zIndex: 200,
-  },
-  comboPillText: {
-    color: colors.navy,
-    fontSize: 13,
-    fontWeight: '800' as const,
-  },
-  toast: {
-    position: 'absolute',
-    top: 0,
-    left: 16,
-    right: 16,
-    backgroundColor: Colors.primaryDeep,
-    borderRadius: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    alignItems: 'center',
-    zIndex: 300,
-  },
-  toastText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '700' as const,
-  },
-  xpBurst: {
-    position: 'absolute',
-    top: '45%' as unknown as number,
-    alignSelf: 'center',
-    zIndex: 250,
-  },
-  xpBurstText: {
-    color: colors.green,
-    fontSize: 18,
-    fontWeight: '800' as const,
-  },
+  skipErrorTitle: { fontSize: 16, fontWeight: '600' as const, color: Colors.textMuted, textAlign: 'center' as const },
+  footer: { paddingHorizontal: 24, paddingTop: 8, backgroundColor: Colors.background },
   nextBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    marginHorizontal: 24,
-    marginBottom: 8,
-    paddingVertical: 16,
-    borderRadius: 16,
-    backgroundColor: Colors.primary,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    paddingVertical: 16, borderRadius: 16, backgroundColor: Colors.primary,
   },
-  nextBtnText: {
-    color: Colors.white,
-    fontSize: 16,
-    fontWeight: '700' as const,
-    fontFamily: 'NunitoSans_700Bold',
-  },
-  reviewExitBtn: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginHorizontal: 24,
-    marginBottom: 8,
-    paddingVertical: 12,
-    borderRadius: 16,
-    backgroundColor: Colors.surface,
-  },
-  reviewExitText: {
-    color: Colors.primary,
-    fontSize: 14,
-    fontWeight: '600' as const,
-    fontFamily: 'NunitoSans_600SemiBold',
-  },
+  nextBtnText: { color: Colors.white, fontSize: 16, fontWeight: '700' as const, fontFamily: 'NunitoSans_700Bold' },
+  progressRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16, paddingVertical: 8, backgroundColor: Colors.background },
+  statsRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  statText: { color: Colors.textMuted, fontSize: 12, fontWeight: '700' as const },
+  xpRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  badgePill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 99 },
+  badgePillText: { fontSize: 10, fontWeight: '800' as const, color: colors.text },
+  comboPill: { position: 'absolute', top: 110, alignSelf: 'center', backgroundColor: colors.amber, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 99, zIndex: 200 },
+  comboPillText: { color: colors.navy, fontSize: 13, fontWeight: '800' as const },
+  toast: { position: 'absolute', top: 0, left: 16, right: 16, backgroundColor: Colors.primaryDeep, borderRadius: 14, paddingVertical: 14, paddingHorizontal: 20, alignItems: 'center', zIndex: 300 },
+  toastText: { color: '#fff', fontSize: 15, fontWeight: '700' as const },
+  xpBurst: { position: 'absolute', top: '45%' as unknown as number, alignSelf: 'center', zIndex: 250 },
+  xpBurstText: { color: colors.green, fontSize: 18, fontWeight: '800' as const },
 });
