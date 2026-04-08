@@ -9,6 +9,7 @@
  *   UNIQUE(user_id, level, session_date)
  */
 import { supabase } from '@/lib/supabaseClient';
+import * as Sentry from '@sentry/react-native';
 import type { AppQuestion } from '@/types/database';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -50,6 +51,7 @@ export async function getOrCreateStreamSession(
 
   if (selectErr) {
     console.error('[StreamSession] select error', selectErr);
+    Sentry.captureException(selectErr, { tags: { context: 'stream_session' } });
     throw selectErr;
   }
 
@@ -81,6 +83,7 @@ export async function getOrCreateStreamSession(
 
   if (insertErr) {
     console.error('[StreamSession] insert error', insertErr);
+    Sentry.captureException(insertErr, { tags: { context: 'stream_session' } });
     throw insertErr;
   }
 
@@ -145,6 +148,7 @@ export async function selectQuestionsForSession(
 
   if (eligibleErr) {
     console.error('[StreamSession] eligible query error', eligibleErr);
+    Sentry.captureException(eligibleErr, { tags: { context: 'stream_session' } });
     throw eligibleErr;
   }
 
@@ -174,6 +178,7 @@ export async function selectQuestionsForSession(
 
   if (allErr) {
     console.error('[StreamSession] recycle query error', allErr);
+    Sentry.captureException(allErr, { tags: { context: 'stream_session' } });
     throw allErr;
   }
 
@@ -207,6 +212,7 @@ export async function advanceSession(
 
   if (error) {
     console.error('[StreamSession] advance error', error);
+    Sentry.captureException(error, { tags: { context: 'stream_session' } });
   }
 }
 
@@ -232,6 +238,7 @@ export async function saveStreamAnswer(params: {
 
   if (error) {
     console.error('[StreamSession] saveAnswer error', error);
+    Sentry.captureException(error, { tags: { context: 'stream_session' } });
   }
 }
 
@@ -248,6 +255,7 @@ export async function fetchQuestionById(
 
   if (error) {
     console.error('[StreamSession] fetchQuestion error', error);
+    Sentry.captureException(error, { tags: { context: 'stream_session' } });
     return null;
   }
 
@@ -268,6 +276,7 @@ export async function fetchQuestionsByIds(
 
   if (error) {
     console.error('[StreamSession] fetchQuestionsByIds error', error);
+    Sentry.captureException(error, { tags: { context: 'stream_session' } });
     return [];
   }
 

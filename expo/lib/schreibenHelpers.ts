@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabaseClient';
+import * as Sentry from '@sentry/react-native';
 import type { AppQuestion } from '@/types/database';
 import type { AssessmentResult } from '@/types/schreiben';
 
@@ -29,6 +30,7 @@ export const assessSchreiben = async (
     }
   } catch (cacheErr) {
     console.log('schreibenHelpers assessSchreiben: cache check failed, proceeding to edge function', cacheErr);
+    Sentry.captureException(cacheErr, { tags: { context: 'schreiben' } });
   }
 
   const requiredPoints = taskType === 'form_fill'
@@ -48,6 +50,7 @@ export const assessSchreiben = async (
     const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
     if (refreshError || !refreshed.session) {
       console.log('schreibenHelpers assessSchreiben: session refresh failed', refreshError);
+      Sentry.captureException(refreshError ?? new Error('Session expired — please sign in again'), { tags: { context: 'schreiben' } });
       throw new Error('Session expired — please sign in again');
     }
     accessToken = refreshed.session.access_token;
@@ -90,6 +93,7 @@ export const assessSchreiben = async (
     });
   } catch (fetchErr) {
     console.log('schreibenHelpers assessSchreiben fetch network error', String(fetchErr));
+    Sentry.captureException(fetchErr, { tags: { context: 'schreiben' } });
     throw new Error('Network error calling assess-schreiben');
   }
 
@@ -99,7 +103,9 @@ export const assessSchreiben = async (
   console.log('schreibenHelpers assessSchreiben response body', responseText.slice(0, 500));
 
   if (!response.ok) {
-    throw new Error(`Edge function returned ${response.status}: ${responseText.slice(0, 200)}`);
+    const err = new Error(`Edge function returned ${response.status}: ${responseText.slice(0, 200)}`);
+    Sentry.captureException(err, { tags: { context: 'schreiben' } });
+    throw err;
   }
 
   let data: Record<string, unknown>;
@@ -107,7 +113,9 @@ export const assessSchreiben = async (
     data = JSON.parse(responseText);
   } catch {
     console.log('schreibenHelpers assessSchreiben: failed to parse JSON');
-    throw new Error('Invalid JSON from edge function');
+    const parseErr = new Error('Invalid JSON from edge function');
+    Sentry.captureException(parseErr, { tags: { context: 'schreiben' } });
+    throw parseErr;
   }
 
   console.log('schreibenHelpers assessSchreiben parsed keys:', Object.keys(data));
@@ -116,7 +124,9 @@ export const assessSchreiben = async (
 
   if (!assessment) {
     console.log('schreibenHelpers assessSchreiben: could not find assessment. Full data:', JSON.stringify(data).slice(0, 500));
-    throw new Error('Assessment not found in response');
+    const noAssessmentErr = new Error('Assessment not found in response');
+    Sentry.captureException(noAssessmentErr, { tags: { context: 'schreiben' } });
+    throw noAssessmentErr;
   }
 
   console.log('schreibenHelpers assessSchreiben result score:', assessment.overall_score);
@@ -135,6 +145,7 @@ export async function fetchSchreibenTeile(level: string): Promise<Array<{ teil: 
 
   if (error) {
     console.log('fetchSchreibenTeile error', error);
+    Sentry.captureException(error, { tags: { context: 'schreiben' } });
     throw error;
   }
 
@@ -187,6 +198,7 @@ export async function fetchSchreibenQuestions(
 
   if (error) {
     console.log('fetchSchreibenQuestions error', error);
+    Sentry.captureException(error, { tags: { context: 'schreiben' } });
     throw error;
   }
 
@@ -210,6 +222,7 @@ export async function fetchExistingSubmission(
 
   if (error) {
     console.log('fetchExistingSubmission error', error);
+    Sentry.captureException(error, { tags: { context: 'schreiben' } });
     return null;
   }
 
@@ -224,6 +237,7 @@ export async function fetchExistingSubmission(
       return parsed as AssessmentResult;
     } catch {
       console.log('fetchExistingSubmission: failed to parse assessment_json');
+      Sentry.captureException(new Error('Failed to parse assessment_json in fetchExistingSubmission'), { tags: { context: 'schreiben' } });
     }
   }
 

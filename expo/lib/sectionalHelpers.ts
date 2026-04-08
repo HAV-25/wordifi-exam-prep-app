@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabaseClient';
 import { MOCK_TEST_QUESTION_COUNTS, shuffleArray, XP_RATES } from '@/theme/constants';
 import type { AppQuestion, UserProfile } from '@/types/database';
+import * as Sentry from '@sentry/react-native';
 
 const PAID_TIERS = ['paid_early', 'monthly', 'quarterly', 'winback_monthly', 'winback_quarterly'];
 
@@ -41,6 +42,7 @@ export async function fetchAvailableTeile(level: string): Promise<TeilInfo[]> {
 
   if (error) {
     console.log('fetchAvailableTeile error', error);
+    Sentry.captureException(error, { tags: { context: 'sectional' } });
     throw error;
   }
 
@@ -146,6 +148,7 @@ export async function fetchSectionalQuestions(
 
   if (error) {
     console.log('fetchSectionalQuestions error', error);
+    Sentry.captureException(error, { tags: { context: 'sectional' } });
     throw error;
   }
 
@@ -195,6 +198,7 @@ export async function createSectionalSession(params: {
 
   if (error) {
     console.log('createSectionalSession error', error);
+    Sentry.captureException(error, { tags: { context: 'sectional' } });
     throw error;
   }
 
@@ -237,6 +241,7 @@ export async function completeSectionalSession(params: {
 
     if (sessionError) {
       console.log('completeSectionalSession session update error', sessionError);
+      Sentry.captureException(sessionError, { tags: { context: 'sectional' } });
     }
 
     const answerRows = questions.map((q) => ({
@@ -252,6 +257,7 @@ export async function completeSectionalSession(params: {
     const { error: answersError } = await (supabase.from('user_answers') as any).insert(answerRows);
     if (answersError) {
       console.log('completeSectionalSession answers insert error', answersError);
+      Sentry.captureException(answersError, { tags: { context: 'sectional' } });
     }
 
     const today = new Date().toISOString().split('T')[0] ?? '';
@@ -278,9 +284,11 @@ export async function completeSectionalSession(params: {
 
     if (profileError) {
       console.error('completeSectionalSession profile update error', profileError);
+      Sentry.captureException(profileError, { tags: { context: 'sectional' } });
     }
   } catch (err) {
     console.log('completeSectionalSession unexpected error', err);
+    Sentry.captureException(err, { tags: { context: 'sectional' } });
   }
 
   return { correctCount, total, scorePct };
@@ -317,6 +325,7 @@ export async function fetchSprachbausteineQuestions(
 
   if (error) {
     console.log('fetchSprachbausteineQuestions error', error);
+    Sentry.captureException(error, { tags: { context: 'sectional' } });
     throw error;
   }
 
@@ -366,6 +375,7 @@ export async function completeSprachbausteineSession(params: {
 
     if (sessionError) {
       console.log('completeSprachbausteineSession session update error', sessionError);
+      Sentry.captureException(sessionError, { tags: { context: 'sectional' } });
     }
 
     const answerRows = [
@@ -391,6 +401,7 @@ export async function completeSprachbausteineSession(params: {
     const { error: answersError } = await (supabase.from('user_answers') as any).insert(answerRows);
     if (answersError) {
       console.log('completeSprachbausteineSession answers insert error', answersError);
+      Sentry.captureException(answersError, { tags: { context: 'sectional' } });
     }
 
     const today = new Date().toISOString().split('T')[0] ?? '';
@@ -414,9 +425,11 @@ export async function completeSprachbausteineSession(params: {
 
     if (profileError) {
       console.log('completeSprachbausteineSession profile update error', profileError);
+      Sentry.captureException(profileError, { tags: { context: 'sectional' } });
     }
   } catch (err) {
     console.log('completeSprachbausteineSession unexpected error', err);
+    Sentry.captureException(err, { tags: { context: 'sectional' } });
   }
 
   return { totalCorrect, totalBlanks, scorePct };
@@ -460,6 +473,7 @@ export async function createSessionLink(params: {
 
   if (error) {
     console.log('createSessionLink error', error);
+    Sentry.captureException(error, { tags: { context: 'sectional' } });
     throw error;
   }
 
@@ -505,6 +519,7 @@ export async function fetchPreviousSessionResult(
 
   if (sessionError || !sessionData || sessionData.length === 0) {
     console.log('fetchPreviousSessionResult no session found', sessionError);
+    if (sessionError) Sentry.captureException(sessionError, { tags: { context: 'sectional' } });
     return null;
   }
 
@@ -525,6 +540,7 @@ export async function fetchPreviousSessionResult(
 
   if (answerError) {
     console.log('fetchPreviousSessionResult answers error', answerError);
+    Sentry.captureException(answerError, { tags: { context: 'sectional' } });
     return null;
   }
 
@@ -544,6 +560,7 @@ export async function fetchPreviousSessionResult(
 
   if (questionError || !questionData) {
     console.log('fetchPreviousSessionResult questions error', questionError);
+    if (questionError) Sentry.captureException(questionError, { tags: { context: 'sectional' } });
     return null;
   }
 

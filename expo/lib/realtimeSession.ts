@@ -2,6 +2,7 @@ import { Platform } from 'react-native';
 import { Audio } from 'expo-av';
 import { File as FSFile, Paths } from 'expo-file-system/next';
 import { EncodingType } from 'expo-file-system';
+import * as Sentry from '@sentry/react-native';
 
 // Load react-native-webrtc on native platforms. Falls back gracefully if unavailable.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -90,6 +91,7 @@ export async function createSprechenSession(params: {
   if (!res.ok) {
     const text = await res.text().catch(() => '');
     console.log('[Realtime] Create session error:', res.status, text);
+    Sentry.captureMessage(`Create sprechen session failed (${res.status}): ${text.slice(0, 200)}`, { tags: { context: 'sprechen_realtime' } });
     throw new Error(`Sitzung konnte nicht erstellt werden (${res.status})`);
   }
 
@@ -134,6 +136,7 @@ export async function scoreSprechenConversation(params: {
   if (!res.ok) {
     const text = await res.text().catch(() => '');
     console.log('[Realtime] Score error:', res.status, text);
+    Sentry.captureMessage(`Score sprechen failed (${res.status}): ${text.slice(0, 200)}`, { tags: { context: 'sprechen_realtime' } });
     throw new Error(`Bewertung fehlgeschlagen (${res.status})`);
   }
 

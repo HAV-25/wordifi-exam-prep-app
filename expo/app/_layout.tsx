@@ -24,22 +24,16 @@ import * as Sentry from '@sentry/react-native';
 import { adapty } from 'react-native-adapty';
 
 Sentry.init({
-  dsn: 'https://108675a38db2e4a51c253936dcaf84aa@o4510781679992832.ingest.de.sentry.io/4511166563483728',
-
-  // Adds more context data to events (IP address, cookies, user, etc.)
-  // For more information, visit: https://docs.sentry.io/platforms/react-native/data-management/data-collected/
+  dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
+  enabled: !!process.env.EXPO_PUBLIC_SENTRY_DSN,
+  environment: __DEV__ ? 'development' : 'production',
+  tracesSampleRate: 0.2,
+  debug: __DEV__,
   sendDefaultPii: true,
-
-  // Enable Logs
   enableLogs: true,
-
-  // Configure Session Replay
   replaysSessionSampleRate: 0.1,
   replaysOnErrorSampleRate: 1,
   integrations: [Sentry.mobileReplayIntegration(), Sentry.feedbackIntegration()],
-
-  // uncomment the line below to enable Spotlight (https://spotlightjs.com)
-  // spotlight: __DEV__,
 });
 
 void SplashScreen.preventAutoHideAsync();
@@ -122,6 +116,19 @@ function RootLayoutNav() {
   );
 }
 
+function SentryFallback() {
+  return (
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, backgroundColor: '#F8FAFF' }}>
+      <Text style={{ fontSize: 18, fontWeight: '700', color: '#0A0E1A', marginBottom: 8 }}>
+        Something went wrong
+      </Text>
+      <Text style={{ fontSize: 14, color: '#94A3B8', textAlign: 'center' }}>
+        The Wordifi team has been notified. Please restart the app.
+      </Text>
+    </View>
+  );
+}
+
 export default Sentry.wrap(function RootLayout() {
   const [fontsLoaded] = useFonts({
     Outfit_800ExtraBold,
@@ -139,25 +146,27 @@ export default Sentry.wrap(function RootLayout() {
   }
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <AppConfigProvider>
-      <AuthProvider>
-        <AccessProvider>
-          <QuestionTypeMetaProvider>
-          <SafeAreaProvider>
-            <GestureHandlerRootView style={styles.gestureRoot}>
-              <ErrorBoundary>
-                <WalkthroughProvider>
-                  <RootLayoutNav />
-                </WalkthroughProvider>
-              </ErrorBoundary>
-            </GestureHandlerRootView>
-          </SafeAreaProvider>
-          </QuestionTypeMetaProvider>
-        </AccessProvider>
-      </AuthProvider>
-      </AppConfigProvider>
-    </QueryClientProvider>
+    <Sentry.ErrorBoundary fallback={SentryFallback}>
+      <QueryClientProvider client={queryClient}>
+        <AppConfigProvider>
+        <AuthProvider>
+          <AccessProvider>
+            <QuestionTypeMetaProvider>
+            <SafeAreaProvider>
+              <GestureHandlerRootView style={styles.gestureRoot}>
+                <ErrorBoundary>
+                  <WalkthroughProvider>
+                    <RootLayoutNav />
+                  </WalkthroughProvider>
+                </ErrorBoundary>
+              </GestureHandlerRootView>
+            </SafeAreaProvider>
+            </QuestionTypeMetaProvider>
+          </AccessProvider>
+        </AuthProvider>
+        </AppConfigProvider>
+      </QueryClientProvider>
+    </Sentry.ErrorBoundary>
   );
 });
 
