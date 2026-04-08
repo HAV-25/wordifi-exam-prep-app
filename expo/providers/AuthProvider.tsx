@@ -5,13 +5,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as Linking from 'expo-linking';
 import * as Sentry from '@sentry/react-native';
 
-import { signOutUser } from '@/lib/authHelpers';
+import { signOutUser, updateTcAccepted } from '@/lib/authHelpers';
 import { ensureUserProfile, reconcilePendingOnboarding } from '@/lib/profileHelpers';
 import { supabase } from '@/lib/supabaseClient';
 import type { UserProfile } from '@/types/database';
+import { useAppConfig } from '@/providers/AppConfigProvider';
 
 export const [AuthProvider, useAuth] = createContextHook(() => {
   const queryClient = useQueryClient();
+  const config = useAppConfig();
   const [session, setSession] = useState<Session | null>(null);
   const [isSessionLoading, setIsSessionLoading] = useState<boolean>(true);
 
@@ -154,6 +156,20 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
 
     return () => clearTimeout(timer);
   }, [session?.user?.id, profileQuery.data?.onboarding_completed_at]);
+
+  // Ensure tc_accepted is set after session is established.
+  // Handles the confirmation_pending path where no session exists at signup time.
+  useEffect(() => {
+    const uid = session?.user?.id;
+    const profile = profileQuery.data as (UserProfile & { tc_accepted?: boolean }) | null | undefined;
+    if (!uid || !profile || profile.tc_accepted) return;
+
+    void updateTcAccepted(uid, config.tc_version)
+      .then(() => void profileQuery.refetch())
+      .catch((err) => {
+        console.error('[Auth] tc_accepted update failed:', err);
+      });
+  }, [session?.user?.id, (profileQuery.data as any)?.tc_accepted]);
 
   const signOutMutation = useMutation({
     mutationFn: async () => signOutUser(),

@@ -53,36 +53,6 @@ const SESSION_SIZE = 20;
 
 // ─── Progress bar (reused from before) ──────────────────────────────────────
 
-function SessionProgressBar({ answered, total }: { answered: number; total: number }) {
-  const progressAnim = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    if (total > 0) {
-      Animated.timing(progressAnim, { toValue: answered / total, duration: 400, useNativeDriver: false }).start();
-    }
-  }, [answered, total, progressAnim]);
-
-  return (
-    <View style={progressStyles.wrapper}>
-      <View style={progressStyles.container}>
-        {answered > 0 && (
-          <Animated.View
-            style={[progressStyles.fill, {
-              width: progressAnim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }),
-            }]}
-          />
-        )}
-      </View>
-      <Text style={progressStyles.counter}>{answered} / {total}</Text>
-    </View>
-  );
-}
-
-const progressStyles = StyleSheet.create({
-  wrapper: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, gap: 10, paddingVertical: 6, backgroundColor: Colors.primaryDeep },
-  container: { flex: 1, height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.12)', overflow: 'hidden' },
-  fill: { height: '100%', borderRadius: 4, backgroundColor: colors.blue },
-  counter: { color: 'rgba(255,255,255,0.85)', fontSize: 12, fontWeight: '700' as const, minWidth: 40, textAlign: 'right' as const },
-});
 
 // ─── Main screen ─────────────────────────────────────────────────────────────
 
@@ -361,6 +331,7 @@ export default function TestStreamScreen() {
     // Reset answer state and advance
     setIsAnswered(false);
     setSelectedAnswer(null);
+    setAudioUnlockedMap({});
     setCurrentIndex(newIndex);
   }, [currentIndex, totalQuestions, sessionId, isStreamLimited]);
 
@@ -493,8 +464,6 @@ export default function TestStreamScreen() {
           </Animated.View>
         </Pressable>
       </View>
-
-      <SessionProgressBar answered={sessionAnsweredCount} total={totalQuestions} />
 
       {isRecycledBanner ? (
         <View style={styles.recycledBanner}>

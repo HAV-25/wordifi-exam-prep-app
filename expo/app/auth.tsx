@@ -91,7 +91,7 @@ export default function AuthScreen() {
           // Onboarding data already persisted to AsyncStorage in paywall.tsx.
           // Tag it with the new userId so reconciliation is scoped to this user only.
           await tagPendingOnboardingForUser(result.userId, onboardingSessionNonce);
-          await updateTcAccepted(result.userId, config.tc_version).catch(() => {});
+          // tc_accepted is handled by AuthProvider after session is established
           router.push({ pathname: '/check-email', params: { email: result.email } });
           return;
         }
