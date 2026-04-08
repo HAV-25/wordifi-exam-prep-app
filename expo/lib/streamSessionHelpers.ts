@@ -128,23 +128,15 @@ export async function selectQuestionsForSession(
     seenIds.add(row.question_id);
   }
 
-  // Fetch eligible (unseen) questions
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let query = supabase
+  // Fetch eligible (unseen) questions — per section for balanced mix
+  const fetchLimit = seenIds.size > 0 ? count * 5 : count * 2;
+  const { data: eligible, error: eligibleErr } = await supabase
     .from('app_questions')
-    .select('id')
+    .select('id, section')
     .eq('level', level)
     .eq('is_active', true)
-    .in('section', sections);
-
-  if (seenIds.size > 0) {
-    // Supabase .not('id', 'in', ...) with large sets — fetch more and filter client-side
-    query = query.limit(count * 5);
-  } else {
-    query = query.limit(count * 2);
-  }
-
-  const { data: eligible, error: eligibleErr } = await query;
+    .in('section', sections)
+    .limit(fetchLimit);
 
   if (eligibleErr) {
     console.error('[StreamSession] eligible query error', eligibleErr);
@@ -152,29 +144,47 @@ export async function selectQuestionsForSession(
     throw eligibleErr;
   }
 
-  let pool = ((eligible ?? []) as { id: string }[])
-    .filter((q) => !seenIds.has(q.id))
-    .map((q) => q.id);
+  const unseen = ((eligible ?? []) as { id: string; section: string }[])
+    .filter((q) => !seenIds.has(q.id));
 
-  // Shuffle
-  for (let i = pool.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [pool[i], pool[j]] = [pool[j]!, pool[i]!];
+  // Split by section and shuffle each pool
+  const horenPool = shuffleIds(unseen.filter((q) => q.section === 'Hören').map((q) => q.id));
+  const lesenPool = shuffleIds(unseen.filter((q) => q.section === 'Lesen').map((q) => q.id));
+
+  // Target: half from each section, fill remainder from the other if short
+  const half = Math.floor(count / 2);
+  const horenTake = Math.min(horenPool.length, half);
+  const lesenTake = Math.min(lesenPool.length, half);
+  let selected = [
+    ...horenPool.slice(0, horenTake),
+    ...lesenPool.slice(0, lesenTake),
+  ];
+  // Fill shortfall from the other section
+  const remaining = count - selected.length;
+  if (remaining > 0) {
+    const horenExtra = horenPool.slice(horenTake, horenTake + remaining);
+    const lesenExtra = lesenPool.slice(lesenTake, lesenTake + remaining);
+    selected = [...selected, ...horenExtra, ...lesenExtra];
+    selected = selected.slice(0, count);
   }
 
-  if (pool.length >= count) {
-    return { questionIds: pool.slice(0, count), isRecycled: false };
+  // Final shuffle so Hören and Lesen appear in random order
+  selected = shuffleIds(selected);
+
+  if (selected.length >= count) {
+    console.log('[StreamSession] balanced pool:', horenTake, 'Hören +', lesenTake, 'Lesen');
+    return { questionIds: selected.slice(0, count), isRecycled: false };
   }
 
-  // Not enough unseen — recycle from full pool
-  console.log('[StreamSession] pool exhausted, recycling. Found', pool.length, 'unseen');
+  // Not enough unseen — recycle from full pool with same balanced approach
+  console.log('[StreamSession] pool exhausted, recycling. Found', selected.length, 'unseen');
   const { data: allQuestions, error: allErr } = await supabase
     .from('app_questions')
-    .select('id')
+    .select('id, section')
     .eq('level', level)
     .eq('is_active', true)
     .in('section', sections)
-    .limit(count * 2);
+    .limit(count * 3);
 
   if (allErr) {
     console.error('[StreamSession] recycle query error', allErr);
@@ -182,11 +192,18 @@ export async function selectQuestionsForSession(
     throw allErr;
   }
 
-  let recycled = ((allQuestions ?? []) as { id: string }[]).map((q) => q.id);
-  for (let i = recycled.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [recycled[i], recycled[j]] = [recycled[j]!, recycled[i]!];
+  const allRows = (allQuestions ?? []) as { id: string; section: string }[];
+  const horenAll = shuffleIds(allRows.filter((q) => q.section === 'Hören').map((q) => q.id));
+  const lesenAll = shuffleIds(allRows.filter((q) => q.section === 'Lesen').map((q) => q.id));
+  const hTake = Math.min(horenAll.length, half);
+  const lTake = Math.min(lesenAll.length, half);
+  let recycled = [...horenAll.slice(0, hTake), ...lesenAll.slice(0, lTake)];
+  const rRemaining = count - recycled.length;
+  if (rRemaining > 0) {
+    recycled = [...recycled, ...horenAll.slice(hTake, hTake + rRemaining), ...lesenAll.slice(lTake, lTake + rRemaining)];
+    recycled = recycled.slice(0, count);
   }
+  recycled = shuffleIds(recycled);
 
   return { questionIds: recycled.slice(0, count), isRecycled: true };
 }
@@ -286,4 +303,15 @@ export async function fetchQuestionsByIds(
     map.set(q.id, q);
   }
   return questionIds.map((id) => map.get(id)).filter(Boolean) as AppQuestion[];
+}
+
+// ─── Helper: Fisher-Yates shuffle ───────────────────────────────────────────
+
+function shuffleIds(ids: string[]): string[] {
+  const arr = [...ids];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j]!, arr[i]!];
+  }
+  return arr;
 }

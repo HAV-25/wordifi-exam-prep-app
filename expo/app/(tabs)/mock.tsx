@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
-import { BookOpen, Clock, Headphones, Lock, Monitor, Play, Shield, Trophy } from 'lucide-react-native';
+import { BookOpen, Clock, Headphones, Lock, Monitor, Play, Shield, Trophy, X } from 'lucide-react-native';
 import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
@@ -276,6 +276,14 @@ export default function MockScreen() {
                 <Text style={styles.modalTitle}>Mock Exam — {targetLevel}</Text>
                 <Text style={styles.modalSubtitle}>Hören + Lesen</Text>
               </View>
+              <Pressable
+                accessibilityLabel="Cancel"
+                onPress={closeSetup}
+                hitSlop={8}
+                testID="cancel-mock-button"
+              >
+                <X color={Colors.textMuted} size={22} />
+              </Pressable>
             </View>
 
             <View style={styles.timingCard}>
@@ -347,29 +355,13 @@ export default function MockScreen() {
                   </>
                 )}
               </Pressable>
-              <Pressable
-                accessibilityLabel="Auf Computer fortsetzen"
-                onPress={() => {
-                  closeSetup();
-                  router.push({
-                    pathname: '/desktop-code' as any,
-                    params: { level: targetLevel, examType },
-                  });
-                }}
-                style={styles.desktopButton}
-                testID="desktop-mock-button"
-              >
-                <Monitor color={Colors.primary} size={16} />
-                <Text style={styles.desktopButtonText}>📺 Auf Computer fortsetzen</Text>
-              </Pressable>
-              <Pressable
-                accessibilityLabel="Cancel"
-                onPress={closeSetup}
-                style={styles.cancelButton}
-                testID="cancel-mock-button"
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </Pressable>
+              <View style={[styles.desktopButton, { opacity: 0.55 }]}>
+                <Monitor color={Colors.textMuted} size={16} />
+                <Text style={[styles.desktopButtonText, { color: Colors.textMuted }]}>Continue on Computer</Text>
+                <View style={styles.comingSoonPill}>
+                  <Text style={styles.comingSoonText}>Coming Soon</Text>
+                </View>
+              </View>
             </View>
           </Pressable>
         </Pressable>
@@ -765,6 +757,17 @@ const styles = StyleSheet.create({
   desktopButtonText: {
     color: Colors.primary,
     fontSize: 15,
+    fontWeight: '700' as const,
+  },
+  comingSoonPill: {
+    backgroundColor: '#FEF3C7',
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  comingSoonText: {
+    color: '#92400E',
+    fontSize: 11,
     fontWeight: '700' as const,
   },
 });
