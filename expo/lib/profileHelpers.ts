@@ -332,24 +332,32 @@ const PENDING_ONBOARDING_KEY = 'wordifi_pending_onboarding';
 // Storage envelope: wraps OnboardingAnswers with a userId tag and session nonce.
 // forUserId is stamped after signup so reconciliation only applies to the intended user.
 // sessionNonce ensures tagging only works within the same app session that saved the data.
+// savedAt allows a freshness check when nonce mismatches (OAuth browser handoff restarts the app).
 type PendingOnboardingEnvelope = OnboardingAnswers & {
   forUserId?: string;
   sessionNonce?: string;
+  savedAt?: number;
 };
 
 export async function savePendingOnboarding(
   answers: OnboardingAnswers,
   sessionNonce: string
 ): Promise<void> {
-  const envelope: PendingOnboardingEnvelope = { ...answers, sessionNonce };
+  const envelope: PendingOnboardingEnvelope = { ...answers, sessionNonce, savedAt: Date.now() };
   await AsyncStorage.setItem(PENDING_ONBOARDING_KEY, JSON.stringify(envelope));
 }
 
 /**
  * Tag existing pending onboarding data with the userId it was created for.
- * Only stamps if the session nonce matches — prevents a new app session from
- * adopting stale data written by a previous session.
+ *
+ * Prefers an exact session-nonce match. When the nonce doesn't match (common
+ * during Google/Apple OAuth — the browser handoff can restart the app process,
+ * generating a new nonce) we fall back to a freshness check: if the data was
+ * saved less than 5 minutes ago it's almost certainly from this user's just-
+ * completed onboarding, so we still tag it.
  */
+const FRESHNESS_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
+
 export async function tagPendingOnboardingForUser(
   userId: string,
   sessionNonce: string
@@ -358,8 +366,20 @@ export async function tagPendingOnboardingForUser(
     const raw = await AsyncStorage.getItem(PENDING_ONBOARDING_KEY);
     if (!raw) return;
     const envelope = JSON.parse(raw) as PendingOnboardingEnvelope;
-    // Refuse to tag if the data was written by a different app session
-    if (envelope.sessionNonce !== sessionNonce) return;
+
+    const nonceMatch = envelope.sessionNonce === sessionNonce;
+    const isFresh = typeof envelope.savedAt === 'number' && (Date.now() - envelope.savedAt) < FRESHNESS_WINDOW_MS;
+
+    if (!nonceMatch && !isFresh) {
+      // Data is stale and from a different session — don't tag
+      console.log('[Onboarding] tagPending: nonce mismatch and data too old, skipping');
+      return;
+    }
+
+    if (!nonceMatch && isFresh) {
+      console.log('[Onboarding] tagPending: nonce mismatch but data is fresh — tagging (OAuth restart)');
+    }
+
     envelope.forUserId = userId;
     await AsyncStorage.setItem(PENDING_ONBOARDING_KEY, JSON.stringify(envelope));
   } catch {
@@ -392,12 +412,19 @@ export async function reconcilePendingOnboarding(
   const pending = await loadPendingOnboarding();
   if (!pending) return false;
 
-  // Untagged data cannot be trusted — we don't know which user it was meant for.
-  // This covers stale AsyncStorage from abandoned onboarding or a different user's session.
-  // Tagged data that was saved by paywall.tsx gets stamped in auth.tsx after signup.
+  // If data is untagged, check freshness before discarding.
+  // OAuth sign-up (Google/Apple) can restart the app, so tagPendingOnboardingForUser
+  // in auth.tsx may never run. Fresh untagged data is safe to claim for the current user.
   if (!pending.forUserId) {
-    await clearPendingOnboarding();
-    return false;
+    const isFresh = typeof pending.savedAt === 'number' && (Date.now() - pending.savedAt) < FRESHNESS_WINDOW_MS;
+    if (isFresh) {
+      console.log('[Onboarding] reconcile: untagged but fresh data — claiming for user', userId);
+      pending.forUserId = userId;
+    } else {
+      console.log('[Onboarding] reconcile: untagged stale data — discarding');
+      await clearPendingOnboarding();
+      return false;
+    }
   }
 
   // Pending data is tagged for a different user — not ours, discard

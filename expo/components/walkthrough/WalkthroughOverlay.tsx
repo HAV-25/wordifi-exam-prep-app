@@ -244,17 +244,8 @@ export function WalkthroughOverlay() {
       onRequestClose={handleSkip}
     >
       <Animated.View style={[styles.root, { opacity: scrimOpacity }]}>
-        {/* ── Spotlight (steps 0-5) ── */}
-        {showSpotlight ? (
-          <SpotlightCutout
-            rect={spotlightRect}
-            padding={stepDef.padding}
-            reduceMotion={reduceMotion}
-          />
-        ) : null}
-
-        {/* ── Full scrim for final step and while measuring (no spotlight) ── */}
-        {!showSpotlight && !isFinalStep ? (
+        {/* ── Full dark scrim (no spotlight cutout — tooltip card is enough) ── */}
+        {!isFinalStep ? (
           <View style={styles.fullScrim} pointerEvents="none" />
         ) : null}
 
