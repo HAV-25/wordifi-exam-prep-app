@@ -1,12 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Dimensions } from 'react-native';
-import Svg, { Path, Rect } from 'react-native-svg';
+import Svg, { Path } from 'react-native-svg';
 import type { TargetRect } from './WalkthroughProvider';
 
 const { width: SW, height: SH } = Dimensions.get('window');
 const CORNER_RADIUS = 16;
 const SCRIM_COLOR = 'rgba(10, 14, 26, 0.82)';
-const GLOW_COLOR = 'rgba(0, 229, 182, 0.6)';
+
 
 type Props = {
   rect: TargetRect;
@@ -129,17 +129,6 @@ export function SpotlightCutout({ rect, padding, reduceMotion }: Props) {
       pointerEvents="none"
     >
       <Path d={d} fill={SCRIM_COLOR} fillRule="evenodd" />
-      <Rect
-        x={x}
-        y={y}
-        width={w}
-        height={h}
-        rx={r}
-        ry={r}
-        fill="none"
-        stroke={GLOW_COLOR}
-        strokeWidth={2}
-      />
     </Svg>
   );
 }

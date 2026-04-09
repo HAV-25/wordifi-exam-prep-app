@@ -4,6 +4,7 @@ import { BookOpen, ChevronDown, ChevronRight, Clock, Eye, Headphones, Lock, Mic,
 import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Animated,
   Modal,
   Pressable,
@@ -159,6 +160,7 @@ export default function TestsScreen() {
       const questions = await fetchSchreibenQuestions(targetLevel, teil);
       if (questions.length === 0) {
         setSchreibenStarting(null);
+        Alert.alert('No Questions', 'No Schreiben questions available for this level and Teil yet.');
         return;
       }
       setSchreibenStarting(null);
@@ -173,6 +175,7 @@ export default function TestsScreen() {
     } catch (err) {
       console.log('TestsScreen handleStartSchreiben error', err);
       setSchreibenStarting(null);
+      Alert.alert('Error', 'Could not load Schreiben questions. Please try again.');
     }
   }, [targetLevel, schreibenEnabled]);
 

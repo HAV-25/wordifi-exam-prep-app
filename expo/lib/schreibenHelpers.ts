@@ -190,7 +190,7 @@ export async function fetchSchreibenQuestions(
 
   const { data, error } = await supabase
     .from('app_questions')
-    .select('id, question_text, task_description, task_subtype, source_structure_type, options, correct_answer, level, section, teil, rubric_card, model_answer_script, explanation_en, explanation_de, stimulus_text, is_active')
+    .select('id, question_text, task_subtype, source_structure_type, options, correct_answer, level, section, teil, rubric_card, model_answer_script, explanation_en, explanation_de, stimulus_text, is_active')
     .eq('level', level)
     .eq('section', 'Schreiben')
     .eq('teil', teil)

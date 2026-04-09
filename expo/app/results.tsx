@@ -3,7 +3,7 @@ import { ChevronRight, Share2 } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const CTA_BUTTON_HEIGHT = 56;    // primary CTA / footer height
+const FOOTER_HEIGHT = 220;       // share(56) + primary(54) + row(48) + gaps(20) + pad(32) + extra
 const BOTTOM_CONTENT_BUFFER = 24; // breathing room below last content item
 import {
   AccessibilityInfo,
@@ -33,13 +33,13 @@ import type { AppQuestion } from '@/types/database';
 function performanceLabel(score: number): { text: string; color: string } {
   if (score >= 70) return { text: 'Exam-ready performance', color: colors.green };
   if (score >= 40) return { text: 'Good progress — keep practising', color: colors.amber };
-  return { text: 'Every answer is a learning step', color: colors.navy };
+  return { text: 'Every answer is a learning step', color: 'rgba(255,255,255,0.74)' };
 }
 
 function scoreColor(score: number): string {
   if (score >= 70) return colors.green;
   if (score >= 40) return colors.amber;
-  return colors.navy;
+  return 'rgba(255,255,255,0.9)';
 }
 
 export default function ResultsScreen() {
@@ -145,7 +145,7 @@ export default function ResultsScreen() {
       <ScrollView
         contentContainerStyle={[
           styles.content,
-          { paddingBottom: insets.bottom + CTA_BUTTON_HEIGHT + BOTTOM_CONTENT_BUFFER },
+          { paddingBottom: insets.bottom + FOOTER_HEIGHT + BOTTOM_CONTENT_BUFFER },
         ]}
       >
         <View style={styles.heroCard}>
@@ -160,7 +160,7 @@ export default function ResultsScreen() {
                 <Text style={styles.xpLabel}> XP</Text>
               </View>
             </View>
-            <ScoreRing label="Score" score={scorePct} size={96} />
+            <ScoreRing label="Score" score={scorePct} size={80} />
           </View>
         </View>
 
@@ -274,10 +274,10 @@ function AnimatedXpText({ value, style }: { value: Animated.AnimatedInterpolatio
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: Colors.background },
-  content: { padding: 20, gap: 16, paddingBottom: 180 },
-  heroCard: { borderRadius: 28, backgroundColor: Colors.primary, padding: 20, gap: 16 },
+  content: { padding: 20, gap: 16 },
+  heroCard: { borderRadius: 28, backgroundColor: Colors.primary, padding: 20, gap: 16, overflow: 'hidden' as const },
   heroMeta: { color: 'rgba(255,255,255,0.74)', fontWeight: '700' as const },
-  heroRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 16 },
+  heroRow: { flexDirection: 'row', alignItems: 'center', gap: 16 },
   heroTextWrap: { flex: 1, gap: 8 },
   scoreLine: { fontSize: 42, fontWeight: '800' as const },
   performance: { fontSize: 15, fontWeight: '600' as const, lineHeight: 20 },

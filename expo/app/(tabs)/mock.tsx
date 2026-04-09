@@ -577,8 +577,8 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     padding: 24,
-    gap: 18,
-    paddingBottom: 40,
+    gap: 14,
+    paddingBottom: 24,
   },
   modalHandle: {
     width: 40,
