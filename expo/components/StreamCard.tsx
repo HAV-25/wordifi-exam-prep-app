@@ -295,18 +295,27 @@ export const StreamCard = React.memo(function StreamCard({
                       disabled={isAnswered || needsAudioGate}
                       testID={`stream-option-${option.key}`}
                     >
-                      {isAnswered && selectedAnswer ? (
-                        <View style={[st.binaryIcon, { backgroundColor: getLetterBg(option.key) }]}>
-                          {(() => {
-                            const nk = option.key.toLowerCase();
-                            const isCorrectOpt = nk === question.correct_answer.toLowerCase();
-                            const isSelectedOpt = nk === selectedAnswer.toLowerCase();
-                            if ((isSelectedOpt && isCorrectOpt) || isCorrectOpt) return <Check color={B.primaryFg} size={16} />;
-                            if (isSelectedOpt) return <X color={B.primaryFg} size={16} />;
-                            return null;
-                          })()}
-                        </View>
-                      ) : null}
+                      {(() => {
+                        const isRichtig = option.key.toLowerCase() === 'richtig' || option.text.toLowerCase() === 'richtig' || option.text.toLowerCase() === 'ja';
+                        if (!isAnswered) {
+                          // Pre-answer: always show green check for Richtig, red X for Falsch
+                          return (
+                            <View style={[st.binaryIcon, { backgroundColor: isRichtig ? '#22C55E' : '#EF4444' }]}>
+                              {isRichtig ? <Check color={B.primaryFg} size={16} /> : <X color={B.primaryFg} size={16} />}
+                            </View>
+                          );
+                        }
+                        // Post-answer: show with answer feedback colors
+                        const nk = option.key.toLowerCase();
+                        const isCorrectOpt = nk === question.correct_answer.toLowerCase();
+                        const isSelectedOpt = nk === (selectedAnswer ?? '').toLowerCase();
+                        const bg = (isSelectedOpt && isCorrectOpt) || isCorrectOpt ? '#22C55E' : isSelectedOpt ? '#EF4444' : B.muted;
+                        return (
+                          <View style={[st.binaryIcon, { backgroundColor: bg }]}>
+                            {isRichtig ? <Check color={B.primaryFg} size={16} /> : <X color={B.primaryFg} size={16} />}
+                          </View>
+                        );
+                      })()}
                       <Text style={[st.binaryText, { color: getTextColor(option.key) }]}>{option.text}</Text>
                     </Pressable>
                   </Animated.View>
