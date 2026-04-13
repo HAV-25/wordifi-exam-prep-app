@@ -3,7 +3,7 @@ import { ChevronRight, Share2 } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const CTA_BUTTON_HEIGHT = 56;    // primary CTA / footer height
+const FOOTER_HEIGHT = 220;       // share(56) + primary(54) + secondary(48) + gaps(20) + pad(32) + extra
 const BOTTOM_CONTENT_BUFFER = 24; // breathing room below last content item
 import {
   AccessibilityInfo,
@@ -23,7 +23,7 @@ import ConfettiBurst, { type ConfettiBurstRef } from '@/components/ConfettiBurst
 import { QuestionCard } from '@/components/QuestionCard';
 import { ScoreRing } from '@/components/ScoreRing';
 import ShareResultSheet from '@/components/ShareResultSheet';
-import { StimulusCard } from '@/components/StimulusCard';
+import { StimulusCard, shouldShowStimulus } from '@/components/StimulusCard';
 import Colors from '@/constants/colors';
 import { colors } from '@/theme';
 import { updatePreparednessScore } from '@/lib/streamHelpers';
@@ -35,13 +35,13 @@ import type { AppQuestion } from '@/types/database';
 function performanceLabel(score: number): { text: string; color: string } {
   if (score >= 70) return { text: 'Exam-ready performance', color: colors.green };
   if (score >= 40) return { text: 'Good progress — keep practising', color: colors.amber };
-  return { text: 'Every answer is a learning step', color: colors.navy };
+  return { text: 'Every answer is a learning step', color: 'rgba(255,255,255,0.74)' };
 }
 
 function scoreColor(score: number): string {
   if (score >= 70) return colors.green;
   if (score >= 40) return colors.amber;
-  return colors.navy;
+  return 'rgba(255,255,255,0.9)';
 }
 
 function formatDuration(seconds: number): string {
@@ -198,7 +198,7 @@ export default function SectionalResultsScreen() {
       <ScrollView
         contentContainerStyle={[
           styles.content,
-          { paddingBottom: insets.bottom + CTA_BUTTON_HEIGHT + BOTTOM_CONTENT_BUFFER },
+          { paddingBottom: insets.bottom + FOOTER_HEIGHT + BOTTOM_CONTENT_BUFFER },
         ]}
         showsVerticalScrollIndicator={false}
       >
@@ -219,7 +219,7 @@ export default function SectionalResultsScreen() {
                 <Text style={styles.xpLabel}> XP</Text>
               </View>
             </View>
-            <ScoreRing label="Score" score={scorePct} size={96} />
+            <ScoreRing label="Score" score={scorePct} size={80} />
           </View>
         </View>
 
@@ -272,7 +272,7 @@ export default function SectionalResultsScreen() {
                 {section === 'Hören' && question.audio_url ? (
                   <AudioPlayer audioUrl={question.audio_url} />
                 ) : null}
-                {section === 'Lesen' && question.stimulus_text ? (
+                {section === 'Lesen' && question.stimulus_text && shouldShowStimulus(level, section, teil) ? (
                   <View>
                     <Pressable
                       accessibilityLabel="Show passage"
@@ -400,13 +400,13 @@ const styles = StyleSheet.create({
   content: {
     padding: 20,
     gap: 16,
-    paddingBottom: 180,
   },
   heroCard: {
     borderRadius: 28,
     backgroundColor: Colors.primary,
     padding: 20,
     gap: 16,
+    overflow: 'hidden' as const,
   },
   heroMeta: {
     color: 'rgba(255,255,255,0.74)',
@@ -415,7 +415,7 @@ const styles = StyleSheet.create({
   },
   heroRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    alignItems: 'center',
     gap: 16,
   },
   heroTextWrap: {

@@ -4,6 +4,19 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import Colors from '@/constants/colors';
 
+/**
+ * Decides whether to render a stimulus card for a given question.
+ * Some question types have redundant stimulus_text that just duplicates
+ * fragments of the options (e.g. A1 Lesen Teil 2 — matching questions
+ * where the options contain the full reading content). For those, we
+ * suppress the stimulus entirely to avoid confusing the user.
+ */
+export function shouldShowStimulus(level: string, section: string, teil: number | string): boolean {
+  const teilNum = typeof teil === 'string' ? Number(teil) : teil;
+  if (level === 'A1' && section === 'Lesen' && teilNum === 2) return false;
+  return true;
+}
+
 type StimulusCardProps = {
   text: string;
   type: string | null;
@@ -13,9 +26,8 @@ type StimulusCardProps = {
 export function StimulusCard({ text, type, collapsible = false }: StimulusCardProps) {
   const [expanded, setExpanded] = useState<boolean>(!collapsible);
   const label = useMemo<string>(() => {
-    const suffix = type ? type.toLowerCase() : 'text';
-    return `Read the following ${suffix}:`;
-  }, [type]);
+    return 'Read the following:';
+  }, []);
 
   return (
     <View style={styles.card} testID="stimulus-card">

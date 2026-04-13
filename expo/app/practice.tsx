@@ -12,7 +12,7 @@ import { AudioPlayer } from '@/components/AudioPlayer';
 import { EmptyState } from '@/components/EmptyState';
 import { OptionButton } from '@/components/OptionButton';
 import { QuestionCard } from '@/components/QuestionCard';
-import { StimulusCard } from '@/components/StimulusCard';
+import { StimulusCard, shouldShowStimulus } from '@/components/StimulusCard';
 import Colors from '@/constants/colors';
 import { submitCompletedSession } from '@/lib/sessionHelpers';
 import { supabase } from '@/lib/supabaseClient';
@@ -266,7 +266,7 @@ export default function PracticeScreen() {
       ) : currentQuestion ? (
         <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + TAB_BAR_HEIGHT + BOTTOM_CONTENT_BUFFER }]}>
           {section === 'Hören' && currentQuestion.audio_url ? <AudioPlayer audioUrl={currentQuestion.audio_url} /> : null}
-          {section === 'Lesen' && currentQuestion.stimulus_text ? <StimulusCard text={currentQuestion.stimulus_text} type={currentQuestion.stimulus_type} /> : null}
+          {section === 'Lesen' && currentQuestion.stimulus_text && shouldShowStimulus(level, section, teil) ? <StimulusCard text={currentQuestion.stimulus_text} type={currentQuestion.stimulus_type} /> : null}
           <QuestionCard title={currentQuestion.question_text} subtitle={currentQuestion.question_type.replace('_', ' ')}>
             {renderOptions()}
           </QuestionCard>

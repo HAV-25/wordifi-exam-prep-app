@@ -23,7 +23,7 @@ import ConfettiBurst, { type ConfettiBurstRef } from '@/components/ConfettiBurst
 import { QuestionCard } from '@/components/QuestionCard';
 import { ScoreRing } from '@/components/ScoreRing';
 import ShareResultSheet from '@/components/ShareResultSheet';
-import { StimulusCard } from '@/components/StimulusCard';
+import { StimulusCard, shouldShowStimulus } from '@/components/StimulusCard';
 import Colors from '@/constants/colors';
 import { colors } from '@/theme';
 import { useQuestionMeta } from '@/lib/useQuestionTypeMeta';
@@ -180,7 +180,7 @@ export default function ResultsScreen() {
                 </View>
                 {!isCorrect ? <Text style={styles.correctAnswerText}>Correct answer: {correctOption?.text ?? question.correct_answer}</Text> : null}
                 {section === 'Hören' && question.audio_url ? <AudioPlayer audioUrl={question.audio_url} /> : null}
-                {section === 'Lesen' && question.stimulus_text ? (
+                {section === 'Lesen' && question.stimulus_text && shouldShowStimulus(level, section, teil) ? (
                   <View>
                     <Pressable accessibilityLabel="Show passage" onPress={() => setExpandedStimulusId((value) => (value === question.id ? null : question.id))} style={styles.showPassageButton} testID={`show-passage-${question.id}`}>
                       <Text style={styles.showPassageText}>{expandedStimulusId === question.id ? 'Hide passage' : 'Show passage'}</Text>

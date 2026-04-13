@@ -20,7 +20,7 @@ import {
 
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { ScoreRing } from '@/components/ScoreRing';
-import { StimulusCard } from '@/components/StimulusCard';
+import { StimulusCard, shouldShowStimulus } from '@/components/StimulusCard';
 import Colors from '@/constants/colors';
 import { colors } from '@/theme';
 import { submitQuestionReport } from '@/lib/mockHelpers';
@@ -228,7 +228,7 @@ export default function MockResultsScreen() {
       const selectedOption = question.options.find((o) => o.key.toLowerCase() === selectedAnswer);
       const correctOption = question.options.find((o) => o.key.toLowerCase() === question.correct_answer.toLowerCase());
       const isHoren = question.section === 'Hören';
-      const hasStimulus = !isHoren && Boolean(question.stimulus_text);
+      const hasStimulus = !isHoren && Boolean(question.stimulus_text) && shouldShowStimulus(question.level, question.section, question.teil);
       const isExpanded = expandedStimulusIds.has(question.id);
       const isQuestionReported = reportedIds.has(question.id);
 

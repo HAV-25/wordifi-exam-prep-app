@@ -18,7 +18,7 @@ import {
 
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { OptionButton } from '@/components/OptionButton';
-import { StimulusCard } from '@/components/StimulusCard';
+import { StimulusCard, shouldShowStimulus } from '@/components/StimulusCard';
 import Colors from '@/constants/colors';
 import { colors } from '@/theme';
 import {
@@ -435,7 +435,7 @@ export default function SectionalTestScreen() {
             <AudioPlayer audioUrl={currentQuestion.audio_url} />
           ) : null}
 
-          {currentQuestion.stimulus_text ? (
+          {currentQuestion.stimulus_text && shouldShowStimulus(level, section, teil) ? (
             <StimulusCard
               text={currentQuestion.stimulus_text}
               type={currentQuestion.stimulus_type}
