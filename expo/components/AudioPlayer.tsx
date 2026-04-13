@@ -1,5 +1,5 @@
 import { Audio, type AVPlaybackStatus } from 'expo-av';
-import { AlertCircle, Pause, Play, RotateCcw, Gauge } from 'lucide-react-native';
+import { AlertCircle, Gauge, Pause, Play, RefreshCw, RotateCcw } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -13,10 +13,19 @@ import {
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 
-import Colors from '@/constants/colors';
-import { colors } from '@/theme';
+import { fontFamily } from '@/theme';
 
-const WAVEFORM_BAR_COUNT = 32;
+// ─── Banani design tokens ────────────────────────────────────────────────────
+const B = {
+  primary: '#2B70EF',
+  primaryFg: '#FFFFFF',
+  card: '#FFFFFF',
+  border: '#E2E8F0',
+  foreground: '#374151',
+  muted: '#94A3B8',
+} as const;
+
+const WAVEFORM_BAR_COUNT = 25;
 const MAX_REPLAYS = 3;
 
 const WAVEFORM_SEED = Array.from({ length: WAVEFORM_BAR_COUNT }, (_, i) => {
@@ -60,16 +69,8 @@ export function AudioPlayer({ audioUrl, onFirstPlay, onPlaybackComplete }: Audio
         const baseHeight = WAVEFORM_SEED[i] ?? 0.5;
         return Animated.loop(
           Animated.sequence([
-            Animated.timing(anim, {
-              toValue: baseHeight,
-              duration: 300 + (i % 5) * 80,
-              useNativeDriver: true,
-            }),
-            Animated.timing(anim, {
-              toValue: baseHeight * 0.35,
-              duration: 250 + (i % 7) * 60,
-              useNativeDriver: true,
-            }),
+            Animated.timing(anim, { toValue: baseHeight, duration: 300 + (i % 5) * 80, useNativeDriver: true }),
+            Animated.timing(anim, { toValue: baseHeight * 0.35, duration: 250 + (i % 7) * 60, useNativeDriver: true }),
           ])
         );
       });
@@ -77,11 +78,7 @@ export function AudioPlayer({ audioUrl, onFirstPlay, onPlaybackComplete }: Audio
       return () => animations.forEach((a) => a.stop());
     } else {
       barAnims.forEach((anim, i) => {
-        Animated.timing(anim, {
-          toValue: (WAVEFORM_SEED[i] ?? 0.5) * 0.4,
-          duration: 300,
-          useNativeDriver: true,
-        }).start();
+        Animated.timing(anim, { toValue: (WAVEFORM_SEED[i] ?? 0.5) * 0.4, duration: 300, useNativeDriver: true }).start();
       });
     }
   }, [isPlaying, barAnims]);
@@ -101,36 +98,22 @@ export function AudioPlayer({ audioUrl, onFirstPlay, onPlaybackComplete }: Audio
       hasPlayedRef.current = false;
 
       if (soundRef.current) {
-        try {
-          await soundRef.current.unloadAsync();
-        } catch (e) {
-          console.log('AudioPlayer unload previous error', e);
-        }
+        try { await soundRef.current.unloadAsync(); } catch {}
         soundRef.current = null;
       }
 
       try {
         if (!audioModeSetRef.current) {
-          await Audio.setAudioModeAsync({
-            playsInSilentModeIOS: true,
-            staysActiveInBackground: false,
-            shouldDuckAndroid: true,
-          });
+          await Audio.setAudioModeAsync({ playsInSilentModeIOS: true, staysActiveInBackground: false, shouldDuckAndroid: true });
           audioModeSetRef.current = true;
-          console.log('AudioPlayer: audio mode set successfully');
         }
 
         const encodedUrl = encodeURI(audioUrl);
-        console.log('AudioPlayer: loading audio from', encodedUrl);
-
         const nextSound = new Audio.Sound();
         nextSound.setOnPlaybackStatusUpdate((status: AVPlaybackStatus) => {
           if (!isMounted) return;
           if (!status.isLoaded) {
-            if (status.error) {
-              console.log('AudioPlayer playback error', status.error);
-              setError('Audio nicht verfügbar');
-            }
+            if (status.error) setError('Audio nicht verfügbar');
             return;
           }
           setPositionMillis(status.positionMillis ?? 0);
@@ -144,39 +127,22 @@ export function AudioPlayer({ audioUrl, onFirstPlay, onPlaybackComplete }: Audio
           }
         });
 
-        await nextSound.loadAsync(
-          { uri: encodedUrl },
-          { shouldPlay: false }
-        );
-
-        if (!isMounted) {
-          await nextSound.unloadAsync();
-          return;
-        }
+        await nextSound.loadAsync({ uri: encodedUrl }, { shouldPlay: false });
+        if (!isMounted) { await nextSound.unloadAsync(); return; }
         soundRef.current = nextSound;
         setIsLoaded(true);
         setIsBuffering(false);
-        console.log('AudioPlayer: audio loaded successfully');
-      } catch (loadError) {
-        console.log('AudioPlayer load error', loadError);
-        if (isMounted) {
-          setError('Audio nicht verfügbar');
-          setIsBuffering(false);
-        }
+      } catch {
+        if (isMounted) { setError('Audio nicht verfügbar'); setIsBuffering(false); }
       }
     }
 
     void prepareSound();
-
     return () => {
       isMounted = false;
       const activeSound = soundRef.current;
       soundRef.current = null;
-      if (activeSound) {
-        void activeSound.unloadAsync().catch((e) =>
-          console.log('AudioPlayer cleanup unload error', e)
-        );
-      }
+      if (activeSound) void activeSound.unloadAsync().catch(() => {});
     };
   }, [audioUrl, reloadKey]);
 
@@ -198,9 +164,7 @@ export function AudioPlayer({ audioUrl, onFirstPlay, onPlaybackComplete }: Audio
   }, [positionMillis, durationMillis]);
 
   const triggerHaptic = useCallback(() => {
-    if (Platform.OS !== 'web') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    }
+    if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
   }, []);
 
   const animatePlayButton = useCallback(() => {
@@ -216,27 +180,15 @@ export function AudioPlayer({ audioUrl, onFirstPlay, onPlaybackComplete }: Audio
     animatePlayButton();
     try {
       const status = await soundRef.current.getStatusAsync();
-      if (!status.isLoaded) {
-        console.log('AudioPlayer: sound not loaded when trying to play/pause');
-        return;
-      }
+      if (!status.isLoaded) return;
       if (status.isPlaying) {
         await soundRef.current.pauseAsync();
       } else {
-        if (isFinished) {
-          await soundRef.current.setPositionAsync(0);
-          setIsFinished(false);
-        }
+        if (isFinished) { await soundRef.current.setPositionAsync(0); setIsFinished(false); }
         await soundRef.current.playAsync();
-        if (!hasPlayedRef.current && onFirstPlay) {
-          hasPlayedRef.current = true;
-          onFirstPlay();
-        }
+        if (!hasPlayedRef.current && onFirstPlay) { hasPlayedRef.current = true; onFirstPlay(); }
       }
-    } catch (e) {
-      console.log('AudioPlayer playPause error', e);
-      setError('Audio nicht verfügbar');
-    }
+    } catch { setError('Audio nicht verfügbar'); }
   }, [isLoaded, isFinished, onFirstPlay, triggerHaptic, animatePlayButton]);
 
   const handleReplay = useCallback(async () => {
@@ -250,31 +202,18 @@ export function AudioPlayer({ audioUrl, onFirstPlay, onPlaybackComplete }: Audio
       setIsFinished(false);
       setReplayCount((prev) => prev + 1);
       await soundRef.current.playAsync();
-      if (!hasPlayedRef.current && onFirstPlay) {
-        hasPlayedRef.current = true;
-        onFirstPlay();
-      }
-    } catch (e) {
-      console.log('AudioPlayer replay error', e);
-    }
+      if (!hasPlayedRef.current && onFirstPlay) { hasPlayedRef.current = true; onFirstPlay(); }
+    } catch {}
   }, [isLoaded, onFirstPlay, triggerHaptic, animatePlayButton]);
 
-  const handleRetry = useCallback(() => {
-    console.log('AudioPlayer: retrying load');
-    setReloadKey((v) => v + 1);
-  }, []);
+  const handleRetry = useCallback(() => { setReloadKey((v) => v + 1); }, []);
 
   const handleSpeedToggle = useCallback(async () => {
     if (!soundRef.current || !isLoaded) return;
     triggerHaptic();
     const newSpeed = playbackSpeed === 1 ? 0.75 : 1;
     setPlaybackSpeed(newSpeed);
-    try {
-      await soundRef.current.setRateAsync(newSpeed, true);
-      console.log('AudioPlayer: speed set to', newSpeed);
-    } catch (e) {
-      console.log('AudioPlayer setRate error', e);
-    }
+    try { await soundRef.current.setRateAsync(newSpeed, true); } catch {}
   }, [isLoaded, playbackSpeed, triggerHaptic]);
 
   const handleWaveformPress = useCallback(
@@ -283,16 +222,10 @@ export function AudioPlayer({ audioUrl, onFirstPlay, onPlaybackComplete }: Audio
       triggerHaptic();
       const ratio = Math.max(0, Math.min(1, locationX / waveformWidth));
       const seekTo = Math.floor(ratio * durationMillis);
-      console.log('AudioPlayer: scrub to', seekTo, 'ms (', Math.round(ratio * 100), '%)');
       try {
         await soundRef.current.setPositionAsync(seekTo);
-        if (isFinished) {
-          setIsFinished(false);
-          await soundRef.current.playAsync();
-        }
-      } catch (e) {
-        console.log('AudioPlayer scrub error', e);
-      }
+        if (isFinished) { setIsFinished(false); await soundRef.current.playAsync(); }
+      } catch {}
     },
     [isLoaded, waveformWidth, durationMillis, isFinished, triggerHaptic]
   );
@@ -301,57 +234,41 @@ export function AudioPlayer({ audioUrl, onFirstPlay, onPlaybackComplete }: Audio
     setWaveformWidth(e.nativeEvent.layout.width);
   }, []);
 
-  const replayLabel = useMemo(() => {
-    const used = Math.min(replayCount, MAX_REPLAYS);
-    return `${used}/${MAX_REPLAYS}`;
-  }, [replayCount]);
-
+  const replayLabel = useMemo(() => `${Math.min(replayCount, MAX_REPLAYS)}/${MAX_REPLAYS}`, [replayCount]);
   const replayLimitReached = replayCount >= MAX_REPLAYS;
+  const activeBarIndex = Math.floor(progress * WAVEFORM_BAR_COUNT);
 
   if (error) {
     return (
-      <View style={styles.card} testID="audio-player-error">
-        <View style={styles.errorRow}>
-          <AlertCircle color="#FF6B6B" size={20} />
-          <Text style={styles.error}>Audio nicht verfügbar</Text>
+      <View style={s.card} testID="audio-player-error">
+        <View style={s.errorRow}>
+          <AlertCircle color="#EF4444" size={20} />
+          <Text style={s.errorText}>Audio nicht verfügbar</Text>
         </View>
-        <Pressable
-          accessibilityLabel="Retry audio"
-          onPress={handleRetry}
-          style={({ pressed }) => [styles.retryButton, pressed && styles.retryPressed]}
-          testID="retry-audio-button"
-        >
-          <RotateCcw color={Colors.primary} size={16} />
-          <Text style={styles.retryText}>Retry</Text>
+        <Pressable onPress={handleRetry} style={s.retryBtn} testID="retry-audio-button">
+          <RotateCcw color={B.primary} size={16} />
+          <Text style={s.retryText}>Retry</Text>
         </Pressable>
       </View>
     );
   }
 
   const getPlayIcon = () => {
-    if (isBuffering) return <ActivityIndicator color={colors.white} size="small" />;
-    if (isFinished) return <RotateCcw color={colors.white} size={20} />;
-    if (isPlaying) return <Pause color={colors.white} size={20} />;
-    return <Play color={colors.white} size={20} />;
+    if (isBuffering) return <ActivityIndicator color={B.primaryFg} size="small" />;
+    if (isFinished) return <RotateCcw color={B.primaryFg} size={24} />;
+    if (isPlaying) return <Pause color={B.primaryFg} size={24} />;
+    return <Play color={B.primaryFg} size={24} style={{ marginLeft: 2 }} />;
   };
-
-  const getPlayLabel = () => {
-    if (isBuffering) return 'Loading audio';
-    if (isFinished) return 'Replay audio';
-    if (isPlaying) return 'Pause audio';
-    return 'Play audio';
-  };
-
-  const activeBarIndex = Math.floor(progress * WAVEFORM_BAR_COUNT);
 
   return (
-    <View style={styles.card} testID="audio-player">
-      <View style={styles.topRow}>
+    <View style={s.card} testID="audio-player">
+      {/* Player main: play button + waveform */}
+      <View style={s.playerMain}>
         <Animated.View style={{ transform: [{ scale: playButtonScale }] }}>
           <Pressable
-            accessibilityLabel={getPlayLabel()}
+            accessibilityLabel={isPlaying ? 'Pause audio' : 'Play audio'}
             onPress={isFinished ? handleReplay : handlePlayPause}
-            style={({ pressed }) => [styles.playButton, pressed && styles.playPressed]}
+            style={s.playBtn}
             testID="play-audio-button"
             disabled={isBuffering}
           >
@@ -359,251 +276,167 @@ export function AudioPlayer({ audioUrl, onFirstPlay, onPlaybackComplete }: Audio
           </Pressable>
         </Animated.View>
 
-        <View style={styles.centerColumn}>
+        <View style={s.waveformWrap}>
           <Pressable
-            style={styles.waveformTouchArea}
-            onPress={(e) => {
-              const x = e.nativeEvent.locationX;
-              void handleWaveformPress(x);
-            }}
+            style={s.waveformTouchArea}
+            onPress={(e) => void handleWaveformPress(e.nativeEvent.locationX)}
             onLayout={onWaveformLayout}
             testID="waveform-scrub"
-            accessibilityLabel="Scrub audio position"
           >
-            <View style={styles.waveformContainer}>
+            <View style={s.waveform}>
               {WAVEFORM_SEED.map((height, i) => {
                 const isPast = i < activeBarIndex;
                 const isCurrent = i === activeBarIndex;
-                const barColor = isPast || isCurrent
-                  ? colors.teal
-                  : 'rgba(255,255,255,0.22)';
-
+                const barColor = isPast || isCurrent ? B.primary : B.border;
                 return (
                   <Animated.View
                     key={i}
                     style={[
-                      styles.waveformBar,
+                      s.waveBar,
                       {
                         backgroundColor: barColor,
                         height: `${height * 100}%`,
                         transform: [{ scaleY: barAnims[i] ?? new Animated.Value(0.4) }],
                       },
-                      isCurrent && isPlaying && styles.waveformBarActive,
                     ]}
                   />
                 );
               })}
             </View>
           </Pressable>
-
-          <View style={styles.timeRow}>
-            <Text style={styles.timeText}>{formattedTime}</Text>
-            {playbackSpeed !== 1 ? (
-              <Text style={styles.speedIndicator}>{playbackSpeed}x</Text>
-            ) : null}
-          </View>
+          <Text style={s.timestamp}>{formattedTime}</Text>
         </View>
       </View>
 
-      <View style={styles.bottomRow}>
-        <Pressable
-          onPress={handleSpeedToggle}
-          style={({ pressed }) => [styles.speedButton, pressed && styles.speedPressed]}
-          testID="speed-toggle-button"
-          accessibilityLabel={`Playback speed ${playbackSpeed}x`}
-          disabled={!isLoaded}
-        >
-          <Gauge color={playbackSpeed === 0.75 ? colors.teal : 'rgba(255,255,255,0.5)'} size={14} />
-          <Text
-            style={[
-              styles.speedText,
-              playbackSpeed === 0.75 && styles.speedTextActive,
-            ]}
-          >
-            {playbackSpeed === 1 ? '1x' : '0.75x'}
-          </Text>
+      {/* Controls row */}
+      <View style={s.playerControls}>
+        <Pressable onPress={handleSpeedToggle} style={s.controlPill} disabled={!isLoaded} testID="speed-toggle-button">
+          <Gauge color={B.foreground} size={16} />
+          <Text style={s.controlPillText}>{playbackSpeed === 1 ? '1x' : '0.75x'}</Text>
         </Pressable>
 
-        <View style={styles.replayBadge}>
-          <RotateCcw
-            color={replayLimitReached ? colors.amber : 'rgba(255,255,255,0.5)'}
-            size={12}
-          />
-          <Text
-            style={[
-              styles.replayText,
-              replayLimitReached && styles.replayTextLimit,
-            ]}
-          >
-            Replay: {replayLabel}
-          </Text>
+        <View style={s.controlPill}>
+          <RotateCcw color={B.foreground} size={16} />
+          <Text style={s.controlPillText}>Replay: {replayLabel}</Text>
         </View>
 
-        {isLoaded && (
-          <Pressable
-            accessibilityLabel="Replay audio"
-            onPress={handleReplay}
-            style={({ pressed }) => [styles.replayButton, pressed && styles.replayPressed]}
-            testID="replay-audio-button"
-          >
-            <RotateCcw color={colors.teal} size={14} />
+        {isLoaded ? (
+          <Pressable onPress={handleReplay} style={s.controlPillIcon} testID="replay-audio-button">
+            <RefreshCw color={B.foreground} size={16} />
           </Pressable>
-        )}
+        ) : null}
       </View>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const s = StyleSheet.create({
   card: {
-    borderRadius: 16,
-    backgroundColor: colors.navy,
-    padding: 16,
-    gap: 12,
+    backgroundColor: B.card,
+    borderRadius: 24,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: B.border,
+    ...Platform.select({
+      ios: { shadowColor: '#0F1F3D', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.04, shadowRadius: 32 },
+      android: { elevation: 3 },
+    }),
   },
-  topRow: {
+  playerMain: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
+    gap: 16,
+    marginBottom: 16,
   },
-  playButton: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+  playBtn: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: B.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.blue,
+    ...Platform.select({
+      ios: { shadowColor: 'rgba(43,112,239,0.25)', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 1, shadowRadius: 20 },
+      android: { elevation: 6 },
+    }),
   },
-  playPressed: {
-    opacity: 0.85,
-  },
-  centerColumn: {
+  waveformWrap: {
     flex: 1,
-    gap: 6,
+    gap: 8,
   },
   waveformTouchArea: {
-    height: 44,
+    height: 32,
     justifyContent: 'center',
   },
-  waveformContainer: {
+  waveform: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 36,
-    gap: 2,
+    gap: 3,
+    height: 24,
   },
-  waveformBar: {
+  waveBar: {
     flex: 1,
     borderRadius: 2,
-    minHeight: 4,
+    minHeight: 3,
+    minWidth: 2,
   },
-  waveformBarActive: {
-    shadowColor: colors.teal,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.6,
-    shadowRadius: 4,
+  timestamp: {
+    fontFamily: fontFamily.bodySemiBold,
+    fontSize: 13,
+    color: B.muted,
   },
-  timeRow: {
+  playerControls: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
   },
-  timeText: {
-    color: 'rgba(255,255,255,0.55)',
-    fontSize: 11,
-    fontWeight: '500' as const,
-  },
-  speedIndicator: {
-    color: colors.teal,
-    fontSize: 10,
-    fontWeight: '700' as const,
-    backgroundColor: 'rgba(0,229,182,0.12)',
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  bottomRow: {
+  controlPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    paddingTop: 2,
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    backgroundColor: 'rgba(15,31,61,0.04)',
+    borderRadius: 999,
   },
-  speedButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+  controlPillText: {
+    fontFamily: fontFamily.bodyBold,
+    fontSize: 13,
+    color: B.foreground,
   },
-  speedPressed: {
-    opacity: 0.7,
-  },
-  speedText: {
-    color: 'rgba(255,255,255,0.5)',
-    fontSize: 11,
-    fontWeight: '700' as const,
-  },
-  speedTextActive: {
-    color: colors.teal,
-  },
-  replayBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-  },
-  replayText: {
-    color: 'rgba(255,255,255,0.5)',
-    fontSize: 11,
-    fontWeight: '600' as const,
-  },
-  replayTextLimit: {
-    color: colors.amber,
-  },
-  replayButton: {
-    marginLeft: 'auto',
+  controlPillIcon: {
     width: 34,
     height: 34,
     borderRadius: 17,
-    backgroundColor: 'rgba(0,229,182,0.12)',
+    backgroundColor: 'rgba(15,31,61,0.04)',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  replayPressed: {
-    opacity: 0.7,
+    marginLeft: 'auto',
   },
   errorRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
   },
-  error: {
-    color: '#FF6B6B',
+  errorText: {
+    fontFamily: fontFamily.bodySemiBold,
     fontSize: 14,
-    fontWeight: '600' as const,
+    color: '#EF4444',
   },
-  retryButton: {
+  retryBtn: {
     alignSelf: 'flex-start',
-    minHeight: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    justifyContent: 'center',
-    paddingHorizontal: 14,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-  },
-  retryPressed: {
-    opacity: 0.7,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: 'rgba(43,112,239,0.08)',
+    marginTop: 12,
   },
   retryText: {
-    color: Colors.surface,
-    fontWeight: '600' as const,
+    fontFamily: fontFamily.bodySemiBold,
     fontSize: 13,
+    color: B.primary,
   },
 });

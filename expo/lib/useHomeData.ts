@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { useRef } from 'react';
 
 import { fetchLeaderboard } from '@/lib/profileHelpers';
 import { fetchSectionAccuracy } from '@/lib/streamHelpers';
@@ -29,6 +30,26 @@ export type SectionHistoryItem = {
   progressPct: number;
 };
 
+export type LeaderboardNeighbor = {
+  rank: number;
+  display_name: string;
+  target_level: string;
+  exam_type: string;
+  readiness_score: number;
+  streak: number;
+  xp: number;
+  avatar_color: string | null;
+  is_current_user: boolean;
+};
+
+export type TrendDay = {
+  day_date: string;
+  daily_xp: number;
+  daily_correct: number;
+  daily_total: number;
+  cumulative_accuracy: number | null;
+};
+
 export type HomeData = {
   preparedness: number;
   streak: number;
@@ -51,6 +72,13 @@ export type HomeData = {
   leaderboardPercentile: number | null;
   subscriptionTier: string;
   isLoading: boolean;
+  // New fields for redesign
+  firstName: string | null;
+  greeting: string;
+  motivationalQuote: string | null;
+  leaderboardNeighbors: LeaderboardNeighbor[];
+  trendData: TrendDay[];
+  trendPercentage: number | null;
 };
 
 function calcDaysToExam(examDate: string | null): number | null {
@@ -63,6 +91,28 @@ function calcDaysToExam(examDate: string | null): number | null {
   return diff > 0 ? diff : null;
 }
 
+function getGreeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Good morning';
+  if (hour < 17) return 'Good afternoon';
+  return 'Good evening';
+}
+
+function pickQuoteCategory(
+  streak: number,
+  daysToExam: number | null,
+  hasPracticedToday: boolean,
+  preparedness: number,
+): string {
+  // Prioritize: exam close > streak > comeback > milestone > general
+  if (daysToExam !== null && daysToExam <= 30) return 'exam_close';
+  if (streak >= 3) return 'streak';
+  if (streak === 0 && !hasPracticedToday) return 'comeback';
+  if (preparedness >= 60) return 'milestone';
+  if (!hasPracticedToday) return 'low_activity';
+  return 'general';
+}
+
 const SECTION_ORDER: SectionHistoryItem['section'][] = ['Hören', 'Lesen', 'Schreiben', 'Sprechen'];
 
 export function useHomeData(): HomeData {
@@ -70,6 +120,7 @@ export function useHomeData(): HomeData {
   const { access } = useAccess();
   const userId = user?.id ?? '';
   const targetLevel = profile?.target_level ?? 'A1';
+  const firstName = (profile as any)?.first_name ?? null;
 
   const sectionAccuracyQuery = useQuery({
     queryKey: ['section-accuracy', userId],
@@ -113,7 +164,6 @@ export function useHomeData(): HomeData {
 
       const mockRows = (mockData ?? []) as Array<{ overall_score_pct: number | null }>;
 
-      // Per-section aggregation for Zone E
       const sectionMap: Record<string, { questionCount: number; testCount: number }> = {};
       for (const s of completed) {
         if (!sectionMap[s.section]) sectionMap[s.section] = { questionCount: 0, testCount: 0 };
@@ -214,6 +264,92 @@ export function useHomeData(): HomeData {
     staleTime: 120_000,
   });
 
+  // New: leaderboard neighbors for ranking card
+  const neighborsQuery = useQuery({
+    queryKey: ['leaderboard-neighbors', userId, targetLevel],
+    enabled: Boolean(userId) && Boolean(targetLevel),
+    queryFn: async (): Promise<LeaderboardNeighbor[]> => {
+      try {
+        const readiness = Math.round(profile?.preparedness_score ?? 0);
+        const { data, error } = await (supabase.rpc as any)('get_leaderboard_neighbors', {
+          p_user_id: userId,
+          p_target_level: targetLevel,
+          p_user_readiness: readiness,
+        });
+        if (error) return [];
+        return (data ?? []) as LeaderboardNeighbor[];
+      } catch {
+        return [];
+      }
+    },
+    staleTime: 120_000,
+  });
+
+  // New: 7-day trend data
+  const trendQuery = useQuery({
+    queryKey: ['7day-trend', userId],
+    enabled: Boolean(userId),
+    queryFn: async (): Promise<TrendDay[]> => {
+      try {
+        const { data, error } = await (supabase.rpc as any)('get_7day_trend', {
+          p_user_id: userId,
+        });
+        if (error) return [];
+        return (data ?? []) as TrendDay[];
+      } catch {
+        return [];
+      }
+    },
+    staleTime: 60_000,
+  });
+
+  // New: motivational quote (cached per session via staleTime)
+  const streak = profile?.streak_count ?? 0;
+  const preparedness = profile?.preparedness_score ?? 0;
+  const dailyStreamCount = (profile as Record<string, unknown> | null)?.daily_stream_count as number | undefined;
+  const hasPracticedToday = (dailyStreamCount ?? 0) > 0;
+  const daysToExam = calcDaysToExam(profile?.exam_date ?? null);
+
+  const categoryRef = useRef(
+    pickQuoteCategory(streak, daysToExam, hasPracticedToday, preparedness)
+  );
+
+  const quoteQuery = useQuery({
+    queryKey: ['motivational-quote', userId, categoryRef.current],
+    enabled: Boolean(userId),
+    queryFn: async (): Promise<string | null> => {
+      try {
+        const category = categoryRef.current;
+        let query = supabase
+          .from('motivational_quotes' as never)
+          .select('text')
+          .eq('category', category as never) as any;
+
+        if (category === 'streak' && streak > 0) {
+          query = query.or(`min_streak.is.null,min_streak.lte.${streak}`);
+        }
+        if (category === 'exam_close' && daysToExam !== null) {
+          query = query.or(`max_days_to_exam.is.null,max_days_to_exam.gte.${daysToExam}`);
+        }
+
+        const { data, error } = await query;
+        if (error || !data || data.length === 0) {
+          // Fallback to general
+          const { data: fallback } = await (supabase.from('motivational_quotes' as never) as any)
+            .select('text')
+            .eq('category', 'general');
+          const items = fallback ?? [];
+          return items.length > 0 ? items[Math.floor(Math.random() * items.length)].text : null;
+        }
+        const items = data as Array<{ text: string }>;
+        return items[Math.floor(Math.random() * items.length)].text;
+      } catch {
+        return null;
+      }
+    },
+    staleTime: Infinity, // Don't refetch within this session
+  });
+
   const horenAccuracy = sectionAccuracyQuery.data
     ? Math.round(sectionAccuracyQuery.data.horenAccuracy * 100)
     : 0;
@@ -236,11 +372,24 @@ export function useHomeData(): HomeData {
     };
   });
 
-  const dailyStreamCount = (profile as Record<string, unknown> | null)?.daily_stream_count as number | undefined;
+  // Calculate trend percentage from 7-day data
+  const trendData = trendQuery.data ?? [];
+  let trendPercentage: number | null = null;
+  if (trendData.length >= 7) {
+    const firstHalf = trendData.slice(0, 3);
+    const secondHalf = trendData.slice(4, 7);
+    const avgFirst = firstHalf.reduce((s, d) => s + d.daily_xp, 0) / Math.max(firstHalf.length, 1);
+    const avgSecond = secondHalf.reduce((s, d) => s + d.daily_xp, 0) / Math.max(secondHalf.length, 1);
+    if (avgFirst > 0) {
+      trendPercentage = Math.round(((avgSecond - avgFirst) / avgFirst) * 100);
+    } else if (avgSecond > 0) {
+      trendPercentage = 100;
+    }
+  }
 
   return {
-    preparedness: profile?.preparedness_score ?? 0,
-    streak: profile?.streak_count ?? 0,
+    preparedness,
+    streak,
     xp: profile?.xp_total ?? 0,
     targetLevel,
     examType: profile?.exam_type ?? 'TELC',
@@ -251,8 +400,8 @@ export function useHomeData(): HomeData {
     sectionalTotal: 8,
     mockLastScore: statsQuery.data?.mockLastScore ?? null,
     recentSessions: recentSessionsQuery.data ?? [],
-    hasPracticedToday: (dailyStreamCount ?? 0) > 0,
-    daysToExam: calcDaysToExam(profile?.exam_date ?? null),
+    hasPracticedToday,
+    daysToExam,
     trialHoursRemaining: access.trial_hours_remaining ?? null,
     activityCounts: {
       streamAnswered: activityCountsQuery.data?.streamSessions ?? 0,
@@ -265,5 +414,12 @@ export function useHomeData(): HomeData {
     leaderboardPercentile: leaderboardQuery.data ?? null,
     subscriptionTier: profile?.subscription_tier ?? 'free_trial',
     isLoading: sectionAccuracyQuery.isLoading || statsQuery.isLoading,
+    // New fields
+    firstName,
+    greeting: getGreeting(),
+    motivationalQuote: quoteQuery.data ?? null,
+    leaderboardNeighbors: neighborsQuery.data ?? [],
+    trendData,
+    trendPercentage,
   };
 }

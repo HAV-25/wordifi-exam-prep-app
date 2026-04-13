@@ -6,7 +6,15 @@
  */
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
-import { Headphones, BookOpenText } from 'lucide-react-native';
+import {
+  ArrowRight,
+  BookOpenText,
+  Flame,
+  Headphones,
+  Sparkles,
+  Star,
+  Zap,
+} from 'lucide-react-native';
 import * as Sentry from '@sentry/react-native';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -27,8 +35,7 @@ import { PreparednessBottomSheet } from '@/components/PreparednessBottomSheet';
 import { ReportModal } from '@/components/ReportModal';
 import { StreamCard } from '@/components/StreamCard';
 import { TrialBanner } from '@/components/TrialBanner';
-import Colors from '@/constants/colors';
-import { colors } from '@/theme';
+import { fontFamily, fontSize } from '@/theme';
 import { TEIL_NAMES } from '@/theme/constants';
 import { didCrossBadgeThreshold, formatXp, getBadgeTier } from '@/lib/badgeHelpers';
 import {
@@ -49,10 +56,22 @@ import { useAccess } from '@/providers/AccessProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import type { AppQuestion } from '@/types/database';
 
+// ─── Banani design tokens ────────────────────────────────────────────────────
+const B = {
+  background: '#F8FAFF',
+  foreground: '#374151',
+  border: '#E2E8F0',
+  primary: '#2B70EF',
+  primaryFg: '#FFFFFF',
+  card: '#FFFFFF',
+  muted: '#94A3B8',
+  accent: '#F0C808',
+  accentFg: '#374151',
+  warning: '#F59E0B',
+  questionColor: '#0F1F3D',
+} as const;
+
 const SESSION_SIZE = 20;
-
-// ─── Progress bar (reused from before) ──────────────────────────────────────
-
 
 // ─── Main screen ─────────────────────────────────────────────────────────────
 
@@ -65,7 +84,7 @@ export default function TestStreamScreen() {
   const targetLevel = profile?.target_level ?? 'A1';
   const today = new Date().toISOString().slice(0, 10);
 
-  // ── Core question state (simple, no refs) ──────────────────────────────────
+  // ── Core question state ────────────────────────────────────────────────────
   const [questions, setQuestions] = useState<AppQuestion[]>([]);
   const [currentIndex, setCurrentIndex] = useState<number>(0);
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -98,7 +117,6 @@ export default function TestStreamScreen() {
   const xpBurstTranslateY = useRef(new Animated.Value(0)).current;
   const xpBurstScale = useRef(new Animated.Value(0.8)).current;
   const streakToastAnim = useRef(new Animated.Value(-80)).current;
-  const gaugeScaleAnim = useRef(new Animated.Value(1)).current;
   const comboToastAnim = useRef(new Animated.Value(0)).current;
 
   const XP_PER_LEVEL: Record<string, number> = useMemo(() => ({ A1: 5, A2: 10, B1: 15 }), []);
@@ -107,13 +125,11 @@ export default function TestStreamScreen() {
   // ── Derived values ─────────────────────────────────────────────────────────
   const currentQuestion = questions[currentIndex] ?? null;
   const totalQuestions = questions.length;
-  const gaugeColor = useMemo(() => {
-    if (localPreparedness < 40) return colors.red;
-    if (localPreparedness < 70) return colors.amber;
-    return colors.green;
-  }, [localPreparedness]);
   const badgeTier = useMemo(() => getBadgeTier(localXp), [localXp]);
   const formattedXp = useMemo(() => formatXp(localXp), [localXp]);
+
+  const isPaidUser = (profile?.subscription_tier ?? 'free_trial') === 'pro';
+  const trialHours = access.trial_hours_remaining;
 
   // ── Sync profile values ────────────────────────────────────────────────────
   useEffect(() => {
@@ -133,7 +149,7 @@ export default function TestStreamScreen() {
     }
   }, [userId]);
 
-  // ── Session init (2 DB calls total, then zero for questions) ───────────────
+  // ── Session init ───────────────────────────────────────────────────────────
   useEffect(() => {
     if (!userId || !targetLevel) return;
     let cancelled = false;
@@ -143,9 +159,7 @@ export default function TestStreamScreen() {
       setInitError(null);
       try {
         const result: SessionResult = await getOrCreateStreamSession(userId, targetLevel, today, streamSections);
-
         if (cancelled) return;
-
         if (result.status === 'complete') {
           setIsComplete(true);
           setSessionId(result.session.id);
@@ -153,17 +167,12 @@ export default function TestStreamScreen() {
           setIsLoading(false);
           return;
         }
-
         if (result.status === 'created' && 'isRecycled' in result && result.isRecycled) {
           setIsRecycledBanner(true);
         }
-
         const session = result.session;
-        // Fetch all questions upfront — single DB call
         const questionData = await fetchQuestionsByIds(session.question_ids);
-
         if (cancelled) return;
-
         setSessionId(session.id);
         setQuestions(questionData);
         setCurrentIndex(session.current_index);
@@ -187,9 +196,7 @@ export default function TestStreamScreen() {
     const xpVal = XP_PER_LEVEL[level] ?? 5;
     setXpBurstValue(xpVal);
     setXpBurstVisible(true);
-    xpBurstOpacity.setValue(0);
-    xpBurstTranslateY.setValue(0);
-    xpBurstScale.setValue(0.8);
+    xpBurstOpacity.setValue(0); xpBurstTranslateY.setValue(0); xpBurstScale.setValue(0.8);
     Animated.parallel([
       Animated.timing(xpBurstOpacity, { toValue: 1, duration: 150, useNativeDriver: true }),
       Animated.timing(xpBurstScale, { toValue: 1, duration: 150, useNativeDriver: true }),
@@ -200,13 +207,6 @@ export default function TestStreamScreen() {
       ]).start(() => setXpBurstVisible(false));
     });
   }, [XP_PER_LEVEL, xpBurstOpacity, xpBurstTranslateY, xpBurstScale]);
-
-  const animateGaugePulse = useCallback(() => {
-    Animated.sequence([
-      Animated.timing(gaugeScaleAnim, { toValue: 1.12, duration: 200, useNativeDriver: true }),
-      Animated.timing(gaugeScaleAnim, { toValue: 1, duration: 400, useNativeDriver: true }),
-    ]).start();
-  }, [gaugeScaleAnim]);
 
   const showStreakToastBanner = useCallback((text: string) => {
     setStreakToast(text);
@@ -231,10 +231,8 @@ export default function TestStreamScreen() {
     async (questionId: string, selectedKey: string, isCorrect: boolean) => {
       setSelectedAnswer(selectedKey);
       setIsAnswered(true);
-
       const newCount = sessionAnsweredCount + 1;
       setSessionAnsweredCount(newCount);
-
       decrementStreamRemaining();
       incrementDailyStreamCount().catch(() => {});
 
@@ -248,108 +246,59 @@ export default function TestStreamScreen() {
         setCorrectStreak(0);
       }
 
-      if (newCount === Math.ceil(SESSION_SIZE / 2)) {
-        showStreakToastBanner('Halfway there — you\'re doing great 🔥');
-      }
-      if (newCount === 10) {
-        showComboToastBanner('10 questions done! 💪');
-      }
+      if (newCount === Math.ceil(SESSION_SIZE / 2)) showStreakToastBanner('Halfway there — you\'re doing great 🔥');
+      if (newCount === 10) showComboToastBanner('10 questions done! 💪');
+      if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
 
-      if (Platform.OS !== 'web') {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-      }
-
-      animateGaugePulse();
-
-      // Save answer — non-blocking
       if (sessionId) {
-        saveStreamAnswer({
-          sessionId,
-          userId,
-          questionId,
-          selectedAnswer: selectedKey,
-          isCorrect,
-        }).catch((err) => console.error('[Stream] Save answer error:', err));
+        saveStreamAnswer({ sessionId, userId, questionId, selectedAnswer: selectedKey, isCorrect }).catch((err) => console.error('[Stream] Save answer error:', err));
       }
+      updatePreparednessScore(userId, 1).then((newScore) => setLocalPreparedness(newScore)).catch(() => {});
 
-      // Update preparedness — non-blocking
-      updatePreparednessScore(userId, 1).then((newScore) => {
-        setLocalPreparedness(newScore);
-      }).catch(() => {});
-
-      // Update XP + streak — non-blocking
       if (isCorrect && profile) {
         try {
           const oldXp = localXp;
-          const { newXp, newStreak } = await updateXpAndStreak(userId, {
-            ...profile,
-            xp_total: localXp,
-            streak_count: localStreak,
-            last_active_date: profile.last_active_date,
-          });
+          const { newXp, newStreak } = await updateXpAndStreak(userId, { ...profile, xp_total: localXp, streak_count: localStreak, last_active_date: profile.last_active_date });
           setLocalXp(newXp);
           const crossedBadge = didCrossBadgeThreshold(oldXp, newXp);
           if (crossedBadge) showStreakToastBanner(`🏅 You reached ${crossedBadge.label}!`);
           if (newStreak !== localStreak) setLocalStreak(newStreak);
-        } catch { /* silent */ }
+        } catch {}
       }
 
-      // Check badges every 5 answers
       if (newCount % 5 === 0) {
-        checkAndAwardBadges(userId, targetLevel, localXp).then((badge) => {
-          if (badge) setCelebrationBadge(badge);
-        }).catch(() => {});
+        checkAndAwardBadges(userId, targetLevel, localXp).then((badge) => { if (badge) setCelebrationBadge(badge); }).catch(() => {});
         refreshProfile().catch(() => {});
       }
     },
     [sessionId, userId, profile, localXp, localStreak, targetLevel, sessionAnsweredCount,
      correctStreak, decrementStreamRemaining, incrementDailyStreamCount, triggerXpBurst,
-     animateGaugePulse, showStreakToastBanner, showComboToastBanner, refreshProfile]
+     showStreakToastBanner, showComboToastBanner, refreshProfile]
   );
 
-  // ── Handle Next (advance to next question) ─────────────────────────────────
+  // ── Handle Next ────────────────────────────────────────────────────────────
   const handleNext = useCallback(() => {
-    if (isStreamLimited) {
-      setShowPaywall(true);
-      return;
-    }
-
+    if (isStreamLimited) { setShowPaywall(true); return; }
     const newIndex = currentIndex + 1;
     const isNowComplete = newIndex >= totalQuestions;
-
-    // Advance session in DB — non-blocking
-    if (sessionId) {
-      advanceSession(sessionId, newIndex, totalQuestions)
-        .catch((err) => console.error('[Stream] Advance error:', err));
-    }
-
-    if (isNowComplete) {
-      setIsComplete(true);
-      return;
-    }
-
-    // Reset answer state and advance
-    setIsAnswered(false);
-    setSelectedAnswer(null);
-    setAudioUnlockedMap({});
-    setCurrentIndex(newIndex);
+    if (sessionId) advanceSession(sessionId, newIndex, totalQuestions).catch((err) => console.error('[Stream] Advance error:', err));
+    if (isNowComplete) { setIsComplete(true); return; }
+    setIsAnswered(false); setSelectedAnswer(null); setAudioUnlockedMap({}); setCurrentIndex(newIndex);
   }, [currentIndex, totalQuestions, sessionId, isStreamLimited]);
 
   const handleAudioPlayed = useCallback((questionId: string) => {
     setAudioUnlockedMap((prev) => ({ ...prev, [questionId]: true }));
   }, []);
 
-  const handleReportPress = useCallback((qId: string) => {
-    setReportQuestionId(qId);
-  }, []);
+  const handleReportPress = useCallback((qId: string) => { setReportQuestionId(qId); }, []);
 
   // ── Render: Loading ────────────────────────────────────────────────────────
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.loadingWrap}>
-          <ActivityIndicator color={Colors.accent} size="large" />
-          <Text style={styles.loadingText}>Loading questions...</Text>
+      <SafeAreaView style={s.safeArea}>
+        <View style={s.emptyWrap}>
+          <ActivityIndicator color={B.primary} size="large" />
+          <Text style={s.emptyDesc}>Loading questions...</Text>
         </View>
       </SafeAreaView>
     );
@@ -358,13 +307,13 @@ export default function TestStreamScreen() {
   // ── Render: Init error ─────────────────────────────────────────────────────
   if (initError) {
     return (
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.emptyWrap}>
-          <Text style={styles.emptyEmoji}>⚠️</Text>
-          <Text style={styles.emptyTitle}>Couldn't load questions</Text>
-          <Text style={styles.emptyDesc}>{initError}</Text>
-          <Pressable style={styles.ctaPrimary} onPress={() => { setInitError(null); setIsLoading(true); }}>
-            <Text style={styles.ctaPrimaryText}>Try Again</Text>
+      <SafeAreaView style={s.safeArea}>
+        <View style={s.emptyWrap}>
+          <Text style={s.emptyEmoji}>⚠️</Text>
+          <Text style={s.emptyTitle}>Couldn't load questions</Text>
+          <Text style={s.emptyDesc}>{initError}</Text>
+          <Pressable style={s.ctaPrimary} onPress={() => { setInitError(null); setIsLoading(true); }}>
+            <Text style={s.ctaPrimaryText}>Try Again</Text>
           </Pressable>
         </View>
       </SafeAreaView>
@@ -374,16 +323,13 @@ export default function TestStreamScreen() {
   // ── Render: Session complete ───────────────────────────────────────────────
   if (isComplete) {
     return (
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.emptyWrap}>
-          <Text style={styles.emptyEmoji}>🎉</Text>
-          <Text style={styles.emptyTitle}>Today's stream complete!</Text>
-          <Text style={styles.emptyDesc}>
-            You answered {sessionAnsweredCount} questions today.{'\n'}
-            Come back tomorrow for your next stream.
-          </Text>
-          <Pressable style={styles.ctaSecondary} onPress={() => router.push('/(tabs)/tests' as never)}>
-            <Text style={styles.ctaSecondaryText}>Try a Sectional Test</Text>
+      <SafeAreaView style={s.safeArea}>
+        <View style={s.emptyWrap}>
+          <Text style={s.emptyEmoji}>🎉</Text>
+          <Text style={s.emptyTitle}>Today's stream complete!</Text>
+          <Text style={s.emptyDesc}>You answered {sessionAnsweredCount} questions today.{'\n'}Come back tomorrow for your next stream.</Text>
+          <Pressable style={s.ctaSecondary} onPress={() => router.push('/(tabs)/tests' as never)}>
+            <Text style={s.ctaSecondaryText}>Try a Sectional Test</Text>
           </Pressable>
         </View>
       </SafeAreaView>
@@ -394,24 +340,21 @@ export default function TestStreamScreen() {
   if (isStreamLimited && !isAnswered) {
     const dailyLimit = access.stream_questions_per_day ?? 0;
     return (
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.emptyWrap}>
-          <Text style={styles.emptyEmoji}>⏰</Text>
-          <Text style={styles.emptyTitle}>Daily limit reached</Text>
-          <Text style={styles.emptyDesc}>
-            You've answered {dailyLimit} question{dailyLimit !== 1 ? 's' : ''} today — your daily allowance.{'\n'}
-            Upgrade to practise unlimited questions every day.
-          </Text>
-          <View style={styles.emptyCtas}>
-            <Pressable style={styles.ctaPrimary} onPress={() => setShowPaywall(true)}>
-              <Text style={styles.ctaPrimaryText}>Unlock Unlimited</Text>
+      <SafeAreaView style={s.safeArea}>
+        <View style={s.emptyWrap}>
+          <Text style={s.emptyEmoji}>⏰</Text>
+          <Text style={s.emptyTitle}>Daily limit reached</Text>
+          <Text style={s.emptyDesc}>You've answered {dailyLimit} question{dailyLimit !== 1 ? 's' : ''} today — your daily allowance.{'\n'}Upgrade to practise unlimited questions every day.</Text>
+          <View style={s.emptyCtas}>
+            <Pressable style={s.ctaPrimary} onPress={() => setShowPaywall(true)}>
+              <Text style={s.ctaPrimaryText}>Unlock Unlimited</Text>
             </Pressable>
-            <Pressable style={styles.ctaSecondary} onPress={() => router.push('/(tabs)/tests' as never)}>
-              <Text style={styles.ctaSecondaryText}>Try a Sectional Test</Text>
+            <Pressable style={s.ctaSecondary} onPress={() => router.push('/(tabs)/tests' as never)}>
+              <Text style={s.ctaSecondaryText}>Try a Sectional Test</Text>
             </Pressable>
           </View>
         </View>
-        <PaywallModal visible={showPaywall} onClose={() => setShowPaywall(false)} />
+        <PaywallModal visible={showPaywall} variant="stream_limit" onUpgrade={() => setShowPaywall(false)} onDismiss={() => setShowPaywall(false)} />
       </SafeAreaView>
     );
   }
@@ -419,13 +362,13 @@ export default function TestStreamScreen() {
   // ── Render: No questions ───────────────────────────────────────────────────
   if (questions.length === 0) {
     return (
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.emptyWrap}>
-          <Text style={styles.emptyEmoji}>🏆</Text>
-          <Text style={styles.emptyTitle}>No questions available</Text>
-          <Text style={styles.emptyDesc}>Come back tomorrow or try a Sectional Test.</Text>
-          <Pressable style={styles.ctaPrimary} onPress={() => router.push('/(tabs)/tests' as never)}>
-            <Text style={styles.ctaPrimaryText}>Try Sectional Test</Text>
+      <SafeAreaView style={s.safeArea}>
+        <View style={s.emptyWrap}>
+          <Text style={s.emptyEmoji}>🏆</Text>
+          <Text style={s.emptyTitle}>No questions available</Text>
+          <Text style={s.emptyDesc}>Come back tomorrow or try a Sectional Test.</Text>
+          <Pressable style={s.ctaPrimary} onPress={() => router.push('/(tabs)/tests' as never)}>
+            <Text style={s.ctaPrimaryText}>Try Sectional Test</Text>
           </Pressable>
         </View>
       </SafeAreaView>
@@ -434,48 +377,58 @@ export default function TestStreamScreen() {
 
   // ── Render: Main stream ────────────────────────────────────────────────────
   return (
-    <SafeAreaView style={styles.safeArea}>
-      {access.trial_hours_remaining !== null ? (
-        <TrialBanner hoursRemaining={access.trial_hours_remaining} onUpgrade={() => setShowPaywall(true)} />
+    <SafeAreaView style={s.safeArea}>
+      {/* Upgrade nudge / trial banner */}
+      {!isPaidUser ? (
+        <Pressable style={s.nudgeCard} onPress={() => setShowPaywall(true)}>
+          <View style={s.nudgeIcon}>
+            <Sparkles color={B.accentFg} size={18} />
+          </View>
+          <View style={s.nudgeCopy}>
+            <Text style={s.nudgeTitle}>Unlock all levels & sections</Text>
+            {trialHours !== null ? (
+              <Text style={s.nudgeSubtitle}>{Math.ceil(trialHours)} hours left on your trial</Text>
+            ) : null}
+          </View>
+          <View style={s.nudgeArrow}>
+            <ArrowRight color={B.muted} size={16} />
+          </View>
+        </Pressable>
       ) : null}
 
-      {/* Status bar */}
-      <View style={styles.statusBar}>
-        <View style={styles.statusLeft}>
+      {/* Stream header */}
+      <View style={s.streamHeader}>
+        <View style={s.headerContext}>
           {currentQuestion ? (
             <>
-              {currentQuestion.section === 'Hören' ? (
-                <Headphones color="rgba(255,255,255,0.8)" size={14} />
-              ) : (
-                <BookOpenText color="rgba(255,255,255,0.8)" size={14} />
-              )}
-              <Text style={styles.statusLabelText} numberOfLines={1}>
+              <View style={s.headerIcon}>
+                {currentQuestion.section === 'Hören'
+                  ? <Headphones color={B.muted} size={18} />
+                  : <BookOpenText color={B.muted} size={18} />}
+              </View>
+              <Text style={s.headerContextText}>
                 {targetLevel} · {currentQuestion.section} · Teil {currentQuestion.teil}
-                {TEIL_NAMES[currentQuestion.section]?.[currentQuestion.teil]
-                  ? ` · ${TEIL_NAMES[currentQuestion.section][currentQuestion.teil].de} / ${TEIL_NAMES[currentQuestion.section][currentQuestion.teil].en}`
-                  : ''}
               </Text>
             </>
           ) : null}
         </View>
-        <Pressable onPress={() => setShowBottomSheet(true)} testID="gauge-pill">
-          <Animated.View style={[styles.gaugePill, { backgroundColor: gaugeColor, transform: [{ scale: gaugeScaleAnim }] }]}>
-            <Text style={styles.gaugeText}>{currentIndex + 1}/{totalQuestions}</Text>
-          </Animated.View>
-        </Pressable>
+        <View style={s.headerCounter}>
+          <Text style={s.headerCounterText}>{currentIndex + 1}/{totalQuestions}</Text>
+        </View>
       </View>
 
+      {/* Recycled banner */}
       {isRecycledBanner ? (
-        <View style={styles.recycledBanner}>
-          <Text style={styles.recycledText}>You've seen all questions this month! 🏆 Starting a new cycle.</Text>
+        <View style={s.recycledBanner}>
+          <Text style={s.recycledText}>You've seen all questions this month! 🏆 Starting a new cycle.</Text>
           <Pressable onPress={() => setIsRecycledBanner(false)} hitSlop={8}>
-            <Text style={styles.recycledClose}>✕</Text>
+            <Text style={s.recycledClose}>✕</Text>
           </Pressable>
         </View>
       ) : null}
 
-      {/* Question card — uses ScrollView for long content */}
-      <View style={styles.cardContainer}>
+      {/* Question card */}
+      <View style={s.cardContainer}>
         {currentQuestion ? (
           <StreamCard
             question={currentQuestion}
@@ -488,57 +441,58 @@ export default function TestStreamScreen() {
             reviewMode={false}
           />
         ) : (
-          <View style={styles.skipErrorWrap}>
-            <Text style={styles.skipErrorEmoji}>⚠️</Text>
-            <Text style={styles.skipErrorTitle}>Couldn't load this question</Text>
-            <Pressable style={styles.ctaPrimary} onPress={() => {
+          <View style={s.skipErrorWrap}>
+            <Text style={s.emptyEmoji}>⚠️</Text>
+            <Text style={s.emptyDesc}>Couldn't load this question</Text>
+            <Pressable style={s.ctaPrimary} onPress={() => {
               if (currentIndex + 1 < totalQuestions) {
-                setIsAnswered(false);
-                setSelectedAnswer(null);
-                setCurrentIndex(currentIndex + 1);
+                setIsAnswered(false); setSelectedAnswer(null); setCurrentIndex(currentIndex + 1);
                 if (sessionId) advanceSession(sessionId, currentIndex + 1, totalQuestions).catch(() => {});
               }
             }}>
-              <Text style={styles.ctaPrimaryText}>Skip to next</Text>
+              <Text style={s.ctaPrimaryText}>Skip to next</Text>
             </Pressable>
           </View>
         )}
       </View>
 
-      {/* Next button — shown after answering */}
+      {/* Next button */}
       {isAnswered ? (
-        <View style={[styles.footer, { paddingBottom: insets.bottom + 12 }]}>
-          <Pressable onPress={handleNext} style={styles.nextBtn} testID="stream-next-btn">
-            <Text style={styles.nextBtnText}>
+        <View style={[s.footer, { paddingBottom: insets.bottom + 12 }]}>
+          <Pressable onPress={handleNext} style={s.nextBtn} testID="stream-next-btn">
+            <Text style={s.nextBtnText}>
               {currentIndex + 1 >= totalQuestions ? 'Fertig' : 'Weiter →'}
             </Text>
           </Pressable>
         </View>
       ) : null}
 
-      {/* Stats row */}
-      <View style={styles.progressRow}>
-        <View style={styles.statsRow}>
-          <Text style={styles.statText}>🔥 {localStreak}</Text>
-          <View style={styles.xpRow}>
-            <Text style={styles.statText}>⭐ {formattedXp} XP</Text>
-            <View style={[styles.badgePill, { backgroundColor: badgeTier.color }]}>
-              <Text style={styles.badgePillText}>{badgeTier.label}</Text>
-            </View>
-          </View>
+      {/* Motivational stats bar */}
+      <View style={s.motivationalBar}>
+        <View style={s.motItem}>
+          <Flame color={B.warning} size={18} />
+          <Text style={s.motItemText}>{localStreak}</Text>
+        </View>
+        <View style={s.motItem}>
+          <Star color={B.accent} size={18} />
+          <Text style={s.motItemText}>{formattedXp}</Text>
+          <Text style={s.motItemText}>XP</Text>
+        </View>
+        <View style={s.motBadge}>
+          <Text style={s.motBadgeText}>{badgeTier.label}</Text>
         </View>
       </View>
 
-      {/* Toasts and overlays */}
+      {/* Toasts and overlays (unchanged logic) */}
       {comboToast ? (
-        <Animated.View style={[styles.comboPill, { opacity: comboToastAnim, transform: [{ scale: comboToastAnim.interpolate({ inputRange: [0, 1], outputRange: [0.8, 1] }) }] }]}>
-          <Text style={styles.comboPillText}>{comboToast}</Text>
+        <Animated.View style={[s.comboPill, { opacity: comboToastAnim, transform: [{ scale: comboToastAnim.interpolate({ inputRange: [0, 1], outputRange: [0.8, 1] }) }] }]}>
+          <Text style={s.comboPillText}>{comboToast}</Text>
         </Animated.View>
       ) : null}
 
       {xpBurstVisible ? (
-        <Animated.View pointerEvents="none" style={[styles.xpBurst, { opacity: xpBurstOpacity, transform: [{ translateY: xpBurstTranslateY }, { scale: xpBurstScale }] }]}>
-          <Text style={styles.xpBurstText}>+{xpBurstValue} XP</Text>
+        <Animated.View pointerEvents="none" style={[s.xpBurst, { opacity: xpBurstOpacity, transform: [{ translateY: xpBurstTranslateY }, { scale: xpBurstScale }] }]}>
+          <Text style={s.xpBurstText}>+{xpBurstValue} XP</Text>
         </Animated.View>
       ) : null}
 
@@ -547,85 +501,97 @@ export default function TestStreamScreen() {
       ) : null}
 
       {streakToast ? (
-        <Animated.View style={[styles.toast, { transform: [{ translateY: streakToastAnim }] }]}>
-          <Text style={styles.toastText}>{streakToast}</Text>
+        <Animated.View style={[s.toast, { transform: [{ translateY: streakToastAnim }] }]}>
+          <Text style={s.toastText}>{streakToast}</Text>
         </Animated.View>
       ) : null}
 
-      <PreparednessBottomSheet
-        visible={showBottomSheet}
-        onClose={() => setShowBottomSheet(false)}
-        level={targetLevel}
-        overallScore={localPreparedness}
-        horenPct={horenPct}
-        lesenPct={lesenPct}
-        streak={localStreak}
-        lastActiveDate={profile?.last_active_date ?? null}
-      />
-
-      <ReportModal
-        visible={Boolean(reportQuestionId)}
-        questionId={reportQuestionId ?? ''}
-        userId={userId}
-        onClose={() => setReportQuestionId(null)}
-      />
-
-      <PaywallModal
-        visible={showPaywall}
-        variant="stream_limit"
-        onUpgrade={() => setShowPaywall(false)}
-        onDismiss={() => setShowPaywall(false)}
-      />
+      <PreparednessBottomSheet visible={showBottomSheet} onClose={() => setShowBottomSheet(false)} level={targetLevel} overallScore={localPreparedness} horenPct={horenPct} lesenPct={lesenPct} streak={localStreak} lastActiveDate={profile?.last_active_date ?? null} />
+      <ReportModal visible={Boolean(reportQuestionId)} questionId={reportQuestionId ?? ''} userId={userId} onClose={() => setReportQuestionId(null)} />
+      <PaywallModal visible={showPaywall} variant="stream_limit" onUpgrade={() => setShowPaywall(false)} onDismiss={() => setShowPaywall(false)} />
     </SafeAreaView>
   );
 }
 
-// ─── Styles ──────────────────────────────────────────────────────────────────
+// ─── Styles (Banani faithful) ────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: Colors.background },
-  statusBar: {
-    height: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, backgroundColor: Colors.primaryDeep,
+const s = StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: B.background },
+
+  // Upgrade nudge card
+  nudgeCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    marginHorizontal: 20, marginTop: 12, marginBottom: 6,
+    paddingHorizontal: 14, paddingVertical: 12,
+    backgroundColor: B.card, borderWidth: 1, borderColor: B.border, borderRadius: 16,
+    ...Platform.select({
+      ios: { shadowColor: '#0F1F3D', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.03, shadowRadius: 18 },
+      android: { elevation: 2 },
+    }),
   },
-  statusLeft: { flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 },
-  statusLabelText: { fontSize: 12, fontWeight: '600' as const, color: 'rgba(255,255,255,0.7)' },
-  gaugePill: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 99 },
-  gaugeText: { color: '#fff', fontSize: 12, fontWeight: '700' as const },
-  loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
-  loadingText: { color: Colors.textMuted, fontSize: 15, fontWeight: '600' as const },
-  emptyWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, gap: 12 },
-  emptyEmoji: { fontSize: 48 },
-  emptyTitle: { fontSize: 20, fontWeight: '700' as const, color: Colors.text, textAlign: 'center' },
-  emptyDesc: { fontSize: 14, color: Colors.textMuted, textAlign: 'center', lineHeight: 22 },
-  emptyCtas: { gap: 10, width: '100%', marginTop: 16 },
-  ctaPrimary: { backgroundColor: Colors.accent, paddingVertical: 14, borderRadius: 14, alignItems: 'center' },
-  ctaPrimaryText: { color: '#fff', fontSize: 15, fontWeight: '700' as const },
-  ctaSecondary: { backgroundColor: Colors.surfaceMuted, paddingVertical: 14, borderRadius: 14, alignItems: 'center' },
-  ctaSecondaryText: { color: Colors.text, fontSize: 15, fontWeight: '600' as const },
-  recycledBanner: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF3E0', paddingHorizontal: 16, paddingVertical: 10, gap: 10 },
-  recycledText: { flex: 1, color: '#E65100', fontSize: 13, fontWeight: '600' as const, lineHeight: 18 },
-  recycledClose: { color: '#E65100', fontWeight: '700' as const, fontSize: 16 },
+  nudgeIcon: { width: 22, height: 22, alignItems: 'center', justifyContent: 'center' },
+  nudgeCopy: { flex: 1, gap: 2 },
+  nudgeTitle: { fontFamily: fontFamily.bodySemiBold, fontSize: 14, color: B.foreground, lineHeight: 14 * 1.25 },
+  nudgeSubtitle: { fontFamily: fontFamily.bodyRegular, fontSize: 12, color: B.muted, lineHeight: 12 * 1.25 },
+  nudgeArrow: { width: 18, height: 18, alignItems: 'center', justifyContent: 'center' },
+
+  // Stream header
+  streamHeader: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingHorizontal: 20, paddingTop: 12, paddingBottom: 20,
+  },
+  headerContext: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  headerIcon: { width: 18, height: 18, alignItems: 'center', justifyContent: 'center' },
+  headerContextText: { fontFamily: fontFamily.display, fontSize: 14, color: B.muted },
+  headerCounter: {
+    backgroundColor: 'rgba(43,112,239,0.1)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999,
+  },
+  headerCounterText: { fontFamily: fontFamily.display, fontSize: 14, color: B.primary },
+
+  // Recycled banner
+  recycledBanner: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF3E0', paddingHorizontal: 16, paddingVertical: 10, gap: 10, marginHorizontal: 20, borderRadius: 12, marginBottom: 8 },
+  recycledText: { flex: 1, fontFamily: fontFamily.bodySemiBold, color: '#E65100', fontSize: 13, lineHeight: 18 },
+  recycledClose: { fontFamily: fontFamily.bodyBold, color: '#E65100', fontSize: 16 },
+
+  // Card container
   cardContainer: { flex: 1, overflow: 'hidden' },
   skipErrorWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, gap: 16 },
-  skipErrorEmoji: { fontSize: 40 },
-  skipErrorTitle: { fontSize: 16, fontWeight: '600' as const, color: Colors.textMuted, textAlign: 'center' as const },
-  footer: { paddingHorizontal: 24, paddingTop: 8, backgroundColor: Colors.background },
+
+  // Footer / Next button
+  footer: { paddingHorizontal: 20, paddingTop: 8, backgroundColor: B.background },
   nextBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    paddingVertical: 16, borderRadius: 16, backgroundColor: Colors.primary,
+    alignItems: 'center', justifyContent: 'center', paddingVertical: 16, borderRadius: 16, backgroundColor: B.primary,
   },
-  nextBtnText: { color: Colors.white, fontSize: 16, fontWeight: '700' as const, fontFamily: 'NunitoSans_700Bold' },
-  progressRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16, paddingVertical: 8, backgroundColor: Colors.background },
-  statsRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  statText: { color: Colors.textMuted, fontSize: 12, fontWeight: '700' as const },
-  xpRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  badgePill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 99 },
-  badgePillText: { fontSize: 10, fontWeight: '800' as const, color: colors.text },
-  comboPill: { position: 'absolute', top: 110, alignSelf: 'center', backgroundColor: colors.amber, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 99, zIndex: 200 },
-  comboPillText: { color: colors.navy, fontSize: 13, fontWeight: '800' as const },
-  toast: { position: 'absolute', top: 0, left: 16, right: 16, backgroundColor: Colors.primaryDeep, borderRadius: 14, paddingVertical: 14, paddingHorizontal: 20, alignItems: 'center', zIndex: 300 },
-  toastText: { color: '#fff', fontSize: 15, fontWeight: '700' as const },
+  nextBtnText: { fontFamily: fontFamily.bodyBold, color: B.primaryFg, fontSize: 16 },
+
+  // Motivational stats bar
+  motivationalBar: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 18, paddingHorizontal: 20, paddingVertical: 16,
+  },
+  motItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  motItemText: { fontFamily: fontFamily.display, fontSize: 16, color: B.questionColor },
+  motBadge: {
+    backgroundColor: B.accent, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999,
+  },
+  motBadgeText: { fontFamily: fontFamily.display, fontSize: 13, color: B.accentFg, letterSpacing: 0.5, textTransform: 'uppercase' },
+
+  // Empty states
+  emptyWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, gap: 12 },
+  emptyEmoji: { fontSize: 48 },
+  emptyTitle: { fontFamily: fontFamily.display, fontSize: 20, color: B.questionColor, textAlign: 'center' },
+  emptyDesc: { fontFamily: fontFamily.bodyRegular, fontSize: 14, color: B.muted, textAlign: 'center', lineHeight: 22 },
+  emptyCtas: { gap: 10, width: '100%', marginTop: 16 },
+  ctaPrimary: { backgroundColor: B.primary, paddingVertical: 14, borderRadius: 16, alignItems: 'center' },
+  ctaPrimaryText: { fontFamily: fontFamily.bodyBold, color: B.primaryFg, fontSize: 15 },
+  ctaSecondary: { backgroundColor: 'rgba(15,31,61,0.04)', paddingVertical: 14, borderRadius: 16, alignItems: 'center' },
+  ctaSecondaryText: { fontFamily: fontFamily.bodySemiBold, color: B.foreground, fontSize: 15 },
+
+  // Toasts & overlays
+  comboPill: { position: 'absolute', top: 110, alignSelf: 'center', backgroundColor: B.accent, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 999, zIndex: 200 },
+  comboPillText: { fontFamily: fontFamily.display, color: B.accentFg, fontSize: 13 },
+  toast: { position: 'absolute', top: 0, left: 16, right: 16, backgroundColor: B.primary, borderRadius: 16, paddingVertical: 14, paddingHorizontal: 20, alignItems: 'center', zIndex: 300 },
+  toastText: { fontFamily: fontFamily.bodyBold, color: B.primaryFg, fontSize: 15 },
   xpBurst: { position: 'absolute', top: '45%' as unknown as number, alignSelf: 'center', zIndex: 250 },
-  xpBurstText: { color: colors.green, fontSize: 18, fontWeight: '800' as const },
+  xpBurstText: { fontFamily: fontFamily.display, color: '#22C55E', fontSize: 18 },
 });
