@@ -5,7 +5,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as Linking from 'expo-linking';
 import * as Sentry from '@sentry/react-native';
 
+import { adapty } from 'react-native-adapty';
+
 import { signOutUser, updateTcAccepted } from '@/lib/authHelpers';
+import { syncSubscriptionOnLaunch } from '@/lib/adaptyPaywall';
 import { ensureUserProfile, reconcilePendingOnboarding } from '@/lib/profileHelpers';
 import { supabase } from '@/lib/supabaseClient';
 import type { UserProfile } from '@/types/database';
@@ -39,8 +42,13 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
           id: nextSession.user.id,
           email: nextSession.user.email,
         });
+        // Link Adapty profile with Supabase user
+        adapty.identify(nextSession.user.id).catch((err) =>
+          console.warn('[Adapty] identify failed:', err)
+        );
       } else {
         Sentry.setUser(null);
+        adapty.logout().catch(() => {});
       }
     });
 
@@ -118,6 +126,21 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       .finally(() => {
         reconcilingRef.current = false;
       });
+  }, [session?.user?.id, profileQuery.data]);
+
+  // Sync Adapty subscription status on launch (handles renewals/expirations between sessions)
+  const adaptysSyncRef = useRef(false);
+  useEffect(() => {
+    const uid = session?.user?.id;
+    const profile = profileQuery.data;
+    if (!uid || !profile || adaptysSyncRef.current) return;
+    adaptysSyncRef.current = true;
+
+    syncSubscriptionOnLaunch(uid, profile.subscription_tier ?? 'free_trial')
+      .then((changed) => {
+        if (changed) void profileQuery.refetch();
+      })
+      .catch(() => {});
   }, [session?.user?.id, profileQuery.data]);
 
   // Fallback: if profile exists with no onboarding_completed_at after reconcile has had

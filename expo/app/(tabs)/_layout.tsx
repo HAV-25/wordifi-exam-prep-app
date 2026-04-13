@@ -27,9 +27,10 @@ function TabIcon({
     <View style={[styles.navInner, focused && styles.navInnerActive]}>
       <Icon
         color={focused ? BANANI.primaryFg : BANANI.foreground}
-        size={22}
+        size={20}
       />
       <Text
+        numberOfLines={1}
         style={[
           styles.navLabel,
           { color: focused ? BANANI.primaryFg : BANANI.foreground },
@@ -50,10 +51,10 @@ export default function TabLayout() {
         headerShown: false,
         tabBarShowLabel: false,
         tabBarStyle: {
-          height: 72 + insets.bottom + 12,
+          height: 64 + insets.bottom,
           paddingBottom: insets.bottom,
-          paddingTop: 10,
-          paddingHorizontal: 12,
+          paddingTop: 6,
+          paddingHorizontal: 8,
           backgroundColor: BANANI.card,
           borderTopWidth: 1,
           borderTopColor: BANANI.border,
@@ -108,13 +109,13 @@ export default function TabLayout() {
 
 const styles = StyleSheet.create({
   navInner: {
-    width: '100%',
-    minHeight: 60,
-    borderRadius: 18,
+    flex: 1,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 8,
+    gap: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 4,
   },
   navInnerActive: {
     backgroundColor: BANANI.primary,
@@ -124,7 +125,8 @@ const styles = StyleSheet.create({
     }),
   },
   navLabel: {
-    fontFamily: fontFamily.bodyBold,
-    fontSize: 13,
+    fontFamily: fontFamily.bodySemiBold,
+    fontSize: 11,
+    textAlign: 'center',
   },
 });

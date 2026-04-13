@@ -286,7 +286,7 @@ export const StreamCard = React.memo(function StreamCard({
                 return (
                   <Animated.View key={option.key} style={[{ flex: 1 }, animStyle, { transform: [...(animStyle.transform ?? []), { scale: pressAnim }] }]}>
                     <Pressable
-                      style={[st.answerCard, {
+                      style={[st.binaryCard, {
                         borderColor: getCardBorderColor(option.key),
                         backgroundColor: getCardBg(option.key),
                         opacity: getCardOpacity(option.key),
@@ -295,10 +295,19 @@ export const StreamCard = React.memo(function StreamCard({
                       disabled={isAnswered || needsAudioGate}
                       testID={`stream-option-${option.key}`}
                     >
-                      <View style={[st.answerLetter, { backgroundColor: getLetterBg(option.key) }]}>
-                        {renderLetterOrIcon(option.key)}
-                      </View>
-                      <Text style={[st.answerText, { color: getTextColor(option.key) }]}>{option.text}</Text>
+                      {isAnswered && selectedAnswer ? (
+                        <View style={[st.binaryIcon, { backgroundColor: getLetterBg(option.key) }]}>
+                          {(() => {
+                            const nk = option.key.toLowerCase();
+                            const isCorrectOpt = nk === question.correct_answer.toLowerCase();
+                            const isSelectedOpt = nk === selectedAnswer.toLowerCase();
+                            if ((isSelectedOpt && isCorrectOpt) || isCorrectOpt) return <Check color={B.primaryFg} size={16} />;
+                            if (isSelectedOpt) return <X color={B.primaryFg} size={16} />;
+                            return null;
+                          })()}
+                        </View>
+                      ) : null}
+                      <Text style={[st.binaryText, { color: getTextColor(option.key) }]}>{option.text}</Text>
                     </Pressable>
                   </Animated.View>
                 );
@@ -392,36 +401,47 @@ const st = StyleSheet.create({
   stimulusFade: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 24, backgroundColor: 'rgba(255,255,255,0.8)' },
 
   // Question
-  questionWrap: { paddingTop: 32, paddingBottom: 24 },
-  questionText: { fontFamily: fontFamily.display, fontSize: 26, color: B.questionColor, lineHeight: 26 * 1.35, letterSpacing: -0.5 },
+  questionWrap: { paddingTop: 20, paddingBottom: 16 },
+  questionText: { fontFamily: fontFamily.display, fontSize: 22, color: B.questionColor, lineHeight: 22 * 1.35, letterSpacing: -0.3 },
 
   // Answers
   answersWrap: { gap: 0 },
-  answersList: { gap: 12 },
-  binaryRow: { flexDirection: 'row', gap: 12 },
+  answersList: { gap: 10 },
+  binaryRow: { flexDirection: 'row', gap: 10 },
+  binaryCard: {
+    flex: 1, alignItems: 'center', justifyContent: 'center',
+    paddingVertical: 18, borderRadius: 18,
+    borderWidth: 2, borderColor: B.border, backgroundColor: B.card,
+  },
+  binaryIcon: {
+    width: 28, height: 28, borderRadius: 14,
+    alignItems: 'center', justifyContent: 'center',
+    marginBottom: 4,
+  },
+  binaryText: { fontFamily: fontFamily.display, fontSize: 18, color: B.questionColor },
   answerCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
+    gap: 14,
     backgroundColor: B.card,
     borderWidth: 2,
     borderColor: B.border,
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    minHeight: 88,
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    minHeight: 56,
     ...Platform.select({
       ios: { shadowColor: '#0F1F3D', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.02, shadowRadius: 12 },
       android: { elevation: 1 },
     }),
   },
   answerLetter: {
-    width: 40, height: 40, borderRadius: 20,
+    width: 36, height: 36, borderRadius: 18,
     backgroundColor: 'rgba(43,112,239,0.08)',
     alignItems: 'center', justifyContent: 'center',
   },
-  letterText: { fontFamily: fontFamily.display, fontSize: 16, color: B.primary },
-  answerText: { fontFamily: fontFamily.bodyBold, fontSize: 17, color: B.questionColor, lineHeight: 17 * 1.3, flex: 1 },
+  letterText: { fontFamily: fontFamily.display, fontSize: 15, color: B.primary },
+  answerText: { fontFamily: fontFamily.bodySemiBold, fontSize: 16, color: B.questionColor, lineHeight: 22, flex: 1 },
 
   // Explanation panel
   explanationPanel: { backgroundColor: B.card, borderTopLeftRadius: 16, borderTopRightRadius: 16, overflow: 'hidden', ...shadows.panel },

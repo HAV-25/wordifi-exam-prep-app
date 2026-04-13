@@ -40,20 +40,23 @@ export async function getOrCreateStreamSession(
 ): Promise<SessionResult> {
   console.log('[StreamSession] getOrCreate', { userId, level, sessionDate });
 
-  // Check for existing session today
+  // Check for existing session today (pick latest if duplicates exist)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: existing, error: selectErr } = await (supabase.from('stream_sessions') as any)
+  const { data: existingRows, error: selectErr } = await (supabase.from('stream_sessions') as any)
     .select('*')
     .eq('user_id', userId)
     .eq('level', level)
     .eq('session_date', sessionDate)
-    .maybeSingle();
+    .order('created_at', { ascending: false })
+    .limit(1);
 
   if (selectErr) {
     console.error('[StreamSession] select error', selectErr);
     Sentry.captureException(selectErr, { tags: { context: 'stream_session' } });
     throw selectErr;
   }
+
+  const existing = (existingRows as unknown[] | null)?.[0] ?? null;
 
   if (existing) {
     const session = existing as StreamSession;
