@@ -230,8 +230,13 @@ export const StreamCard = React.memo(function StreamCard({
   }, [selectedAnswer, question.correct_answer]);
 
   const explanationText = useMemo(() => {
-    if (explanationLang === 'de' && question.explanation_de) return question.explanation_de;
+    if (explanationLang === 'de') {
+      if (question.explanation_de) return question.explanation_de;
+      if (question.explanation_en) return question.explanation_en;
+      return 'Erklärung kommt bald.';
+    }
     if (question.explanation_en) return question.explanation_en;
+    if (question.explanation_de) return question.explanation_de;
     return 'Explanation coming soon.';
   }, [explanationLang, question.explanation_en, question.explanation_de]);
 

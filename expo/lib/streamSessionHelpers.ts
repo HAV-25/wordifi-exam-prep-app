@@ -85,6 +85,19 @@ export async function getOrCreateStreamSession(
     .single();
 
   if (insertErr) {
+    // Handle unique constraint violation (race condition: another call already created session)
+    if (insertErr.code === '23505') {
+      console.log('[StreamSession] duplicate insert, fetching existing');
+      const { data: raceRow } = await (supabase.from('stream_sessions') as any)
+        .select('*')
+        .eq('user_id', userId)
+        .eq('level', level)
+        .eq('session_date', sessionDate)
+        .order('created_at', { ascending: false })
+        .limit(1);
+      const raceSession = (raceRow as unknown[] | null)?.[0] as StreamSession | undefined;
+      if (raceSession) return { status: 'active', session: raceSession };
+    }
     console.error('[StreamSession] insert error', insertErr);
     Sentry.captureException(insertErr, { tags: { context: 'stream_session' } });
     throw insertErr;

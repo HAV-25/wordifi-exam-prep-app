@@ -99,12 +99,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 4,
-    paddingVertical: 8,
-    paddingHorizontal: 4,
-    borderRadius: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 6,
+    borderRadius: 20,
   },
   tabInnerActive: {
     backgroundColor: B.primary,
+    borderRadius: 20,
     ...Platform.select({
       ios: { shadowColor: 'rgba(43,112,239,0.22)', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 1, shadowRadius: 20 },
       android: { elevation: 6 },
