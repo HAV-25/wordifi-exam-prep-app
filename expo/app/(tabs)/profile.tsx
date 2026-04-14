@@ -30,8 +30,10 @@ import { useQuery } from '@tanstack/react-query';
 
 import Colors from '@/constants/colors';
 import { colors, spacing, radius } from '@/theme';
+import { presentAdaptyPaywall, syncSubscriptionAfterPurchase } from '@/lib/adaptyPaywall';
 import { supabase } from '@/lib/supabaseClient';
 import { useHomeData } from '@/lib/useHomeData';
+import { useAccess } from '@/providers/AccessProvider';
 import { useAuth } from '@/providers/AuthProvider';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -188,7 +190,8 @@ function ActionRow({
 // ─── Screen ───────────────────────────────────────────────────────────────────
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
-  const { profile, user, signOut, isLoading } = useAuth();
+  const { profile, user, signOut, refreshProfile, isLoading } = useAuth();
+  const { refreshAccess } = useAccess();
   const { leaderboardPercentile } = useHomeData();
 
   // tier_config display names (graceful fallback if table missing / schema differs)
@@ -257,9 +260,17 @@ export default function ProfileScreen() {
     router.replace('/onboarding_launch');
   }, [signOut]);
 
-  const navigateUpgrade = useCallback(() => {
-    router.push('/subscription' as never);
-  }, []);
+  const navigateUpgrade = useCallback(async () => {
+    try {
+      const result = await presentAdaptyPaywall(async () => {
+        if (user?.id) {
+          await syncSubscriptionAfterPurchase(user.id);
+          await refreshAccess();
+          await refreshProfile();
+        }
+      });
+    } catch {}
+  }, [user?.id, refreshAccess, refreshProfile]);
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
