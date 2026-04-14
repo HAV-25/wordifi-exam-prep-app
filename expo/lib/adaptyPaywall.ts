@@ -107,8 +107,10 @@ export async function syncSubscriptionOnLaunch(userId: string, currentTier: stri
       return true; // changed
     }
 
-    if (!hasActive && PAID_TIERS.has(currentTier)) {
-      // Adapty says expired but DB says paid → downgrade
+    if (!hasActive && currentTier === 'pro') {
+      // Adapty says expired but DB says 'pro' (Adapty-managed tier) → downgrade
+      // Note: only downgrade 'pro' — other paid tiers (paid_early, monthly, etc.)
+      // may be manually assigned or managed outside Adapty
       await supabase
         .from('user_profiles')
         .update({
@@ -116,7 +118,7 @@ export async function syncSubscriptionOnLaunch(userId: string, currentTier: stri
           subscription_valid_until: null,
         } as never)
         .eq('id', userId);
-      console.log('[Adapty] Launch sync: downgraded to free');
+      console.log('[Adapty] Launch sync: downgraded pro to free');
       return true; // changed
     }
 
