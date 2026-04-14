@@ -41,6 +41,7 @@ import {
   fontSize,
   radius,
   spacing,
+  PAID_TIERS,
 } from '@/theme';
 
 // ─── Banani design tokens (exact from design) ───────────────────────────────
@@ -99,7 +100,7 @@ export default function HomeScreen() {
   const initial = (data.firstName ?? user?.email ?? '?').charAt(0).toUpperCase();
   const scoreInt = Math.round(data.preparedness);
 
-  const isPaidUser = data.subscriptionTier === 'pro';
+  const isPaidUser = PAID_TIERS.has(data.subscriptionTier);
   const showUpgradeBanner = !isPaidUser;
 
   // Sparkline data arrays (7 values)

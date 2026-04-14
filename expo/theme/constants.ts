@@ -151,6 +151,17 @@ export const TEIL_NAMES: Record<string, Record<number, { de: string; en: string 
   },
 } as const;
 
+// ─── Subscription Tiers ──────────────────────────────────────────────────────
+// All tiers that grant paid/premium access. Used to determine banner copy + feature gating.
+export const PAID_TIERS = new Set([
+  'pro',
+  'paid_early',
+  'monthly',
+  'quarterly',
+  'winback_monthly',
+  'winback_quarterly',
+]);
+
 // ─── AsyncStorage Keys ───────────────────────────────────────────────────────
 // Centralised to prevent key typos across the codebase
 export const STORAGE_KEYS = {

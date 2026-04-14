@@ -144,24 +144,32 @@ export async function selectQuestionsForSession(
     seenIds.add(row.question_id);
   }
 
-  // Fetch eligible (unseen) questions — per section for balanced mix
-  const fetchLimit = seenIds.size > 0 ? count * 5 : count * 2;
-  const { data: eligible, error: eligibleErr } = await supabase
-    .from('app_questions')
-    .select('id, section')
-    .eq('level', level)
-    .eq('is_active', true)
-    .in('section', sections)
-    .limit(fetchLimit);
+  // Fetch eligible questions PER SECTION separately to guarantee both pools are populated
+  // (a single combined query with LIMIT returns rows in insertion order, which can be all one section)
+  const perSectionLimit = count * 3; // fetch plenty per section
+  const sectionResults = await Promise.all(
+    sections.map((section) =>
+      supabase
+        .from('app_questions')
+        .select('id, section')
+        .eq('level', level)
+        .eq('is_active', true)
+        .eq('section', section)
+        .limit(perSectionLimit)
+    )
+  );
 
-  if (eligibleErr) {
-    console.error('[StreamSession] eligible query error', eligibleErr);
-    Sentry.captureException(eligibleErr, { tags: { context: 'stream_session' } });
-    throw eligibleErr;
+  const eligible: { id: string; section: string }[] = [];
+  for (const { data, error: err } of sectionResults) {
+    if (err) {
+      console.error('[StreamSession] eligible query error', err);
+      Sentry.captureException(err, { tags: { context: 'stream_session' } });
+      throw err;
+    }
+    eligible.push(...((data ?? []) as { id: string; section: string }[]));
   }
 
-  const unseen = ((eligible ?? []) as { id: string; section: string }[])
-    .filter((q) => !seenIds.has(q.id));
+  const unseen = eligible.filter((q) => !seenIds.has(q.id));
 
   // Split by section and shuffle each pool
   const horenPool = shuffleIds(unseen.filter((q) => q.section === 'Hören').map((q) => q.id));
@@ -192,23 +200,29 @@ export async function selectQuestionsForSession(
     return { questionIds: selected.slice(0, count), isRecycled: false };
   }
 
-  // Not enough unseen — recycle from full pool with same balanced approach
+  // Not enough unseen — recycle from full pool with same balanced per-section approach
   console.log('[StreamSession] pool exhausted, recycling. Found', selected.length, 'unseen');
-  const { data: allQuestions, error: allErr } = await supabase
-    .from('app_questions')
-    .select('id, section')
-    .eq('level', level)
-    .eq('is_active', true)
-    .in('section', sections)
-    .limit(count * 3);
+  const recycleResults = await Promise.all(
+    sections.map((section) =>
+      supabase
+        .from('app_questions')
+        .select('id, section')
+        .eq('level', level)
+        .eq('is_active', true)
+        .eq('section', section)
+        .limit(count * 2)
+    )
+  );
 
-  if (allErr) {
-    console.error('[StreamSession] recycle query error', allErr);
-    Sentry.captureException(allErr, { tags: { context: 'stream_session' } });
-    throw allErr;
+  const allRows: { id: string; section: string }[] = [];
+  for (const { data, error: err } of recycleResults) {
+    if (err) {
+      console.error('[StreamSession] recycle query error', err);
+      Sentry.captureException(err, { tags: { context: 'stream_session' } });
+      throw err;
+    }
+    allRows.push(...((data ?? []) as { id: string; section: string }[]));
   }
-
-  const allRows = (allQuestions ?? []) as { id: string; section: string }[];
   const horenAll = shuffleIds(allRows.filter((q) => q.section === 'Hören').map((q) => q.id));
   const lesenAll = shuffleIds(allRows.filter((q) => q.section === 'Lesen').map((q) => q.id));
   const hTake = Math.min(horenAll.length, half);

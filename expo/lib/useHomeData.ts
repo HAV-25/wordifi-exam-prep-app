@@ -236,10 +236,11 @@ export function useHomeData(): HomeData {
     queryFn: async (): Promise<boolean> => {
       try {
         const { data, error } = await (supabase.from('app_config' as never) as any)
-          .select('campaign_active')
+          .select('value')
+          .eq('key', 'campaign_active')
           .maybeSingle();
         if (error) return false;
-        return (data as Record<string, unknown> | null)?.campaign_active === true;
+        return (data as { value: string } | null)?.value === 'true';
       } catch {
         return false;
       }

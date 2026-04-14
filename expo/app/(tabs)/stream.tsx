@@ -35,7 +35,7 @@ import { PreparednessBottomSheet } from '@/components/PreparednessBottomSheet';
 import { ReportModal } from '@/components/ReportModal';
 import { StreamCard } from '@/components/StreamCard';
 import { TrialBanner } from '@/components/TrialBanner';
-import { fontFamily, fontSize } from '@/theme';
+import { fontFamily, fontSize, PAID_TIERS } from '@/theme';
 import { TEIL_NAMES } from '@/theme/constants';
 import { didCrossBadgeThreshold, formatXp, getBadgeTier } from '@/lib/badgeHelpers';
 import {
@@ -128,7 +128,7 @@ export default function TestStreamScreen() {
   const badgeTier = useMemo(() => getBadgeTier(localXp), [localXp]);
   const formattedXp = useMemo(() => formatXp(localXp), [localXp]);
 
-  const isPaidUser = (profile?.subscription_tier ?? 'free_trial') === 'pro';
+  const isPaidUser = PAID_TIERS.has(profile?.subscription_tier ?? 'free_trial');
   const trialHours = access.trial_hours_remaining;
 
   // ── Sync profile values ────────────────────────────────────────────────────

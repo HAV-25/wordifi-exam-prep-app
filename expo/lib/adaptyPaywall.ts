@@ -8,6 +8,7 @@ import { adapty, createPaywallView } from 'react-native-adapty';
 import type { EventHandlers } from 'react-native-adapty';
 
 import { supabase } from '@/lib/supabaseClient';
+import { PAID_TIERS } from '@/theme/constants';
 
 const PLACEMENT_ID = 'wordifi-onboarding';
 
@@ -91,8 +92,8 @@ export async function syncSubscriptionOnLaunch(userId: string, currentTier: stri
     const profile = await adapty.getProfile();
     const hasActive = profile.accessLevels?.premium?.isActive === true;
 
-    if (hasActive && currentTier !== 'pro') {
-      // Adapty says active but DB says not pro → upgrade
+    if (hasActive && !PAID_TIERS.has(currentTier)) {
+      // Adapty says active but DB says not paid → upgrade
       const expiresAt = profile.accessLevels?.premium?.expiresAt;
       await supabase
         .from('user_profiles')
@@ -106,8 +107,8 @@ export async function syncSubscriptionOnLaunch(userId: string, currentTier: stri
       return true; // changed
     }
 
-    if (!hasActive && currentTier === 'pro') {
-      // Adapty says expired but DB says pro → downgrade
+    if (!hasActive && PAID_TIERS.has(currentTier)) {
+      // Adapty says expired but DB says paid → downgrade
       await supabase
         .from('user_profiles')
         .update({
