@@ -29,6 +29,7 @@ import { colors } from '@/theme';
 import { CTAButton } from '@/components/CTAButton';
 import { GermanConfetti } from '@/components/GermanConfetti';
 import { GermanFlagBadge } from '@/components/GermanFlagBadge';
+import { WordifiLogo } from '@/components/WordifiLogo';
 import { resetPassword, signInWithEmail, signInWithGoogle, signUpWithEmail } from '@/lib/authHelpers';
 import { upsertOnboardingProfile, updatePlayerName } from '@/lib/profileHelpers';
 import { supabase } from '@/lib/supabaseClient';
@@ -245,7 +246,7 @@ export default function OnboardingScreen() {
           <Sparkles color={colors.green} size={36} />
         </View>
         <View style={styles.splashBrandRow}>
-          <Text style={styles.splashBrand}>wordifi</Text>
+          <WordifiLogo variant="light" height={52} />
           <GermanFlagBadge width={22} height={14} />
         </View>
         <Text style={styles.splashTagline}>Your exam, conquered.</Text>

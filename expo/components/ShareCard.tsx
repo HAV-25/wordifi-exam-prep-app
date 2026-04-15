@@ -3,6 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import Colors from '@/constants/colors';
 import { colors } from '@/theme';
+import { WordifiLogo } from '@/components/WordifiLogo';
 
 // Static confetti shapes in the header zone — positional constants
 const HEADER_CONFETTI = [
@@ -68,7 +69,7 @@ export default function ShareCard({
         ))}
         {/* Wordmark + level pill */}
         <View style={styles.z1TopRow}>
-          <Text style={styles.wordmark}>wordifi</Text>
+          <WordifiLogo variant="light" height={26} />
           <View style={styles.levelPill}>
             <Text style={styles.levelPillText}>{level}</Text>
           </View>

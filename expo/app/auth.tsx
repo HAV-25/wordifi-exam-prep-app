@@ -19,6 +19,7 @@ import {
 
 import Colors from '@/constants/colors';
 import { colors, fontFamily } from '@/theme';
+import { WordifiLogo } from '@/components/WordifiLogo';
 import { resetPassword, signInWithEmail, signInWithGoogle, signUpWithEmail, updateTcAccepted } from '@/lib/authHelpers';
 import { tagPendingOnboardingForUser } from '@/lib/profileHelpers';
 import { onboardingSessionNonce } from '@/app/onboarding_launch/_store';
@@ -175,7 +176,7 @@ export default function AuthScreen() {
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.flex}>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           <View style={styles.hero}>
-            <Text style={styles.brand}>wordifi</Text>
+            <WordifiLogo variant="blue" height={44} />
             <Text style={styles.tagline}>Ace your German exam</Text>
           </View>
 

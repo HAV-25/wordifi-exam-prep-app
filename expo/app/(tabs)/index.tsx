@@ -30,6 +30,7 @@ import { PaywallModal } from '@/components/PaywallModal';
 import { PreparednessBottomSheet } from '@/components/PreparednessBottomSheet';
 import { ProgressRing } from '@/components/ProgressRing';
 import { Sparkline } from '@/components/Sparkline';
+import { WordifiLogo } from '@/components/WordifiLogo';
 import { formatXp } from '@/lib/badgeHelpers';
 import { useHomeData, type LeaderboardNeighbor } from '@/lib/useHomeData';
 import { useAccess } from '@/providers/AccessProvider';
@@ -143,7 +144,7 @@ export default function HomeScreen() {
               <Text style={s.avatarInitial}>{initial}</Text>
             </Pressable>
             <View style={s.brandWrap}>
-              <Text style={s.wordmark}>wordifi</Text>
+              <WordifiLogo variant="blue" height={28} />
             </View>
             <View style={s.headerRight}>
               <View style={s.bellBtn}>
