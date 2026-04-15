@@ -19,6 +19,71 @@ export type RetestInfo = {
   is_locked: boolean;
 };
 
+export type TeilHistory = {
+  section: string;
+  teil: number;
+  lastScorePct: number;
+  lastCompletedAt: string;
+};
+
+export async function fetchTeileHistory(userId: string, level: string): Promise<TeilHistory[]> {
+  console.log('sectionalHelpers fetchTeileHistory', { userId, level });
+  if (!userId) return [];
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase.from('test_sessions') as any)
+    .select('section, teil, score_pct, completed_at')
+    .eq('user_id', userId)
+    .eq('level', level)
+    .eq('session_type', 'sectional')
+    .not('completed_at', 'is', null)
+    .order('completed_at', { ascending: false });
+
+  if (error) {
+    console.log('fetchTeileHistory error', error);
+    Sentry.captureException(error, { tags: { context: 'sectional' } });
+    return [];
+  }
+
+  const rows = (data ?? []) as Array<{
+    section: string;
+    teil: number;
+    score_pct: number;
+    completed_at: string;
+  }>;
+
+  const seen = new Set<string>();
+  const result: TeilHistory[] = [];
+  for (const row of rows) {
+    const key = `${row.section}__${row.teil}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push({
+      section: row.section,
+      teil: row.teil,
+      lastScorePct: row.score_pct,
+      lastCompletedAt: row.completed_at,
+    });
+  }
+  return result;
+}
+
+export async function hasCompletedAnyMockTest(userId: string): Promise<boolean> {
+  if (!userId) return false;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase.from('test_sessions') as any)
+    .select('id')
+    .eq('user_id', userId)
+    .eq('session_type', 'mock')
+    .not('completed_at', 'is', null)
+    .limit(1);
+  if (error) {
+    console.log('hasCompletedAnyMockTest error', error);
+    return false;
+  }
+  return (data?.length ?? 0) > 0;
+}
+
 type TeilRow = {
   section: string;
   teil: number;
