@@ -208,12 +208,12 @@ export default function MockScreen() {
                   <View style={styles.sectionRow}>
                     <Lock color={Colors.textMuted} size={14} />
                     <Text style={styles.sectionLabelLocked}>Schreiben</Text>
-                    <Text style={styles.comingSoon}>Coming soon</Text>
+                    <View style={styles.comingSoonPillInline}><Text style={styles.comingSoonTextInline}>Coming Soon</Text></View>
                   </View>
                   <View style={styles.sectionRow}>
                     <Lock color={Colors.textMuted} size={14} />
                     <Text style={styles.sectionLabelLocked}>Sprechen</Text>
-                    <Text style={styles.comingSoon}>Coming soon</Text>
+                    <View style={styles.comingSoonPillInline}><Text style={styles.comingSoonTextInline}>Coming Soon</Text></View>
                   </View>
                 </View>
 
@@ -519,6 +519,17 @@ const styles = StyleSheet.create({
     fontWeight: '600' as const,
     color: Colors.textMuted,
     fontStyle: 'italic' as const,
+  },
+  comingSoonPillInline: {
+    backgroundColor: '#FEF3C7',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+  },
+  comingSoonTextInline: {
+    color: '#92400E',
+    fontSize: 11,
+    fontWeight: '700' as const,
   },
   textLocked: {
     color: Colors.textMuted,
