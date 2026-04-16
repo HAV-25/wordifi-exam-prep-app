@@ -184,7 +184,7 @@ function shuffleArray<T>(array: T[]): T[] {
 export async function fetchSchreibenQuestions(
   level: string,
   teil: number,
-  limit: number = 10
+  limit: number = 1
 ): Promise<AppQuestion[]> {
   console.log('schreibenHelpers fetchSchreibenQuestions', { level, teil, limit });
 
