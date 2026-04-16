@@ -1,10 +1,11 @@
 /**
- * Onboarding Launch — Screen 01: App Intro Polished
- * Source: Banani flow FtXTL2Xb5WF4 / screen S_jwAIdTZqXL
- * CTA navigates to cert selection (first question screen).
+ * Onboarding Launch — Screen 01: App Intro
+ * Opens with an animated Pacifico wordmark splash, then reveals the full intro.
  */
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
+  Animated,
+  Easing,
   Image,
   Pressable,
   StyleSheet,
@@ -15,6 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import Svg, { Path } from 'react-native-svg';
 import { ScreenLayout } from '@/components/ScreenLayout';
+import { GermanFlagBadge } from '@/components/GermanFlagBadge';
 
 const LOGO_URI =
   'https://firebasestorage.googleapis.com/v0/b/banani-prod.appspot.com/o/reference-images%2F1cf9115c-bc87-4683-bfd4-0670f0875c39?alt=media&token=c560f38f-1cf6-46fa-9a2e-f86edac2a035';
@@ -37,6 +39,59 @@ function ArrowIcon() {
 }
 
 export default function AppIntroPolished() {
+  const [splashDone, setSplashDone] = useState(false);
+
+  // ── Splash animation values ─────────────────────────────────────────────
+  const wScale = useRef(new Animated.Value(0.3)).current;
+  const wOpacity = useRef(new Animated.Value(0)).current;
+  const wTranslateX = useRef(new Animated.Value(0)).current;
+  const ordifiOpacity = useRef(new Animated.Value(0)).current;
+  const ordifiTranslateX = useRef(new Animated.Value(20)).current;
+  const taglineOpacity = useRef(new Animated.Value(0)).current;
+  const flagOpacity = useRef(new Animated.Value(0)).current;
+  const splashFadeOut = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    // Phase 1: "w" grows from small to full size (center of screen)
+    Animated.parallel([
+      Animated.timing(wOpacity, { toValue: 1, duration: 300, useNativeDriver: true }),
+      Animated.spring(wScale, { toValue: 1, friction: 6, tension: 80, useNativeDriver: true }),
+    ]).start();
+
+    // Phase 2: "w" slides left, "ordifi" flows in from right
+    const phase2 = setTimeout(() => {
+      Animated.parallel([
+        Animated.timing(wTranslateX, { toValue: -72, duration: 500, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+        Animated.timing(ordifiOpacity, { toValue: 1, duration: 400, delay: 150, useNativeDriver: true }),
+        Animated.timing(ordifiTranslateX, { toValue: 0, duration: 500, delay: 150, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+      ]).start();
+    }, 600);
+
+    // Phase 3: tagline + flag fade in
+    const phase3 = setTimeout(() => {
+      Animated.parallel([
+        Animated.timing(taglineOpacity, { toValue: 1, duration: 400, useNativeDriver: true }),
+        Animated.timing(flagOpacity, { toValue: 1, duration: 400, delay: 100, useNativeDriver: true }),
+      ]).start();
+    }, 1400);
+
+    // Phase 4: fade out splash, reveal intro
+    const phase4 = setTimeout(() => {
+      Animated.timing(splashFadeOut, {
+        toValue: 0,
+        duration: 400,
+        useNativeDriver: true,
+      }).start(() => setSplashDone(true));
+    }, 2800);
+
+    return () => {
+      clearTimeout(phase2);
+      clearTimeout(phase3);
+      clearTimeout(phase4);
+    };
+  }, []);
+
+  // ── Intro content (shown after splash) ──────────────────────────────────
   const ctaFooter = (
     <View style={styles.ctaContainer}>
       <Pressable
@@ -50,8 +105,6 @@ export default function AppIntroPolished() {
           <ArrowIcon />
         </View>
       </Pressable>
-
-      {/* Returning user link */}
       <Pressable
         onPress={() => { router.replace('/auth'); }}
         accessibilityRole="button"
@@ -67,187 +120,125 @@ export default function AppIntroPolished() {
   );
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
-      <ScreenLayout footer={ctaFooter} contentContainerStyle={styles.screen} backgroundColor="#F8FAFF">
-        {/* Top nav — centered logo */}
-        <View style={styles.topNav}>
-          <Image source={{ uri: LOGO_URI }} style={styles.logoImg} resizeMode="contain" />
-        </View>
-
-        {/* Content header */}
-        <View style={styles.contentHeader}>
-          {/* Badges */}
-          <View style={styles.badgesRow}>
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>50,000+ Learners</Text>
+    <View style={styles.root}>
+      {/* Splash overlay — animated wordmark */}
+      {!splashDone ? (
+        <Animated.View style={[styles.splashOverlay, { opacity: splashFadeOut }]}>
+          <View style={styles.splashContent}>
+            <View style={styles.splashWordmarkRow}>
+              <Animated.Text
+                style={[
+                  styles.splashW,
+                  { opacity: wOpacity, transform: [{ scale: wScale }, { translateX: wTranslateX }] },
+                ]}
+              >
+                w
+              </Animated.Text>
+              <Animated.Text
+                style={[
+                  styles.splashOrdifi,
+                  { opacity: ordifiOpacity, transform: [{ translateX: ordifiTranslateX }] },
+                ]}
+              >
+                ordifi
+              </Animated.Text>
             </View>
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>A1 TO B</Text>
-            </View>
+            <Animated.View style={[styles.splashTaglineRow, { opacity: taglineOpacity }]}>
+              <Text style={styles.splashTagline}>Your exam, conquered.</Text>
+            </Animated.View>
+            <Animated.View style={{ opacity: flagOpacity }}>
+              <GermanFlagBadge width={28} height={18} />
+            </Animated.View>
           </View>
+        </Animated.View>
+      ) : null}
 
-          {/* Main heading */}
-          <Text style={styles.mainHeading}>
-            {'Goethe. TELC.\nÖSD.\nOne app.\nOne mission.\n'}
-            <Text style={styles.headingBlue}>You pass.</Text>
-          </Text>
-
-          {/* Sub-heading */}
-          <Text style={styles.subHeading}>
-            Real readiness — built exclusively for German certification.
-          </Text>
-        </View>
-
-        {/* Illustration */}
-        <View style={styles.illustrationContainer}>
-          <Image
-            source={{ uri: ILLUSTRATION_URI }}
-            style={styles.heroIllustration}
-            resizeMode="contain"
-          />
-        </View>
-      </ScreenLayout>
-    </SafeAreaView>
+      {/* Main intro — always rendered (behind splash initially) */}
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <ScreenLayout footer={ctaFooter} contentContainerStyle={styles.screen} backgroundColor="#F8FAFF">
+          <View style={styles.topNav}>
+            <Image source={{ uri: LOGO_URI }} style={styles.logoImg} resizeMode="contain" />
+          </View>
+          <View style={styles.contentHeader}>
+            <View style={styles.badgesRow}>
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>50,000+ Learners</Text>
+              </View>
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>A1 TO B</Text>
+              </View>
+            </View>
+            <Text style={styles.mainHeading}>
+              {'Goethe. TELC.\nÖSD.\nOne app.\nOne mission.\n'}
+              <Text style={styles.headingBlue}>You pass.</Text>
+            </Text>
+            <Text style={styles.subHeading}>
+              Real readiness — built exclusively for German certification.
+            </Text>
+          </View>
+          <View style={styles.illustrationContainer}>
+            <Image
+              source={{ uri: ILLUSTRATION_URI }}
+              style={styles.heroIllustration}
+              resizeMode="contain"
+            />
+          </View>
+        </ScreenLayout>
+      </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#F8FAFF',
-  },
-  screen: {
-    flexGrow: 1,
-    paddingHorizontal: 24,
-    backgroundColor: '#F8FAFF',
-  },
+  root: { flex: 1, backgroundColor: '#F8FAFF' },
 
-  // Top nav
-  topNav: {
+  // ─── Splash overlay ────────────────────────────────────────────────────────
+  splashOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#F8FAFF',
     alignItems: 'center',
-    paddingTop: 16,
-    marginBottom: 32,
+    justifyContent: 'center',
+    zIndex: 10,
   },
-  logoImg: {
-    height: 44,
-    width: 160,
-  },
+  splashContent: { alignItems: 'center', gap: 16 },
+  splashWordmarkRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'center' },
+  splashW: { fontFamily: 'Pacifico_400Regular', fontSize: 52, color: '#2B70EF', letterSpacing: -1 },
+  splashOrdifi: { fontFamily: 'Pacifico_400Regular', fontSize: 52, color: '#2B70EF', letterSpacing: -1 },
+  splashTaglineRow: { marginTop: 4 },
+  splashTagline: { fontSize: 18, fontWeight: '600', color: '#94A3B8' },
 
-  // Content header
-  contentHeader: {
-    alignItems: 'flex-start',
-  },
-  badgesRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    marginBottom: 24,
-  },
+  // ─── Main intro ────────────────────────────────────────────────────────────
+  safeArea: { flex: 1, backgroundColor: '#F8FAFF' },
+  screen: { flexGrow: 1, paddingHorizontal: 24, backgroundColor: '#F8FAFF' },
+  topNav: { alignItems: 'center', paddingTop: 16, marginBottom: 32 },
+  logoImg: { height: 44, width: 160 },
+  contentHeader: { alignItems: 'flex-start' },
+  badgesRow: { flexDirection: 'row', gap: 8, marginBottom: 20 },
   badge: {
-    backgroundColor: '#E8F0FE',
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 100,
+    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999,
+    backgroundColor: 'rgba(43,112,239,0.08)',
   },
-  badgeText: {
-    color: '#2B70EF',
-    fontSize: 11,
-    fontFamily: 'Outfit_800ExtraBold',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
+  badgeText: { fontSize: 12, fontWeight: '700', color: '#2B70EF', letterSpacing: 0.3, textTransform: 'uppercase' },
+  mainHeading: { fontSize: 36, fontWeight: '800', color: '#0F1F3D', lineHeight: 40, letterSpacing: -0.5, marginBottom: 16 },
+  headingBlue: { color: '#2B70EF' },
+  subHeading: { fontSize: 17, fontWeight: '500', color: '#64748B', lineHeight: 24, marginBottom: 24 },
+  illustrationContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: 16 },
+  heroIllustration: { width: '100%', height: 280, borderRadius: 20 },
 
-  // Heading
-  mainHeading: {
-    fontSize: 52,
-    fontFamily: 'Outfit_800ExtraBold',
-    lineHeight: 55,
-    color: '#374151',
-    marginBottom: 16,
-    letterSpacing: -1.5,
-  },
-  headingBlue: {
-    color: '#2B70EF',
-  },
-  subHeading: {
-    fontSize: 18,
-    fontFamily: 'NunitoSans_400Regular',
-    lineHeight: 27,
-    color: '#374151',
-    opacity: 0.85,
-    maxWidth: 300,
-  },
-
-  // Illustration
-  illustrationContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 28,
-    marginBottom: 36,
-    minHeight: 300,
-  },
-  heroIllustration: {
-    width: '100%',
-    maxWidth: 328,
-    height: 300,
-  },
-
-  // CTA
-  ctaContainer: {
-    marginTop: 'auto',
-    width: '100%',
-  },
+  // ─── CTA ───────────────────────────────────────────────────────────────────
+  ctaContainer: { paddingHorizontal: 24, paddingBottom: 12, gap: 16, alignItems: 'center' },
   ctaButton: {
-    minHeight: 72,
-    backgroundColor: '#2B70EF',
-    borderRadius: 100,
-    paddingTop: 8,
-    paddingBottom: 8,
-    paddingLeft: 32,
-    paddingRight: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    shadowColor: '#2B70EF',
-    shadowOffset: { width: 0, height: 20 },
-    shadowOpacity: 0.6,
-    shadowRadius: 40,
-    elevation: 12,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#2B70EF', borderRadius: 999, paddingVertical: 18,
+    paddingHorizontal: 32, width: '100%', gap: 12,
   },
-  ctaPressed: {
-    opacity: 0.88,
-  },
-  ctaText: {
-    flex: 1,
-    textAlign: 'center',
-    fontSize: 20,
-    fontFamily: 'Outfit_800ExtraBold',
-    color: '#FFFFFF',
-    letterSpacing: -0.5,
-    paddingRight: 16,
-  },
+  ctaPressed: { opacity: 0.9 },
+  ctaText: { fontSize: 18, fontWeight: '800', color: '#FFFFFF' },
   ctaIcon: {
-    width: 56,
-    height: 56,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
+    width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center', justifyContent: 'center',
   },
-
-  // Sign in link
-  signInLink: {
-    alignItems: 'center',
-    paddingVertical: 16,
-  },
-  signInText: {
-    fontFamily: 'NunitoSans_400Regular',
-    fontSize: 14,
-    color: '#94A3B8',
-  },
-  signInLinkText: {
-    fontFamily: 'NunitoSans_700Bold',
-    color: '#2B70EF',
-    textDecorationLine: 'underline',
-  },
+  signInLink: { paddingVertical: 8 },
+  signInText: { fontSize: 14, fontWeight: '500', color: '#64748B', textAlign: 'center' },
+  signInLinkText: { color: '#2B70EF', fontWeight: '700' },
 });

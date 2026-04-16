@@ -1,7 +1,6 @@
 import { Check, X } from 'lucide-react-native';
 import React, { useCallback, useRef } from 'react';
 import {
-  AccessibilityInfo,
   Animated,
   Platform,
   Pressable,
@@ -11,8 +10,15 @@ import {
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 
-import { B } from '@/theme/banani';
-import { fontFamily, fontSize, fontWeight } from '@/theme';
+import {
+  colors,
+  fontFamily,
+  fontSize,
+  fontWeight,
+  radius,
+  spacing,
+  touchTargets,
+} from '@/theme';
 
 type OptionButtonProps = {
   label: string;
@@ -65,14 +71,13 @@ export function OptionButton({
 
   const handlePress = useCallback(() => {
     if (disabled) return;
-    // Fire haptic before callback — matches Stream pattern
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     onPress();
   }, [disabled, onPress]);
 
   if (variant === 'binary') {
     const isPositive = binaryPositive ?? false;
-    const iconBg = isPositive ? B.success : B.destructive;
+    const iconBg = isPositive ? '#22C55E' : '#EF4444';
     return (
       <Animated.View style={[{ transform: [{ scale: scaleAnim }] }]}>
         <Pressable
@@ -90,8 +95,8 @@ export function OptionButton({
         >
           <View style={[styles.binaryIcon, { backgroundColor: iconBg }]}>
             {isPositive
-              ? <Check color={B.primaryFg} size={16} strokeWidth={3} />
-              : <X color={B.primaryFg} size={16} strokeWidth={3} />}
+              ? <Check color="#fff" size={16} strokeWidth={3} />
+              : <X color="#fff" size={16} strokeWidth={3} />}
           </View>
           <Text
             style={[styles.binaryText, selected && styles.binaryTextSelected]}
@@ -104,7 +109,7 @@ export function OptionButton({
     );
   }
 
-  // ─── MCQ variant (default) ────────────────────────────────────────────────
+  // ─── MCQ variant (default) — preserves v1 styling ─────────────────────────
   return (
     <Animated.View style={[{ transform: [{ scale: scaleAnim }] }]}>
       <Pressable
@@ -144,102 +149,79 @@ export function OptionButton({
 }
 
 const styles = StyleSheet.create({
-  // ─── MCQ card ──────────────────────────────────────────────────────────────
+  // ─── MCQ card (v1 styling preserved) ───────────────────────────────────────
   button: {
-    minHeight: 56,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    borderRadius: 18,
-    borderWidth: 2,
-    borderColor: B.border,
-    backgroundColor: B.card,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#0F1F3D',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.02,
-        shadowRadius: 12,
-      },
-      android: { elevation: 1 },
-    }),
+    minHeight:       touchTargets.cta,
+    flexDirection:   'row',
+    alignItems:      'center',
+    gap:             spacing.md,
+    borderRadius:    radius.xl,
+    borderWidth:     1,
+    borderColor:     colors.outlineVariant,
+    backgroundColor: colors.surfaceContainerLowest,
+    padding:         spacing.lg,
   },
   buttonSelected: {
-    borderColor: B.primary,
-    backgroundColor: 'rgba(43,112,239,0.06)',
+    borderColor:     colors.answerSelected,
+    backgroundColor: colors.surfaceContainer,
   },
   disabledCard: {
     opacity: 0.5,
   },
-
-  // Leading badge (MCQ)
   leadingBadge: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(43,112,239,0.08)',
+    width:           28,
+    height:          28,
+    borderRadius:    14,
+    alignItems:      'center',
+    justifyContent:  'center',
+    backgroundColor: colors.surfaceContainerHigh,
   },
   leadingBadgeSelected: {
-    backgroundColor: B.primary,
+    backgroundColor: colors.primary,
   },
   leadingText: {
-    color: B.primary,
+    color:      colors.onSurfaceVariant,
     fontFamily: fontFamily.display,
-    fontSize: 15,
+    fontSize:   fontSize.bodySm,
     fontWeight: fontWeight.display,
   },
   leadingTextSelected: {
-    color: B.primaryFg,
+    color: colors.surfaceContainerLowest,
   },
-
-  // Copy block
   copy: {
     flex: 1,
-    gap: 4,
+    gap:  spacing.xs,
   },
   label: {
-    fontFamily: fontFamily.bodySemiBold,
-    fontSize: fontSize.bodyLg,
+    fontFamily: fontFamily.bodyMedium,
+    fontSize:   fontSize.bodyLg,
     lineHeight: 22,
-    color: B.questionColor,
-    fontWeight: '600',
+    color:      colors.onSurface,
+    fontWeight: fontWeight.medium,
   },
   labelSelected: {
-    color: B.primary,
+    color: colors.primary,
   },
   sublabel: {
     fontFamily: fontFamily.bodyRegular,
-    fontSize: fontSize.bodySm,
+    fontSize:   fontSize.bodySm,
     lineHeight: 18,
-    color: B.muted,
+    color:      colors.onSurfaceVariant,
   },
 
-  // ─── Binary card ───────────────────────────────────────────────────────────
+  // ─── Binary card (new — TF/YN horizontal layout) ──────────────────────────
   binaryCard: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems:      'center',
+    justifyContent:  'center',
     paddingVertical: 18,
-    borderRadius: 18,
-    borderWidth: 2,
-    borderColor: B.border,
-    backgroundColor: B.card,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#0F1F3D',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.02,
-        shadowRadius: 12,
-      },
-      android: { elevation: 1 },
-    }),
+    borderRadius:    radius.xl,
+    borderWidth:     1,
+    borderColor:     colors.outlineVariant,
+    backgroundColor: colors.surfaceContainerLowest,
   },
   binaryCardSelected: {
-    borderColor: B.primary,
-    backgroundColor: 'rgba(43,112,239,0.06)',
+    borderColor:     colors.answerSelected,
+    backgroundColor: colors.surfaceContainer,
   },
   binaryIcon: {
     width: 28,
@@ -251,10 +233,10 @@ const styles = StyleSheet.create({
   },
   binaryText: {
     fontFamily: fontFamily.display,
-    fontSize: 18,
-    color: B.questionColor,
+    fontSize:   18,
+    color:      colors.onSurface,
   },
   binaryTextSelected: {
-    color: B.primary,
+    color: colors.primary,
   },
 });
