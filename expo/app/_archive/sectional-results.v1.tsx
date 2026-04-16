@@ -26,7 +26,6 @@ import ShareResultSheet from '@/components/ShareResultSheet';
 import { StimulusCard, shouldShowStimulus } from '@/components/StimulusCard';
 import Colors from '@/constants/colors';
 import { colors } from '@/theme';
-import { B } from '@/theme/banani';
 import { updatePreparednessScore } from '@/lib/streamHelpers';
 import { useQuestionMeta } from '@/lib/useQuestionTypeMeta';
 import { XP_RATES } from '@/theme/constants';
@@ -249,36 +248,26 @@ export default function SectionalResultsScreen() {
                 title={question.question_text}
                 subtitle={`Question ${index + 1}`}
               >
-                <View style={[
-                  styles.reviewAnswerCard,
-                  isCorrect ? styles.reviewAnswerCorrect : styles.reviewAnswerIncorrect,
-                ]}>
-                  <View style={[
-                    styles.reviewAccent,
-                    { backgroundColor: isCorrect ? B.success : '#F59E0B' },
-                  ]} />
-                  <View style={styles.reviewAnswerContent}>
-                    <Text style={styles.reviewAnswerLabel}>
-                      {isCorrect ? 'Correct' : 'Your answer'}
-                    </Text>
-                    <Text style={[
-                      styles.reviewAnswerValue,
-                      { color: isCorrect ? B.success : '#F59E0B' },
-                    ]}>
-                      {(selectedOption?.text ?? selectedAnswer) || 'No answer'}
-                    </Text>
-                  </View>
+                <View style={styles.answerRow}>
+                  <View
+                    style={[
+                      styles.answerDot,
+                      isCorrect ? styles.correctDot : styles.incorrectDot,
+                    ]}
+                  />
+                  <Text
+                    style={[
+                      styles.answerText,
+                      isCorrect ? styles.correctText : styles.incorrectText,
+                    ]}
+                  >
+                    Your answer: {(selectedOption?.text ?? selectedAnswer) || 'No answer'}
+                  </Text>
                 </View>
                 {!isCorrect ? (
-                  <View style={[styles.reviewAnswerCard, styles.reviewAnswerCorrectHint]}>
-                    <View style={[styles.reviewAccent, { backgroundColor: B.success }]} />
-                    <View style={styles.reviewAnswerContent}>
-                      <Text style={styles.reviewAnswerLabel}>Correct answer</Text>
-                      <Text style={[styles.reviewAnswerValue, { color: B.success }]}>
-                        {correctOption?.text ?? question.correct_answer}
-                      </Text>
-                    </View>
-                  </View>
+                  <Text style={styles.correctAnswerText}>
+                    Correct answer: {correctOption?.text ?? question.correct_answer}
+                  </Text>
                 ) : null}
                 {section === 'Hören' && question.audio_url ? (
                   <AudioPlayer audioUrl={question.audio_url} />
@@ -476,36 +465,34 @@ const styles = StyleSheet.create({
   reviewWrap: {
     gap: 12,
   },
-  reviewAnswerCard: {
+  answerRow: {
     flexDirection: 'row',
-    borderRadius: 14,
-    backgroundColor: B.card,
-    borderWidth: 1,
-    borderColor: B.border,
-    overflow: 'hidden',
+    gap: 10,
+    alignItems: 'center',
   },
-  reviewAnswerCorrect: {},
-  reviewAnswerIncorrect: {},
-  reviewAnswerCorrectHint: {
-    backgroundColor: 'rgba(34,197,94,0.04)',
+  answerDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
   },
-  reviewAccent: {
-    width: 4,
+  correctDot: {
+    backgroundColor: colors.green,
   },
-  reviewAnswerContent: {
+  incorrectDot: {
+    backgroundColor: colors.amber,
+  },
+  answerText: {
     flex: 1,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    gap: 2,
+    fontWeight: '700' as const,
   },
-  reviewAnswerLabel: {
-    fontSize: 11,
-    fontWeight: '600' as const,
-    color: B.muted,
-    letterSpacing: 0.3,
+  correctText: {
+    color: Colors.accent,
   },
-  reviewAnswerValue: {
-    fontSize: 15,
+  incorrectText: {
+    color: colors.amber,
+  },
+  correctAnswerText: {
+    color: Colors.accent,
     fontWeight: '700' as const,
   },
   showPassageButton: {

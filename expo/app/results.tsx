@@ -26,6 +26,7 @@ import ShareResultSheet from '@/components/ShareResultSheet';
 import { StimulusCard, shouldShowStimulus } from '@/components/StimulusCard';
 import Colors from '@/constants/colors';
 import { colors } from '@/theme';
+import { B } from '@/theme/banani';
 import { useQuestionMeta } from '@/lib/useQuestionTypeMeta';
 import { useAuth } from '@/providers/AuthProvider';
 import type { AppQuestion } from '@/types/database';
@@ -172,13 +173,26 @@ export default function ResultsScreen() {
             const correctOption = question.options.find((option) => option.key.toLowerCase() === question.correct_answer.toLowerCase());
             return (
               <QuestionCard key={question.id} title={question.question_text} subtitle={`Question ${index + 1}`}>
-                <View style={styles.answerRow}>
-                  <View style={[styles.answerDot, isCorrect ? styles.correctDot : styles.incorrectDot]} />
-                  <Text style={[styles.answerText, isCorrect ? styles.correctText : styles.incorrectText]}>
-                    Your answer: {(selectedOption?.text ?? selectedAnswer) || 'No answer'}
-                  </Text>
+                <View style={[styles.reviewAnswerCard, isCorrect ? styles.reviewAnswerCorrect : styles.reviewAnswerIncorrect]}>
+                  <View style={[styles.reviewAccent, { backgroundColor: isCorrect ? B.success : '#F59E0B' }]} />
+                  <View style={styles.reviewAnswerContent}>
+                    <Text style={styles.reviewAnswerLabel}>{isCorrect ? 'Correct' : 'Your answer'}</Text>
+                    <Text style={[styles.reviewAnswerValue, { color: isCorrect ? B.success : '#F59E0B' }]}>
+                      {(selectedOption?.text ?? selectedAnswer) || 'No answer'}
+                    </Text>
+                  </View>
                 </View>
-                {!isCorrect ? <Text style={styles.correctAnswerText}>Correct answer: {correctOption?.text ?? question.correct_answer}</Text> : null}
+                {!isCorrect ? (
+                  <View style={[styles.reviewAnswerCard, styles.reviewAnswerCorrectHint]}>
+                    <View style={[styles.reviewAccent, { backgroundColor: B.success }]} />
+                    <View style={styles.reviewAnswerContent}>
+                      <Text style={styles.reviewAnswerLabel}>Correct answer</Text>
+                      <Text style={[styles.reviewAnswerValue, { color: B.success }]}>
+                        {correctOption?.text ?? question.correct_answer}
+                      </Text>
+                    </View>
+                  </View>
+                ) : null}
                 {section === 'Hören' && question.audio_url ? <AudioPlayer audioUrl={question.audio_url} /> : null}
                 {section === 'Lesen' && question.stimulus_text && shouldShowStimulus(level, section, teil) ? (
                   <View>
@@ -285,14 +299,14 @@ const styles = StyleSheet.create({
   xpLabel: { color: 'rgba(255,255,255,0.74)', fontWeight: '700' as const, fontSize: 16 },
   xpValue: { color: colors.amber, fontSize: 22, fontWeight: '800' as const },
   reviewWrap: { gap: 12 },
-  answerRow: { flexDirection: 'row', gap: 10, alignItems: 'center' },
-  answerDot: { width: 10, height: 10, borderRadius: 5 },
-  correctDot: { backgroundColor: colors.green },
-  incorrectDot: { backgroundColor: colors.amber },
-  answerText: { flex: 1, fontWeight: '700' as const },
-  correctText: { color: Colors.accent },
-  incorrectText: { color: colors.amber },
-  correctAnswerText: { color: Colors.accent, fontWeight: '700' as const },
+  reviewAnswerCard: { flexDirection: 'row', borderRadius: 14, backgroundColor: B.card, borderWidth: 1, borderColor: B.border, overflow: 'hidden' },
+  reviewAnswerCorrect: {},
+  reviewAnswerIncorrect: {},
+  reviewAnswerCorrectHint: { backgroundColor: 'rgba(34,197,94,0.04)' },
+  reviewAccent: { width: 4 },
+  reviewAnswerContent: { flex: 1, paddingVertical: 10, paddingHorizontal: 14, gap: 2 },
+  reviewAnswerLabel: { fontSize: 11, fontWeight: '600' as const, color: B.muted, letterSpacing: 0.3 },
+  reviewAnswerValue: { fontSize: 15, fontWeight: '700' as const },
   showPassageButton: { minHeight: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.surfaceMuted },
   showPassageText: { color: Colors.primary, fontWeight: '700' as const },
   footer: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 24, paddingTop: 16, paddingBottom: 16, gap: 10, backgroundColor: Colors.background },

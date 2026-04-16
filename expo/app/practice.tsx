@@ -1,6 +1,6 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
-import { BookOpenText, CheckCircle, HelpCircle, Headphones, ThumbsDown, ThumbsUp, X, XCircle } from 'lucide-react-native';
+import { BookOpenText, HelpCircle, Headphones, X } from 'lucide-react-native';
 import React, { useMemo, useRef, useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -131,54 +131,34 @@ export default function PracticeScreen() {
 
     const category = meta?.question_category;
 
-    // True/False
-    if (category === 'true_false') {
+    // True/False or Yes/No — binary horizontal layout
+    if (category === 'true_false' || category === 'yes_no') {
+      const fallbackOpts = category === 'yes_no'
+        ? [{ key: 'ja', text: 'Ja' }, { key: 'nein', text: 'Nein' }]
+        : [{ key: 'richtig', text: 'Richtig' }, { key: 'falsch', text: 'Falsch' }];
       const dbOptions = currentQuestion.options.length > 0
         ? currentQuestion.options
-        : [{ key: 'a', text: 'Richtig' }, { key: 'b', text: 'Falsch' }];
-      return dbOptions.map((option, index) => {
-        const normalizedValue = option.key.toLowerCase();
-        const isSelected = selectedAnswer === normalizedValue;
-        const leading = index === 0
-          ? <CheckCircle color={colors.answerCorrect} size={24} />
-          : <XCircle color={colors.answerIncorrect} size={24} />;
-        const label = index === 0 ? 'Richtig' : 'Falsch';
-        return (
-          <OptionButton
-            key={`${currentQuestion.id}-${option.key}`}
-            label={label}
-            leadingNode={leading}
-            selected={isSelected}
-            onPress={() => setAnswers((value) => ({ ...value, [currentQuestion.id]: normalizedValue }))}
-            testID={`option-${option.key}`}
-          />
-        );
-      });
-    }
-
-    // Yes/No
-    if (category === 'yes_no') {
-      const dbOptions = currentQuestion.options.length > 0
-        ? currentQuestion.options
-        : [{ key: 'a', text: 'Ja' }, { key: 'b', text: 'Nein' }];
-      return dbOptions.map((option, index) => {
-        const normalizedValue = option.key.toLowerCase();
-        const isSelected = selectedAnswer === normalizedValue;
-        const leading = index === 0
-          ? <ThumbsUp color={colors.answerCorrect} size={24} />
-          : <ThumbsDown color={colors.answerIncorrect} size={24} />;
-        const label = index === 0 ? 'Ja' : 'Nein';
-        return (
-          <OptionButton
-            key={`${currentQuestion.id}-${option.key}`}
-            label={label}
-            leadingNode={leading}
-            selected={isSelected}
-            onPress={() => setAnswers((value) => ({ ...value, [currentQuestion.id]: normalizedValue }))}
-            testID={`option-${option.key}`}
-          />
-        );
-      });
+        : fallbackOpts;
+      return (
+        <View style={styles.binaryRow}>
+          {dbOptions.map((option, index) => {
+            const normalizedValue = option.key.toLowerCase();
+            const isSelected = selectedAnswer === normalizedValue;
+            return (
+              <View key={`${currentQuestion.id}-${option.key}`} style={styles.binaryFlex}>
+                <OptionButton
+                  label={option.text}
+                  variant="binary"
+                  binaryPositive={index === 0}
+                  selected={isSelected}
+                  onPress={() => setAnswers((value) => ({ ...value, [currentQuestion.id]: normalizedValue }))}
+                  testID={`option-${option.key}`}
+                />
+              </View>
+            );
+          })}
+        </View>
+      );
     }
 
     // Speaker Match (Hören + matching)
@@ -314,6 +294,8 @@ const styles = StyleSheet.create({
   metaTextBlock: { gap: 1 },
   metaLevelTeil: { fontSize: 12, color: Colors.textBody, fontWeight: '400' },
   metaTypeName: { fontSize: 12, color: Colors.textMuted, fontWeight: '400' },
+  binaryRow: { flexDirection: 'row', gap: 10 },
+  binaryFlex: { flex: 1 },
   speakerBadge: { width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
   speakerBadgeText: { fontSize: 16, fontWeight: '800', color: Colors.primary, fontFamily: 'Outfit_800ExtraBold' },
   tooltipScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: Colors.scrim, alignItems: 'center', justifyContent: 'center' },

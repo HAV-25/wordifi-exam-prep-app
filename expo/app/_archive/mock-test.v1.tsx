@@ -721,57 +721,25 @@ export default function MockTestScreen() {
           </View>
 
           <View style={styles.optionsWrap}>
-            {(() => {
-              const isBinary =
-                currentQuestion.question_type === 'true_false' ||
-                currentQuestion.question_type === 'ja_nein';
-              if (isBinary) {
-                return (
-                  <View style={styles.binaryRow}>
-                    {currentQuestion.options.map((option, idx) => {
-                      const normalizedKey = option.key.toLowerCase();
-                      const isSelected = selectedAnswer === normalizedKey;
-                      return (
-                        <View key={`${currentQuestion.id}-${option.key}`} style={styles.binaryFlex}>
-                          <OptionButton
-                            label={option.text}
-                            variant="binary"
-                            binaryPositive={idx === 0}
-                            selected={isSelected}
-                            onPress={() =>
-                              setAnswers((prev) => ({
-                                ...prev,
-                                [currentQuestion.id]: normalizedKey,
-                              }))
-                            }
-                            testID={`mock-option-${option.key}`}
-                          />
-                        </View>
-                      );
-                    })}
-                  </View>
-                );
-              }
-              return currentQuestion.options.map((option) => {
-                const normalizedKey = option.key.toLowerCase();
-                const isSelected = selectedAnswer === normalizedKey;
-                return (
-                  <OptionButton
-                    key={`${currentQuestion.id}-${option.key}`}
-                    label={option.text}
-                    leading={option.key}
-                    selected={isSelected}
-                    onPress={() =>
-                      setAnswers((prev) => ({
-                        ...prev,
-                        [currentQuestion.id]: normalizedKey,
-                      }))
-                    }
-                    testID={`mock-option-${option.key}`}
-                  />
-                );
-              });
-            })()}
+            {currentQuestion.options.map((option) => {
+              const normalizedKey = option.key.toLowerCase();
+              const isSelected = selectedAnswer === normalizedKey;
+              return (
+                <OptionButton
+                  key={`${currentQuestion.id}-${option.key}`}
+                  label={option.text}
+                  leading={option.key}
+                  selected={isSelected}
+                  onPress={() =>
+                    setAnswers((prev) => ({
+                      ...prev,
+                      [currentQuestion.id]: normalizedKey,
+                    }))
+                  }
+                  testID={`mock-option-${option.key}`}
+                />
+              );
+            })}
           </View>
         </ScrollView>
       ) : null}
@@ -932,13 +900,6 @@ const styles = StyleSheet.create({
   },
   optionsWrap: {
     gap: 10,
-  },
-  binaryRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  binaryFlex: {
-    flex: 1,
   },
   footer: {
     position: 'absolute',

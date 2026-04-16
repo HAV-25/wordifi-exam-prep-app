@@ -1,5 +1,6 @@
-import React, { useMemo } from 'react';
-import { useRouter } from 'expo-router';
+import React, { useCallback, useMemo } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { useRouter, useFocusEffect } from 'expo-router';
 import {
   ArrowRight,
   ArrowUpRight,
@@ -90,9 +91,23 @@ function statusColor(pct: number): string {
 export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const queryClient = useQueryClient();
   const { access } = useAccess();
   const { profile, user } = useAuth();
+  const userId = user?.id ?? '';
+  const targetLevel = profile?.target_level ?? 'A1';
   const data = useHomeData();
+
+  // Refresh home stats whenever the tab gains focus (e.g. after completing a test)
+  useFocusEffect(
+    useCallback(() => {
+      void queryClient.invalidateQueries({ queryKey: ['home-stats', userId, targetLevel] });
+      void queryClient.invalidateQueries({ queryKey: ['section-accuracy', userId] });
+      void queryClient.invalidateQueries({ queryKey: ['7day-trend', userId] });
+      void queryClient.invalidateQueries({ queryKey: ['leaderboard-neighbors', userId, targetLevel] });
+      void queryClient.invalidateQueries({ queryKey: ['leaderboard-percentile', userId, targetLevel] });
+    }, [queryClient, userId, targetLevel])
+  );
 
   const [showBottomSheet, setShowBottomSheet] = React.useState(false);
   const [showPaywall, setShowPaywall] = React.useState(false);

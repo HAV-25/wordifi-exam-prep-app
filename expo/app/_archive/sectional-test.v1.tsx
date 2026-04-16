@@ -1,5 +1,5 @@
 import { Stack, router, useLocalSearchParams } from 'expo-router';
-import { Headphones, BookOpenText, HelpCircle, X } from 'lucide-react-native';
+import { Headphones, BookOpenText, HelpCircle, CheckCircle, XCircle, ThumbsUp, ThumbsDown, X } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -239,40 +239,64 @@ export default function SectionalTestScreen() {
 
     const category = currentMeta?.question_category;
 
-    // True/False or Yes/No — binary horizontal layout
-    if (category === 'true_false' || category === 'yes_no') {
-      const fallbackOpts = category === 'yes_no'
-        ? [{ key: 'ja', text: 'Ja' }, { key: 'nein', text: 'Nein' }]
-        : [{ key: 'richtig', text: 'Richtig' }, { key: 'falsch', text: 'Falsch' }];
+    // True/False
+    if (category === 'true_false') {
       const opts = currentQuestion.options?.length > 0
         ? currentQuestion.options
-        : fallbackOpts;
+        : [{ key: 'a', text: 'Richtig' }, { key: 'b', text: 'Falsch' }];
 
-      return (
-        <View style={styles.binaryRow}>
-          {opts.map((option, idx) => {
-            const normalizedKey = option.key.toLowerCase();
-            const isSelected = selectedAnswer === normalizedKey;
-            return (
-              <View key={`${currentQuestion.id}-${option.key}`} style={styles.binaryFlex}>
-                <OptionButton
-                  label={option.text}
-                  variant="binary"
-                  binaryPositive={idx === 0}
-                  selected={isSelected}
-                  onPress={() =>
-                    setAnswers((prev) => ({
-                      ...prev,
-                      [currentQuestion.id]: normalizedKey,
-                    }))
-                  }
-                  testID={`sectional-option-${option.key}`}
-                />
-              </View>
-            );
-          })}
-        </View>
-      );
+      return opts.map((option, idx) => {
+        const normalizedKey = option.key.toLowerCase();
+        const isSelected = selectedAnswer === normalizedKey;
+        const leadingNode = idx === 0
+          ? <CheckCircle color={colors.answerCorrect} size={24} />
+          : <XCircle color={colors.answerIncorrect} size={24} />;
+        return (
+          <OptionButton
+            key={`${currentQuestion.id}-${option.key}`}
+            label={option.text}
+            leadingNode={leadingNode}
+            selected={isSelected}
+            onPress={() =>
+              setAnswers((prev) => ({
+                ...prev,
+                [currentQuestion.id]: normalizedKey,
+              }))
+            }
+            testID={`sectional-option-${option.key}`}
+          />
+        );
+      });
+    }
+
+    // Yes/No
+    if (category === 'yes_no') {
+      const opts = currentQuestion.options?.length > 0
+        ? currentQuestion.options
+        : [{ key: 'a', text: 'Ja' }, { key: 'b', text: 'Nein' }];
+
+      return opts.map((option, idx) => {
+        const normalizedKey = option.key.toLowerCase();
+        const isSelected = selectedAnswer === normalizedKey;
+        const leadingNode = idx === 0
+          ? <ThumbsUp color={colors.answerCorrect} size={24} />
+          : <ThumbsDown color={colors.answerIncorrect} size={24} />;
+        return (
+          <OptionButton
+            key={`${currentQuestion.id}-${option.key}`}
+            label={option.text}
+            leadingNode={leadingNode}
+            selected={isSelected}
+            onPress={() =>
+              setAnswers((prev) => ({
+                ...prev,
+                [currentQuestion.id]: normalizedKey,
+              }))
+            }
+            testID={`sectional-option-${option.key}`}
+          />
+        );
+      });
     }
 
     // Speaker matching (Hören)
@@ -309,19 +333,27 @@ export default function SectionalTestScreen() {
       });
     }
 
-    // Default (multiple choice, matching, etc.)
+    // Default (multiple choice, etc.)
+    const isTrueFalse = currentQuestion.question_type === 'true_false';
     const opts = currentQuestion.options?.length > 0
       ? currentQuestion.options
+      : isTrueFalse
+      ? [{ key: 'a', text: 'Richtig' }, { key: 'b', text: 'Falsch' }]
       : [];
 
-    return opts.map((option) => {
+    return opts.map((option, idx) => {
       const normalizedKey = option.key.toLowerCase();
       const isSelected = selectedAnswer === normalizedKey;
+      const leadingNode = isTrueFalse
+        ? idx === 0
+          ? <CheckCircle color={colors.answerCorrect} size={24} />
+          : <XCircle color={colors.answerIncorrect} size={24} />
+        : undefined;
       return (
         <OptionButton
           key={`${currentQuestion.id}-${option.key}`}
           label={option.text}
-          leading={option.key}
+          {...(leadingNode ? { leadingNode } : { leading: option.key })}
           selected={isSelected}
           onPress={() =>
             setAnswers((prev) => ({
@@ -607,13 +639,6 @@ const styles = StyleSheet.create({
   },
   optionsWrap: {
     gap: 10,
-  },
-  binaryRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  binaryFlex: {
-    flex: 1,
   },
   speakerBadge: {
     width: 32,
