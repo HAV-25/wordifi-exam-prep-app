@@ -221,12 +221,38 @@ export async function fetchSectionalQuestions(
   const targetCount = MOCK_TEST_QUESTION_COUNTS[level]?.[section]?.[teil];
 
   if (targetCount && allQuestions.length > targetCount) {
-    const shuffled = shuffleArray(allQuestions).slice(0, targetCount);
-    shuffled.sort((a, b) => (a.question_number ?? 0) - (b.question_number ?? 0));
-    console.log('fetchSectionalQuestions selected', { total: allQuestions.length, target: targetCount, selected: shuffled.length });
-    return shuffled;
+    // For hybrid teils (e.g. B1 Hören T1 = TF+MCQ per audio clip),
+    // shuffle by clip group so paired questions stay together.
+    const clipGroups = new Map<string, AppQuestion[]>();
+    for (const q of allQuestions) {
+      const groupKey = q.source_clip_id ?? q.id; // ungrouped questions use their own id
+      const group = clipGroups.get(groupKey) ?? [];
+      group.push(q);
+      clipGroups.set(groupKey, group);
+    }
+
+    // Shuffle the clip groups, then flatten and take up to targetCount
+    const shuffledGroups = shuffleArray(Array.from(clipGroups.values()));
+    const selected: AppQuestion[] = [];
+    for (const group of shuffledGroups) {
+      if (selected.length >= targetCount) break;
+      selected.push(...group);
+    }
+    // Trim to exact target in case last group pushed over
+    const trimmed = selected.slice(0, targetCount);
+    // Sort by clip group first (keeps TF+MCQ pairs together), then by question_number within
+    trimmed.sort((a, b) => {
+      const clipA = a.source_clip_id ?? '';
+      const clipB = b.source_clip_id ?? '';
+      if (clipA !== clipB) return clipA < clipB ? -1 : 1;
+      return (a.question_number ?? 0) - (b.question_number ?? 0);
+    });
+    console.log('fetchSectionalQuestions selected', { total: allQuestions.length, target: targetCount, selected: trimmed.length });
+    return trimmed;
   }
 
+  // Always sort by question_number to preserve paired ordering (TF then MCQ per audio)
+  allQuestions.sort((a, b) => (a.question_number ?? 0) - (b.question_number ?? 0));
   console.log('fetchSectionalQuestions returning all', { total: allQuestions.length, targetCount });
   return allQuestions;
 }
