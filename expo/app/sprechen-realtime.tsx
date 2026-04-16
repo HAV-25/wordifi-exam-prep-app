@@ -86,6 +86,7 @@ export default function SprechenRealtimeScreen() {
   const recordingLimitRef = useRef<number>(240);
   const handleStartConversationRef = useRef<(() => Promise<void>) | null>(null);
   const countdownTriggeredRef = useRef<boolean>(false);
+  const monologueTimerStartedRef = useRef<boolean>(false);
   const isWebRTC = isWebRTCAvailable();
 
   const MAX_DURATION = 240;
@@ -223,12 +224,19 @@ export default function SprechenRealtimeScreen() {
         onStateChange: (state) => {
           console.log('[SprechenRealtime] Conv state:', state);
           if (isMountedRef.current) setConvState(state);
-          if (state === 'connected' && !isMonologue) {
-            // Trigger AI to speak first after session.update is queued by configureSession
+          if (state === 'connected') {
+            // Trigger AI to speak first after session.update is queued by configureSession.
+            // For dialogue: AI starts the conversation. For monologue: AI says "Bitte fahren Sie fort."
             setTimeout(() => {
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               (sessionRef.current as any).sendEvent?.({ type: 'response.create' });
             }, 0);
+          }
+          // For monologue: start timer only after AI finishes its opening ("Bitte fahren Sie fort").
+          // The 'listening' state fires when the AI's response.done is processed.
+          if (state === 'listening' && isMonologue && !monologueTimerStartedRef.current) {
+            monologueTimerStartedRef.current = true;
+            startTimer();
           }
         },
         onTranscript: (entry) => {
@@ -259,13 +267,17 @@ export default function SprechenRealtimeScreen() {
       await realtimeSession.connect(client_secret);
 
       setScreenState('conversation');
-      startTimer();
+      // Dialogue: start timer immediately (AI is already speaking, user speaks after).
+      // Monologue: timer starts only after AI finishes opening — handled in onStateChange above.
+      if (!isMonologue) {
+        startTimer();
+      }
     } catch (err) {
       console.log('[SprechenRealtime] Start error:', err);
       setErrorMsg(err instanceof Error ? err.message : 'Verbindung fehlgeschlagen');
       setScreenState('error');
     }
-  }, [question, accessToken, partnerPromptsMemo, rubricCard, startTimer, taskSubtype, recordingTimeLimitSec]);
+  }, [question, accessToken, partnerPromptsMemo, rubricCard, startTimer, taskSubtype, isMonologue, recordingTimeLimitSec]);
 
   const handleEndConversation = useCallback(async () => {
     if (timerRef.current) {
@@ -335,18 +347,11 @@ export default function SprechenRealtimeScreen() {
     return () => clearTimeout(t);
   }, [countdownValue]);
 
-  // Trigger countdown automatically for monologue once moderator audio finishes
-  useEffect(() => {
-    if (screenState !== 'instruction') {
-      countdownTriggeredRef.current = false;
-      return;
-    }
-    if (!isMonologue) return;
-    if (moderatorAudioUrl && !moderatorFinished) return;
-    if (countdownTriggeredRef.current) return;
-    countdownTriggeredRef.current = true;
-    setCountdownValue(3);
-  }, [screenState, isMonologue, moderatorAudioUrl, moderatorFinished]);
+  // Trigger countdown automatically for monologue once moderator audio finishes.
+  // DISABLED for monologue: the AI now says "Bitte fahren Sie fort" as the verbal cue,
+  // so the 3-2-1 countdown is redundant. Keeping the effect for dialogue-with-countdown
+  // flows if ever needed, but currently only monologue used this path.
+  // useEffect(() => { ... }, [screenState, isMonologue, moderatorAudioUrl, moderatorFinished]);
 
   // ── Final 5-4-3-2-1 grace period AFTER time limit expires ─────────────────
   // When the main timer hits 0, instead of auto-ending, start 5s grace countdown.
@@ -412,6 +417,7 @@ export default function SprechenRealtimeScreen() {
     countdownTriggeredRef.current = false;
     setFinalCountdown(null);
     finalCountdownTriggeredRef.current = false;
+    monologueTimerStartedRef.current = false;
     setScreenState('instruction');
   }, []);
 
