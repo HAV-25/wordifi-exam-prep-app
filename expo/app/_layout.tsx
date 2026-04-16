@@ -5,6 +5,7 @@ import {
   NunitoSans_600SemiBold,
   NunitoSans_700Bold,
 } from '@expo-google-fonts/nunito-sans';
+import { Pacifico_400Regular } from '@expo-google-fonts/pacifico';
 import { useFonts } from 'expo-font';
 import { Redirect, Stack, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
@@ -135,6 +136,7 @@ export default Sentry.wrap(function RootLayout() {
     NunitoSans_400Regular,
     NunitoSans_600SemiBold,
     NunitoSans_700Bold,
+    Pacifico_400Regular,
   });
 
   if (!fontsLoaded) {

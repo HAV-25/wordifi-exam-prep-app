@@ -6,6 +6,7 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
+  Easing,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -29,7 +30,7 @@ import { colors } from '@/theme';
 import { CTAButton } from '@/components/CTAButton';
 import { GermanConfetti } from '@/components/GermanConfetti';
 import { GermanFlagBadge } from '@/components/GermanFlagBadge';
-import { WordifiLogo } from '@/components/WordifiLogo';
+// WordifiLogo no longer used on splash — using Pacifico animated text instead
 import { resetPassword, signInWithEmail, signInWithGoogle, signUpWithEmail } from '@/lib/authHelpers';
 import { upsertOnboardingProfile, updatePlayerName } from '@/lib/profileHelpers';
 import { supabase } from '@/lib/supabaseClient';
@@ -87,25 +88,54 @@ export default function OnboardingScreen() {
   const [forgotSent, setForgotSent] = useState<boolean>(false);
   const [forgotError, setForgotError] = useState<string>('');
 
-  const splashOpacity = useRef(new Animated.Value(0)).current;
-  const splashScale = useRef(new Animated.Value(0.8)).current;
+  // ── Splash animation values ─────────────────────────────────────────────
+  const wScale = useRef(new Animated.Value(0.3)).current;
+  const wOpacity = useRef(new Animated.Value(0)).current;
+  const wTranslateX = useRef(new Animated.Value(0)).current;
+  const ordifiOpacity = useRef(new Animated.Value(0)).current;
+  const ordifiTranslateX = useRef(new Animated.Value(20)).current;
+  const taglineOpacity = useRef(new Animated.Value(0)).current;
+  const flagOpacity = useRef(new Animated.Value(0)).current;
+
   const _scoreAnim = useRef(new Animated.Value(0)).current;
   const forgotModalFade = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (step === 1) {
+      // Phase 1: "w" grows from small to full size (center of screen)
       Animated.parallel([
-        Animated.timing(splashOpacity, { toValue: 1, duration: 800, useNativeDriver: true }),
-        Animated.spring(splashScale, { toValue: 1, friction: 8, useNativeDriver: true }),
+        Animated.timing(wOpacity, { toValue: 1, duration: 300, useNativeDriver: true }),
+        Animated.spring(wScale, { toValue: 1, friction: 6, tension: 80, useNativeDriver: true }),
       ]).start();
 
-      const timer = setTimeout(() => {
-        setStep(2);
-      }, 2000);
-      return () => clearTimeout(timer);
+      // Phase 2: "w" slides left, "ordifi" flows in from right
+      const phase2 = setTimeout(() => {
+        Animated.parallel([
+          Animated.timing(wTranslateX, { toValue: -72, duration: 500, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+          Animated.timing(ordifiOpacity, { toValue: 1, duration: 400, delay: 150, useNativeDriver: true }),
+          Animated.timing(ordifiTranslateX, { toValue: 0, duration: 500, delay: 150, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+        ]).start();
+      }, 600);
+
+      // Phase 3: tagline + flag fade in
+      const phase3 = setTimeout(() => {
+        Animated.parallel([
+          Animated.timing(taglineOpacity, { toValue: 1, duration: 400, useNativeDriver: true }),
+          Animated.timing(flagOpacity, { toValue: 1, duration: 400, delay: 100, useNativeDriver: true }),
+        ]).start();
+      }, 1400);
+
+      // Auto-advance to step 2
+      const advance = setTimeout(() => setStep(2), 2800);
+
+      return () => {
+        clearTimeout(phase2);
+        clearTimeout(phase3);
+        clearTimeout(advance);
+      };
     }
     return undefined;
-  }, [step, splashOpacity, splashScale]);
+  }, [step, wScale, wOpacity, wTranslateX, ordifiOpacity, ordifiTranslateX, taglineOpacity, flagOpacity]);
 
   const fetchSampleQuestions = useCallback(async () => {
     if (!state.selectedLevel) return;
@@ -239,18 +269,41 @@ export default function OnboardingScreen() {
 
   const renderStep1 = () => (
     <View style={styles.splashContainer}>
-      <LinearGradient colors={[colors.navy, '#10233F', '#0D1F38']} style={StyleSheet.absoluteFillObject} />
-      <GermanConfetti />
-      <Animated.View style={[styles.splashContent, { opacity: splashOpacity, transform: [{ scale: splashScale }] }]}>
-        <View style={styles.splashLogoWrap}>
-          <Sparkles color={colors.green} size={36} />
+      <View style={styles.splashContent}>
+        {/* Animated "w" → slides left, "ordifi" flows in */}
+        <View style={styles.splashWordmarkRow}>
+          <Animated.Text
+            style={[
+              styles.splashW,
+              {
+                opacity: wOpacity,
+                transform: [{ scale: wScale }, { translateX: wTranslateX }],
+              },
+            ]}
+          >
+            w
+          </Animated.Text>
+          <Animated.Text
+            style={[
+              styles.splashOrdifi,
+              {
+                opacity: ordifiOpacity,
+                transform: [{ translateX: ordifiTranslateX }],
+              },
+            ]}
+          >
+            ordifi
+          </Animated.Text>
         </View>
-        <View style={styles.splashBrandRow}>
-          <WordifiLogo variant="light" height={52} />
-          <GermanFlagBadge width={22} height={14} />
-        </View>
-        <Text style={styles.splashTagline}>Your exam, conquered.</Text>
-      </Animated.View>
+
+        {/* Tagline + flag fade in */}
+        <Animated.View style={[styles.splashTaglineRow, { opacity: taglineOpacity }]}>
+          <Text style={styles.splashTagline}>Your exam, conquered.</Text>
+        </Animated.View>
+        <Animated.View style={{ opacity: flagOpacity }}>
+          <GermanFlagBadge width={28} height={18} />
+        </Animated.View>
+      </View>
     </View>
   );
 
@@ -1004,35 +1057,36 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: '#F8FAFF',
   },
   splashContent: {
     alignItems: 'center',
-    gap: 12,
+    gap: 16,
   },
-  splashLogoWrap: {
-    width: 80,
-    height: 80,
-    borderRadius: 24,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
-  },
-  splashBrandRow: {
+  splashWordmarkRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+    alignItems: 'baseline',
+    justifyContent: 'center',
   },
-  splashBrand: {
-    fontSize: 42,
-    fontWeight: '800' as const,
-    color: colors.white,
-    letterSpacing: -0.5,
+  splashW: {
+    fontFamily: 'Pacifico_400Regular',
+    fontSize: 52,
+    color: '#2B70EF',
+    letterSpacing: -1,
+  },
+  splashOrdifi: {
+    fontFamily: 'Pacifico_400Regular',
+    fontSize: 52,
+    color: '#2B70EF',
+    letterSpacing: -1,
+  },
+  splashTaglineRow: {
+    marginTop: 4,
   },
   splashTagline: {
     fontSize: 18,
     fontWeight: '600' as const,
-    color: 'rgba(255,255,255,0.65)',
+    color: '#94A3B8',
   },
   stepContainer: {
     flex: 1,
