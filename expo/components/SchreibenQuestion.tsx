@@ -492,28 +492,45 @@ function RequiredPointsList({ points }: { points: string[] }) {
   );
 }
 
-const ASSESSMENT_STAGES = [
-  'Deine Antwort wird bewertet…',
-  'Grammatik wird überprüft…',
-  'Feedback wird vorbereitet…',
-  'Fast fertig…',
+const ASSESSMENT_STAGES: Array<{ de: string; en: string }> = [
+  { de: 'Wir bewerten deine Antwort…', en: 'We are evaluating your response…' },
+  { de: 'Grammatik wird überprüft…', en: 'Checking grammar…' },
+  { de: 'Feedback wird vorbereitet…', en: 'Preparing feedback…' },
+  { de: 'Fast fertig…', en: 'Almost done…' },
 ];
 
 function LoadingIndicator() {
-  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const spinAnim = useRef(new Animated.Value(0)).current;
+  const dot1 = useRef(new Animated.Value(0.3)).current;
+  const dot2 = useRef(new Animated.Value(0.3)).current;
+  const dot3 = useRef(new Animated.Value(0.3)).current;
   const [stageIndex, setStageIndex] = useState(0);
+  const [showReassurance, setShowReassurance] = useState(false);
 
+  // Fade in on mount
   useEffect(() => {
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 0.5, duration: 600, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1, duration: 600, useNativeDriver: true }),
-      ])
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [pulseAnim]);
+    Animated.timing(fadeAnim, { toValue: 1, duration: 300, useNativeDriver: true }).start();
+  }, [fadeAnim]);
 
+  // Pulsing dots animation
+  useEffect(() => {
+    const createDotLoop = (dot: Animated.Value, delay: number) =>
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(delay),
+          Animated.timing(dot, { toValue: 1, duration: 400, useNativeDriver: true }),
+          Animated.timing(dot, { toValue: 0.3, duration: 400, useNativeDriver: true }),
+        ])
+      );
+    const l1 = createDotLoop(dot1, 0);
+    const l2 = createDotLoop(dot2, 150);
+    const l3 = createDotLoop(dot3, 300);
+    l1.start(); l2.start(); l3.start();
+    return () => { l1.stop(); l2.stop(); l3.stop(); };
+  }, [dot1, dot2, dot3]);
+
+  // Stage rotation every 3 seconds
   useEffect(() => {
     const interval = setInterval(() => {
       setStageIndex((prev) => Math.min(prev + 1, ASSESSMENT_STAGES.length - 1));
@@ -521,11 +538,35 @@ function LoadingIndicator() {
     return () => clearInterval(interval);
   }, []);
 
+  // Show reassurance after 3 seconds
+  useEffect(() => {
+    const t = setTimeout(() => setShowReassurance(true), 3000);
+    return () => clearTimeout(t);
+  }, []);
+
+  const stage = ASSESSMENT_STAGES[stageIndex] ?? ASSESSMENT_STAGES[0];
+
   return (
-    <Animated.View style={[styles.loadingWrap, { opacity: pulseAnim }]}>
-      <Text style={styles.loadingEmoji}>✍️</Text>
-      <Text style={styles.loadingTitle}>{ASSESSMENT_STAGES[stageIndex]}</Text>
-      <Text style={styles.loadingSub}>Das dauert nur einen Moment</Text>
+    <Animated.View style={[styles.loadingWrap, { opacity: fadeAnim }]}>
+      {/* Pulsing dots */}
+      <View style={styles.loadingDotsRow}>
+        <Animated.View style={[styles.loadingDot, { opacity: dot1 }]} />
+        <Animated.View style={[styles.loadingDot, { opacity: dot2 }]} />
+        <Animated.View style={[styles.loadingDot, { opacity: dot3 }]} />
+      </View>
+
+      {/* Stage message — German (primary) */}
+      <Text style={styles.loadingTitle}>{stage.de}</Text>
+      {/* English translation */}
+      <Text style={styles.loadingTitleEn}>{stage.en}</Text>
+
+      {/* Reassurance — appears after 3s */}
+      {showReassurance ? (
+        <View style={styles.loadingReassurance}>
+          <Text style={styles.loadingReassuranceDe}>Das kann ein paar Sekunden dauern</Text>
+          <Text style={styles.loadingReassuranceEn}>This may take a few seconds</Text>
+        </View>
+      ) : null}
     </Animated.View>
   );
 }
@@ -782,21 +823,51 @@ const styles = StyleSheet.create({
   loadingWrap: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 40,
-    gap: spacing.sm,
+    paddingVertical: 48,
+    paddingHorizontal: 24,
+    gap: spacing.md,
   },
-  loadingEmoji: {
-    fontSize: 32,
+  loadingDotsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 8,
+  },
+  loadingDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#2B70EF',
   },
   loadingTitle: {
-    fontSize: fontSize.bodyMd,
-    color: colors.navy,
-    fontWeight: '600' as const,
+    fontSize: 17,
+    color: '#0F1F3D',
+    fontWeight: '700' as const,
+    textAlign: 'center' as const,
+    lineHeight: 24,
+  },
+  loadingTitleEn: {
+    fontSize: 14,
+    color: '#94A3B8',
+    fontWeight: '400' as const,
+    textAlign: 'center' as const,
+    lineHeight: 20,
+    marginTop: -4,
+  },
+  loadingReassurance: {
+    marginTop: 12,
+    alignItems: 'center',
+    gap: 2,
+  },
+  loadingReassuranceDe: {
+    fontSize: 13,
+    color: '#94A3B8',
+    fontWeight: '500' as const,
     textAlign: 'center' as const,
   },
-  loadingSub: {
-    fontSize: 13,
-    color: colors.muted,
+  loadingReassuranceEn: {
+    fontSize: 12,
+    color: '#B8C4D4',
+    fontWeight: '400' as const,
     textAlign: 'center' as const,
   },
 });

@@ -72,6 +72,10 @@ export default function SprechenRealtimeScreen() {
   const [moderatorFinished, setModeratorFinished] = useState<boolean>(false);
   const [isNativeRecording, setIsNativeRecording] = useState<boolean>(false);
   const [countdownValue, setCountdownValue] = useState<number | null>(null);
+  const [finalCountdown, setFinalCountdown] = useState<number | null>(null);
+  const finalCountdownScaleAnim = useRef(new Animated.Value(0.5)).current;
+  const finalCountdownOpacityAnim = useRef(new Animated.Value(0)).current;
+  const finalCountdownTriggeredRef = useRef<boolean>(false);
 
   const sessionRef = useRef<IRealtimeSession | null>(null);
   const sessionIdRef = useRef<string | null>(null);
@@ -158,9 +162,8 @@ export default function SprechenRealtimeScreen() {
     timerRef.current = setInterval(() => {
       const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
       setElapsedSeconds(elapsed);
-      if (elapsed >= recordingLimitRef.current) {
-        void handleEndRef.current?.();
-      }
+      // Don't auto-end here — the grace countdown effect handles it
+      // after the 5-second grace period expires.
     }, 1000);
   }, []);
 
@@ -345,6 +348,45 @@ export default function SprechenRealtimeScreen() {
     setCountdownValue(3);
   }, [screenState, isMonologue, moderatorAudioUrl, moderatorFinished]);
 
+  // ── Final 5-4-3-2-1 grace period AFTER time limit expires ─────────────────
+  // When the main timer hits 0, instead of auto-ending, start 5s grace countdown.
+  // Auto-end fires only when grace countdown reaches 0.
+  useEffect(() => {
+    if (screenState !== 'conversation') {
+      finalCountdownTriggeredRef.current = false;
+      setFinalCountdown(null);
+      return;
+    }
+    const limit = isMonologue ? recordingTimeLimitSec : MAX_DURATION;
+    const timeRemaining = limit - elapsedSeconds;
+
+    if (timeRemaining <= 0 && !finalCountdownTriggeredRef.current) {
+      finalCountdownTriggeredRef.current = true;
+      setFinalCountdown(5);
+    }
+  }, [screenState, elapsedSeconds, isMonologue, recordingTimeLimitSec]);
+
+  // Tick the grace countdown and animate each number
+  useEffect(() => {
+    if (finalCountdown === null) return;
+    if (finalCountdown <= 0) {
+      setFinalCountdown(null);
+      // Grace period over — auto-end the conversation
+      void handleEndRef.current?.();
+      return;
+    }
+    // Animate: scale up from 0.5→1 + fade in per tick
+    finalCountdownScaleAnim.setValue(0.5);
+    finalCountdownOpacityAnim.setValue(0);
+    Animated.parallel([
+      Animated.spring(finalCountdownScaleAnim, { toValue: 1, friction: 5, tension: 120, useNativeDriver: true }),
+      Animated.timing(finalCountdownOpacityAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
+    ]).start();
+
+    const t = setTimeout(() => setFinalCountdown((v) => (v !== null && v > 0 ? v - 1 : null)), 1000);
+    return () => clearTimeout(t);
+  }, [finalCountdown, finalCountdownScaleAnim, finalCountdownOpacityAnim]);
+
   const handleNativeRecord = useCallback(async () => {
     const s = sessionRef.current;
     if (!(s instanceof NativeWSRealtimeSession)) return;
@@ -368,6 +410,8 @@ export default function SprechenRealtimeScreen() {
     setModeratorFinished(false);
     setCountdownValue(null);
     countdownTriggeredRef.current = false;
+    setFinalCountdown(null);
+    finalCountdownTriggeredRef.current = false;
     setScreenState('instruction');
   }, []);
 
@@ -667,6 +711,29 @@ export default function SprechenRealtimeScreen() {
             <Text style={styles.endBtnText}>{isMonologue ? 'Aufnahme beenden' : 'Gespräch beenden'}</Text>
           </Pressable>
         </View>
+
+        {/* Final countdown overlay — 5 4 3 2 1 */}
+        {finalCountdown !== null && finalCountdown > 0 ? (
+          <View style={styles.finalCountdownOverlay} pointerEvents="none">
+            <Animated.View
+              style={[
+                styles.finalCountdownCircle,
+                {
+                  opacity: finalCountdownOpacityAnim,
+                  transform: [{ scale: finalCountdownScaleAnim }],
+                },
+              ]}
+            >
+              <Text style={styles.finalCountdownNumber}>{finalCountdown}</Text>
+            </Animated.View>
+            <Animated.Text style={[styles.finalCountdownMessage, { opacity: finalCountdownOpacityAnim }]}>
+              Deine Sprechzeit endet gleich
+            </Animated.Text>
+            <Animated.Text style={[styles.finalCountdownMessageEn, { opacity: finalCountdownOpacityAnim }]}>
+              Your speaking time is ending
+            </Animated.Text>
+          </View>
+        ) : null}
       </View>
     );
   }
@@ -1267,5 +1334,47 @@ const styles = StyleSheet.create({
     fontWeight: '500' as const,
     textAlign: 'center',
     marginTop: spacing.sm,
+  },
+
+  // ─── Final countdown overlay ─────────────────────────────────────────────
+  finalCountdownOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 100,
+    gap: 16,
+  },
+  finalCountdownCircle: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Platform.select({
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.15, shadowRadius: 24 },
+      android: { elevation: 12 },
+    }),
+  },
+  finalCountdownNumber: {
+    fontSize: 56,
+    fontWeight: '800' as const,
+    color: colors.red,
+    lineHeight: 64,
+  },
+  finalCountdownMessage: {
+    fontSize: 16,
+    fontWeight: '600' as const,
+    color: colors.white,
+    textAlign: 'center',
+    paddingHorizontal: 32,
+  },
+  finalCountdownMessageEn: {
+    fontSize: 14,
+    fontWeight: '400' as const,
+    color: 'rgba(255,255,255,0.65)',
+    textAlign: 'center',
+    paddingHorizontal: 32,
   },
 });
