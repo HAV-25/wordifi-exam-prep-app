@@ -9,8 +9,8 @@ import type { UserAccess } from '@/types/access';
 
 const DEFAULT_ACCESS: UserAccess = {
   tier: 'free',
-  stream_questions_per_day: 3,
-  stream_questions_remaining: 3,
+  stream_questions_per_day: 5,
+  stream_questions_remaining: 5,
   schreiben_visible: true,
   schreiben_enabled: false,
   sprechen_visible: true,

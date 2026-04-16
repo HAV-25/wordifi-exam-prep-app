@@ -88,7 +88,7 @@ export type UserProfile = {
   subscription_tier: string;
   subscription_valid_until: string | null;
   trial_active: boolean;
-  preparedness_score: number;
+  readiness_score: number;
   streak_count: number;
   last_active_date: string | null;
   xp_total: number;
@@ -111,7 +111,7 @@ export type UserProfile = {
 
 export type LeaderboardEntry = {
   player_name: string;
-  preparedness_score: number;
+  readiness_score: number;
   streak_count: number;
   target_level: string;
   user_id: string;
@@ -194,7 +194,7 @@ export type Database = {
           subscription_tier?: string;
           subscription_valid_until?: string | null;
           trial_active?: boolean;
-          preparedness_score?: number;
+          readiness_score?: number;
           streak_count?: number;
           last_active_date?: string | null;
           xp_total?: number;

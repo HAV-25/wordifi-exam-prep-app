@@ -219,26 +219,26 @@ export async function createStreamSession(params: {
   return (data as unknown as SessionIdRow).id;
 }
 
-export async function updatePreparednessScore(
+export async function updateReadinessScore(
   userId: string,
   delta: number = 1
 ): Promise<number> {
   const { data: profileData } = await supabase
     .from('user_profiles')
-    .select('preparedness_score')
+    .select('readiness_score')
     .eq('id', userId)
     .single();
 
-  const currentScore = (profileData as { preparedness_score?: number } | null)?.preparedness_score ?? 0;
+  const currentScore = (profileData as { readiness_score?: number } | null)?.readiness_score ?? 0;
   const newScore = Math.max(0, Math.min(100, currentScore + delta));
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error } = await (supabase.from('user_profiles') as any)
-    .update({ preparedness_score: newScore, updated_at: new Date().toISOString() })
+    .update({ readiness_score: newScore, updated_at: new Date().toISOString() })
     .eq('id', userId);
 
   if (error) {
-    console.log('updatePreparednessScore error', error);
+    console.log('updateReadinessScore error', error);
   }
 
   return newScore;

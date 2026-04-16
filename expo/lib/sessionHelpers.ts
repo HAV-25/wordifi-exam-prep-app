@@ -97,7 +97,7 @@ export async function submitCompletedSession(payload: SubmitSessionPayload) {
         xp_total: (profile?.xp_total ?? 0) + correctCount,
         last_active_date: getTodayValue(),
         streak_count: calculateStreak(profile?.last_active_date ?? null, profile?.streak_count ?? 0),
-        preparedness_score: scorePct,
+        readiness_score: scorePct,
         updated_at: new Date().toISOString(),
       })
       .eq('id', userId);

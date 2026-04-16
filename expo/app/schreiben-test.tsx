@@ -24,7 +24,7 @@ import { SchreibenQuestion } from '@/components/SchreibenQuestion';
 import { SchreibenResult } from '@/components/SchreibenResult';
 import { colors, fontSize, radius, shadows, spacing } from '@/theme';
 import { assessSchreiben, fetchExistingSubmission } from '@/lib/schreibenHelpers';
-import { updatePreparednessScore } from '@/lib/streamHelpers';
+import { updateReadinessScore } from '@/lib/streamHelpers';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/providers/AuthProvider';
 import type { AppQuestion } from '@/types/database';
@@ -324,7 +324,7 @@ export default function SchreibenTestScreen() {
         })
         .eq('id', userId);
 
-      await updatePreparednessScore(userId, 5);
+      await updateReadinessScore(userId, 5);
       await refreshProfile();
     } catch (err) {
       console.log('SchreibenTest finishTest error', err);

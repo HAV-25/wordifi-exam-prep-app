@@ -31,7 +31,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { CelebrationOverlay } from '@/components/CelebrationOverlay';
 import { PaywallModal } from '@/components/PaywallModal';
-import { PreparednessBottomSheet } from '@/components/PreparednessBottomSheet';
+import { ReadinessBottomSheet } from '@/components/ReadinessBottomSheet';
 import { ReportModal } from '@/components/ReportModal';
 import { StreamCard } from '@/components/StreamCard';
 import { TrialBanner } from '@/components/TrialBanner';
@@ -41,7 +41,7 @@ import { didCrossBadgeThreshold, formatXp, getBadgeTier } from '@/lib/badgeHelpe
 import {
   checkAndAwardBadges,
   fetchSectionAccuracy,
-  updatePreparednessScore,
+  updateReadinessScore,
   updateXpAndStreak,
   type BadgeType,
 } from '@/lib/streamHelpers';
@@ -98,7 +98,7 @@ export default function TestStreamScreen() {
 
   // ── Gamification state ─────────────────────────────────────────────────────
   const [showPaywall, setShowPaywall] = useState<boolean>(false);
-  const [localPreparedness, setLocalPreparedness] = useState<number>(profile?.preparedness_score ?? 0);
+  const [localReadiness, setLocalReadiness] = useState<number>(profile?.readiness_score ?? 0);
   const [localXp, setLocalXp] = useState<number>(profile?.xp_total ?? 0);
   const [localStreak, setLocalStreak] = useState<number>(profile?.streak_count ?? 0);
   const [celebrationBadge, setCelebrationBadge] = useState<BadgeType | null>(null);
@@ -134,7 +134,7 @@ export default function TestStreamScreen() {
   // ── Sync profile values ────────────────────────────────────────────────────
   useEffect(() => {
     if (profile) {
-      setLocalPreparedness(profile.preparedness_score ?? 0);
+      setLocalReadiness(profile.readiness_score ?? 0);
       setLocalXp(profile.xp_total ?? 0);
       setLocalStreak(profile.streak_count ?? 0);
     }
@@ -253,7 +253,7 @@ export default function TestStreamScreen() {
       if (sessionId) {
         saveStreamAnswer({ sessionId, userId, questionId, selectedAnswer: selectedKey, isCorrect }).catch((err) => console.error('[Stream] Save answer error:', err));
       }
-      updatePreparednessScore(userId, 1).then((newScore) => setLocalPreparedness(newScore)).catch(() => {});
+      updateReadinessScore(userId, 1).then((newScore) => setLocalReadiness(newScore)).catch(() => {});
 
       if (isCorrect && profile) {
         try {
@@ -506,7 +506,7 @@ export default function TestStreamScreen() {
         </Animated.View>
       ) : null}
 
-      <PreparednessBottomSheet visible={showBottomSheet} onClose={() => setShowBottomSheet(false)} level={targetLevel} overallScore={localPreparedness} horenPct={horenPct} lesenPct={lesenPct} streak={localStreak} lastActiveDate={profile?.last_active_date ?? null} />
+      <ReadinessBottomSheet visible={showBottomSheet} onClose={() => setShowBottomSheet(false)} level={targetLevel} overallScore={localReadiness} horenPct={horenPct} lesenPct={lesenPct} streak={localStreak} lastActiveDate={profile?.last_active_date ?? null} />
       <ReportModal visible={Boolean(reportQuestionId)} questionId={reportQuestionId ?? ''} userId={userId} onClose={() => setReportQuestionId(null)} />
       <PaywallModal visible={showPaywall} variant="stream_limit" onUpgrade={() => setShowPaywall(false)} onDismiss={() => setShowPaywall(false)} />
     </SafeAreaView>

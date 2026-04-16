@@ -106,9 +106,9 @@ export default function LeaderboardScreen() {
                 <Text style={styles.myRankNumber}>#{currentUserRank.rank}</Text>
               </View>
               <View style={styles.myRankRight}>
-                <View style={[styles.scorePill, { backgroundColor: getScoreBg(currentUserRank.preparedness_score) }]}>
-                  <Text style={[styles.scorePillText, { color: getScoreColor(currentUserRank.preparedness_score) }]}>
-                    {Math.round(currentUserRank.preparedness_score)}%
+                <View style={[styles.scorePill, { backgroundColor: getScoreBg(currentUserRank.readiness_score) }]}>
+                  <Text style={[styles.scorePillText, { color: getScoreColor(currentUserRank.readiness_score) }]}>
+                    {Math.round(currentUserRank.readiness_score)}%
                   </Text>
                 </View>
                 {currentUserRank.streak_count > 0 ? (
@@ -173,9 +173,9 @@ export default function LeaderboardScreen() {
                       </View>
 
                       <View style={styles.rowRight}>
-                        <View style={[styles.scorePill, { backgroundColor: getScoreBg(entry.preparedness_score) }]}>
-                          <Text style={[styles.scorePillText, { color: getScoreColor(entry.preparedness_score) }]}>
-                            {Math.round(entry.preparedness_score)}%
+                        <View style={[styles.scorePill, { backgroundColor: getScoreBg(entry.readiness_score) }]}>
+                          <Text style={[styles.scorePillText, { color: getScoreColor(entry.readiness_score) }]}>
+                            {Math.round(entry.readiness_score)}%
                           </Text>
                         </View>
                         {entry.streak_count > 0 ? (

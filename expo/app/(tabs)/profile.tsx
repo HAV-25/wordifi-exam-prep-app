@@ -400,7 +400,7 @@ export default function ProfileScreen() {
             <>
               <View style={styles.readinessRow}>
                 <Text style={styles.readinessNumber}>
-                  {Math.round(profile?.preparedness_score ?? 0)}
+                  {Math.round(profile?.readiness_score ?? 0)}
                 </Text>
                 <Text style={styles.readinessPct}>%</Text>
               </View>
@@ -408,7 +408,7 @@ export default function ProfileScreen() {
                 <View
                   style={[
                     styles.progressFill,
-                    { width: `${Math.min(profile?.preparedness_score ?? 0, 100)}%` },
+                    { width: `${Math.min(profile?.readiness_score ?? 0, 100)}%` },
                   ]}
                 />
               </View>

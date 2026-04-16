@@ -27,7 +27,7 @@ import { StimulusCard, shouldShowStimulus } from '@/components/StimulusCard';
 import Colors from '@/constants/colors';
 import { colors } from '@/theme';
 import { B } from '@/theme/banani';
-import { updatePreparednessScore } from '@/lib/streamHelpers';
+import { updateReadinessScore } from '@/lib/streamHelpers';
 import { useQuestionMeta } from '@/lib/useQuestionTypeMeta';
 import { XP_RATES } from '@/theme/constants';
 import { useAuth } from '@/providers/AuthProvider';
@@ -75,13 +75,13 @@ export default function SectionalResultsScreen() {
   const insets = useSafeAreaInsets();
   const { user, profile } = useAuth();
   const userId = user?.id ?? '';
-  const hasUpdatedPreparedness = useRef<boolean>(false);
+  const hasUpdatedReadiness = useRef<boolean>(false);
 
   useEffect(() => {
-    if (userId && !hasUpdatedPreparedness.current) {
-      hasUpdatedPreparedness.current = true;
-      updatePreparednessScore(userId, 5).catch((err) =>
-        console.log('SectionalResults updatePreparedness error', err)
+    if (userId && !hasUpdatedReadiness.current) {
+      hasUpdatedReadiness.current = true;
+      updateReadinessScore(userId, 5).catch((err) =>
+        console.log('SectionalResults updateReadiness error', err)
       );
     }
   }, [userId]);

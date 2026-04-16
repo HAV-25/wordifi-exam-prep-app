@@ -55,7 +55,7 @@ export const springs = {
     stiffness: 250,
     mass:       1,
   },
-  // Preparedness gauge pill colour change
+  // Readiness gauge pill colour change
   gauge: {
     damping:   15,
     stiffness: 150,
@@ -111,7 +111,7 @@ export const scoreReveal = {
   endValue:   32,  // Always starts at 32% for new users
 } as const;
 
-/** Preparedness gauge delta animation */
+/** Readiness gauge delta animation */
 export const gaugeDelta = {
   duration: 600,   // ms
   easing:   easing.standard,

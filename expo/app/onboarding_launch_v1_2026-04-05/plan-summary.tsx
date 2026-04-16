@@ -23,7 +23,7 @@ const FEATURES = [
   'Daily Test Stream targeting weakest sections',
   'Sectional Tests for Hören and Lesen twice weekly',
   'Full Mock Test before exam day',
-  'Daily Preparedness Score tracking',
+  'Daily Readiness Score tracking',
   'Streak System to keep you consistent',
 ] as const;
 

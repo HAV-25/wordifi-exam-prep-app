@@ -78,7 +78,7 @@ export const colors = {
   red:   '#EF4444',   // Error/incorrect
   amber: '#F4B942',   // Warning
 
-  // ─── Preparedness Gauge ─────────────────────────────────────────────────────
+  // ─── Readiness Gauge ─────────────────────────────────────────────────────
   gaugeRed:   '#EF4444',   // < 40%
   gaugeAmber: '#F4B942',   // 40–69%
   gaugeGreen: '#14B86A',   // ≥ 70%

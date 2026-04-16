@@ -42,7 +42,7 @@ export async function ensureUserProfile(user: User): Promise<UserProfile> {
       subscription_tier: 'free_trial',
       trial_active: true,
       trial_expires_at: trialExpiresAt,
-      preparedness_score: 0,
+      readiness_score: 0,
       streak_count: 0,
       xp_total: 0,
       credit_balance: 0,
@@ -168,7 +168,7 @@ export async function updatePlayerName(userId: string, playerName: string): Prom
 export type LeaderboardEntry = {
   rank: number;
   display_name: string;
-  preparedness_score: number;
+  readiness_score: number;
   streak_count: number;
   target_level: string;
   is_current_user: boolean;

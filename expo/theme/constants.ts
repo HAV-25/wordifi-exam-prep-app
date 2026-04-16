@@ -21,8 +21,8 @@ export const EXAM_TIMINGS: Record<string, { hoeren: number; lesen: number; sprac
   B1: { hoeren: 40, lesen: 70, sprachbausteine: 15 },
 } as const;
 
-// ─── Preparedness Score ───────────────────────────────────────────────────────
-export const PREPAREDNESS = {
+// ─── Readiness Score ───────────────────────────────────────────────────────
+export const READINESS = {
   min:           0,
   max:           100,
   deltaStream:  +1,   // Per question answered (regardless of correct/wrong)
@@ -80,7 +80,7 @@ export const LEADERBOARD = {
 
 // ─── Onboarding ──────────────────────────────────────────────────────────────
 export const ONBOARDING = {
-  baseScore:      32,   // Always shown as starting preparedness score
+  baseScore:      32,   // Always shown as starting readiness score
   sampleQuestions: 5,   // Free sample questions in onboarding
 } as const;
 

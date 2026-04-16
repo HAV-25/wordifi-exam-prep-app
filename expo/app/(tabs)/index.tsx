@@ -28,7 +28,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PaywallModal } from '@/components/PaywallModal';
-import { PreparednessBottomSheet } from '@/components/PreparednessBottomSheet';
+import { ReadinessBottomSheet } from '@/components/ReadinessBottomSheet';
 import { ProgressRing } from '@/components/ProgressRing';
 import { Sparkline } from '@/components/Sparkline';
 import { WordifiLogo } from '@/components/WordifiLogo';
@@ -114,7 +114,7 @@ export default function HomeScreen() {
 
   const formattedXp = useMemo(() => formatXp(data.xp), [data.xp]);
   const initial = (data.firstName ?? user?.email ?? '?').charAt(0).toUpperCase();
-  const scoreInt = Math.round(data.preparedness);
+  const scoreInt = Math.round(data.readiness);
 
   const isPaidUser = PAID_TIERS.has(data.subscriptionTier);
   const showUpgradeBanner = !isPaidUser;
@@ -358,11 +358,11 @@ export default function HomeScreen() {
 
       </ScrollView>
 
-      <PreparednessBottomSheet
+      <ReadinessBottomSheet
         visible={showBottomSheet}
         onClose={() => setShowBottomSheet(false)}
         level={data.targetLevel}
-        overallScore={data.preparedness}
+        overallScore={data.readiness}
         horenPct={data.horenAccuracy}
         lesenPct={data.lesenAccuracy}
         schreibenSessions={data.sectionHistory.find((s) => s.section === 'Schreiben')?.testCount ?? 0}

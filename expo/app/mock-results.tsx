@@ -24,7 +24,7 @@ import { StimulusCard, shouldShowStimulus } from '@/components/StimulusCard';
 import Colors from '@/constants/colors';
 import { colors } from '@/theme';
 import { submitQuestionReport } from '@/lib/mockHelpers';
-import { updatePreparednessScore } from '@/lib/streamHelpers';
+import { updateReadinessScore } from '@/lib/streamHelpers';
 import { useAuth } from '@/providers/AuthProvider';
 import type { AppQuestion, StudyPlanItem } from '@/types/database';
 
@@ -92,13 +92,13 @@ export default function MockResultsScreen() {
 
   const { user } = useAuth();
   const userId = user?.id ?? '';
-  const hasUpdatedPreparedness = useRef<boolean>(false);
+  const hasUpdatedReadiness = useRef<boolean>(false);
 
   useEffect(() => {
-    if (userId && !hasUpdatedPreparedness.current) {
-      hasUpdatedPreparedness.current = true;
-      updatePreparednessScore(userId, 20).catch((err) =>
-        console.log('MockResults updatePreparedness error', err)
+    if (userId && !hasUpdatedReadiness.current) {
+      hasUpdatedReadiness.current = true;
+      updateReadinessScore(userId, 20).catch((err) =>
+        console.log('MockResults updateReadiness error', err)
       );
     }
   }, [userId]);

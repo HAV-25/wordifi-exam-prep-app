@@ -51,7 +51,7 @@ export type TrendDay = {
 };
 
 export type HomeData = {
-  preparedness: number;
+  readiness: number;
   streak: number;
   xp: number;
   targetLevel: string;
@@ -102,13 +102,13 @@ function pickQuoteCategory(
   streak: number,
   daysToExam: number | null,
   hasPracticedToday: boolean,
-  preparedness: number,
+  readiness: number,
 ): string {
   // Prioritize: exam close > streak > comeback > milestone > general
   if (daysToExam !== null && daysToExam <= 30) return 'exam_close';
   if (streak >= 3) return 'streak';
   if (streak === 0 && !hasPracticedToday) return 'comeback';
-  if (preparedness >= 60) return 'milestone';
+  if (readiness >= 60) return 'milestone';
   if (!hasPracticedToday) return 'low_activity';
   return 'general';
 }
@@ -271,7 +271,7 @@ export function useHomeData(): HomeData {
     enabled: Boolean(userId) && Boolean(targetLevel),
     queryFn: async (): Promise<LeaderboardNeighbor[]> => {
       try {
-        const readiness = Math.round(profile?.preparedness_score ?? 0);
+        const readiness = Math.round(profile?.readiness_score ?? 0);
         const { data, error } = await (supabase.rpc as any)('get_leaderboard_neighbors', {
           p_user_id: userId,
           p_target_level: targetLevel,
@@ -306,13 +306,13 @@ export function useHomeData(): HomeData {
 
   // New: motivational quote (cached per session via staleTime)
   const streak = profile?.streak_count ?? 0;
-  const preparedness = profile?.preparedness_score ?? 0;
+  const readiness = profile?.readiness_score ?? 0;
   const dailyStreamCount = (profile as Record<string, unknown> | null)?.daily_stream_count as number | undefined;
   const hasPracticedToday = (dailyStreamCount ?? 0) > 0;
   const daysToExam = calcDaysToExam(profile?.exam_date ?? null);
 
   const categoryRef = useRef(
-    pickQuoteCategory(streak, daysToExam, hasPracticedToday, preparedness)
+    pickQuoteCategory(streak, daysToExam, hasPracticedToday, readiness)
   );
 
   const quoteQuery = useQuery({
@@ -389,7 +389,7 @@ export function useHomeData(): HomeData {
   }
 
   return {
-    preparedness,
+    readiness,
     streak,
     xp: profile?.xp_total ?? 0,
     targetLevel,

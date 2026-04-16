@@ -32,7 +32,7 @@ import {
   SPRECHEN_STRUCTURE_LABELS,
 } from '@/lib/sprechenHelpers';
 import type { SprechenResponse } from '@/lib/sprechenHelpers';
-import { updatePreparednessScore } from '@/lib/streamHelpers';
+import { updateReadinessScore } from '@/lib/streamHelpers';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/providers/AuthProvider';
 import type { AppQuestion } from '@/types/database';
@@ -365,7 +365,7 @@ export default function SprechenTestScreen() {
         })
         .eq('id', userId);
 
-      await updatePreparednessScore(userId, 5);
+      await updateReadinessScore(userId, 5);
       await refreshProfile();
     } catch (err) {
       console.log('SprechenTest finishTest error', err);

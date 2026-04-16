@@ -529,7 +529,7 @@ export async function completeMockTest(params: {
         xp_total: (profile?.xp_total ?? 0) + totalCorrect,
         last_active_date: today,
         streak_count: newStreak,
-        preparedness_score: Math.min(100, Math.max(0, overallPct * 0.8 + (profile?.preparedness_score ?? 0) * 0.2)),
+        readiness_score: Math.min(100, Math.max(0, overallPct * 0.8 + (profile?.readiness_score ?? 0) * 0.2)),
         updated_at: new Date().toISOString(),
       })
       .eq('id', userId);

@@ -23,8 +23,8 @@ import {
   View,
 } from 'react-native';
 
-import { PreparednessBar } from '@/components/PreparednessBar';
-import { PreparednessBottomSheet } from '@/components/PreparednessBottomSheet';
+import { ReadinessBar } from '@/components/ReadinessBar';
+import { ReadinessBottomSheet } from '@/components/ReadinessBottomSheet';
 import Colors from '@/constants/colors';
 import { colors, fontSize, radius, shadows, spacing } from '@/theme';
 import { formatXp, getBadgeTier } from '@/lib/badgeHelpers';
@@ -61,7 +61,7 @@ function getDaysUntilExam(examDate: string | null): number | null {
 function getMotivationalMessage(
   streak: number,
   daysToExam: number | null,
-  preparedness: number,
+  readiness: number,
 ): string {
   if (streak > 0 && streak >= 3) {
     return `${streak} day streak — keep it going`;
@@ -69,7 +69,7 @@ function getMotivationalMessage(
   if (daysToExam !== null && daysToExam <= 30) {
     return `${daysToExam} days to your exam`;
   }
-  if (preparedness < 40) {
+  if (readiness < 40) {
     return 'Your readiness needs attention — practice today';
   }
   const tips = [
@@ -205,7 +205,7 @@ export function HomeDashboard({ onStartPractice }: HomeDashboardProps) {
   });
 
   const stats = completedQuery.data;
-  const preparedness = profile?.preparedness_score ?? 0;
+  const readiness = profile?.readiness_score ?? 0;
   const streak = profile?.streak_count ?? 0;
   const xp = profile?.xp_total ?? 0;
   const badgeTier = useMemo(() => getBadgeTier(xp), [xp]);
@@ -219,15 +219,15 @@ export function HomeDashboard({ onStartPractice }: HomeDashboardProps) {
   const streakReinforcement = useMemo(() => getStreakReinforcement(streak), [streak]);
 
   const motivationalMsg = useMemo(
-    () => getMotivationalMessage(streak, daysToExam, preparedness),
-    [streak, daysToExam, preparedness]
+    () => getMotivationalMessage(streak, daysToExam, readiness),
+    [streak, daysToExam, readiness]
   );
 
   const gaugeColor = useMemo(() => {
-    if (preparedness < 40) return colors.red;
-    if (preparedness < 70) return colors.amber;
+    if (readiness < 40) return colors.red;
+    if (readiness < 70) return colors.amber;
     return colors.green;
-  }, [preparedness]);
+  }, [readiness]);
 
   const handleStartFromWelcome = useCallback(async () => {
     setShowWelcome(false);
@@ -323,11 +323,11 @@ export function HomeDashboard({ onStartPractice }: HomeDashboardProps) {
                 <Text style={styles.examLabel}>{examType}</Text>
               </View>
               <View style={[styles.gaugePill, { backgroundColor: gaugeColor }]}>
-                <Text style={styles.gaugeText}>{Math.round(preparedness)}%</Text>
+                <Text style={styles.gaugeText}>{Math.round(readiness)}%</Text>
               </View>
             </View>
 
-            <PreparednessBar score={preparedness} />
+            <ReadinessBar score={readiness} />
 
             <View style={styles.statsRow}>
               <View style={styles.statItem}>
@@ -422,7 +422,7 @@ export function HomeDashboard({ onStartPractice }: HomeDashboardProps) {
 
         <View style={[styles.motivationCard, shadows.card]}>
           <Text style={styles.motivationIcon}>
-            {streak >= 3 ? '🔥' : daysToExam !== null && daysToExam <= 30 ? '📅' : preparedness < 40 ? '📊' : '💡'}
+            {streak >= 3 ? '🔥' : daysToExam !== null && daysToExam <= 30 ? '📅' : readiness < 40 ? '📊' : '💡'}
           </Text>
           <Text style={styles.motivationText}>{motivationalMsg}</Text>
         </View>
@@ -440,11 +440,11 @@ export function HomeDashboard({ onStartPractice }: HomeDashboardProps) {
         ) : null}
       </ScrollView>
 
-      <PreparednessBottomSheet
+      <ReadinessBottomSheet
         visible={showBottomSheet}
         onClose={() => setShowBottomSheet(false)}
         level={targetLevel}
-        overallScore={preparedness}
+        overallScore={readiness}
         horenPct={horenPct}
         lesenPct={lesenPct}
         streak={streak}

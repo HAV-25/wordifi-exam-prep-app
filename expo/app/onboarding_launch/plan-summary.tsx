@@ -53,7 +53,7 @@ const ITEMS: { title: string; sub: string }[] = [
   { title: 'Daily Test Stream',        sub: 'Your weakest sections first, every day' },
   { title: 'Sectional Tests',          sub: 'Hören and Lesen practice twice a week' },
   { title: 'Full Mock Test',           sub: 'One complete simulation before exam day' },
-  { title: 'Daily Preparedness Score', sub: 'Always know exactly where you stand' },
+  { title: 'Daily Readiness Score', sub: 'Always know exactly where you stand' },
   { title: 'Streak System',            sub: '16 minutes a day keeps your score climbing' },
 ];
 
