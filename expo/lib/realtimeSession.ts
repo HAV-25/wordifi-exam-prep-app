@@ -225,9 +225,11 @@ export class WebRTCRealtimeSession implements IRealtimeSession {
   private currentAiText = '';
   private _isConnected = false;
   private _isAiSpeaking = false;
+  private taskSubtype: string;
 
-  constructor(callbacks: RealtimeCallbacks) {
+  constructor(callbacks: RealtimeCallbacks, taskSubtype?: string) {
     this.callbacks = callbacks;
+    this.taskSubtype = taskSubtype ?? 'dialogue';
   }
 
   get isConnected() { return this._isConnected; }
@@ -321,6 +323,7 @@ export class WebRTCRealtimeSession implements IRealtimeSession {
   }
 
   private configureSession() {
+    const isMonologue = this.taskSubtype === 'monologue';
     this.sendEvent({
       type: 'session.update',
       session: {
@@ -330,7 +333,7 @@ export class WebRTCRealtimeSession implements IRealtimeSession {
           type: 'server_vad',
           threshold: 0.5,
           prefix_padding_ms: 300,
-          silence_duration_ms: 700,
+          silence_duration_ms: isMonologue ? 8000 : 700,
         },
       },
     });
@@ -447,12 +450,14 @@ export class NativeWSRealtimeSession implements IRealtimeSession {
   private currentSound: Audio.Sound | null = null;
   private recording: Audio.Recording | null = null;
   private _isRecording = false;
+  private taskSubtype: string;
 
   onAiAudioReady?: () => void;
   onNeedUserAudio?: () => void;
 
-  constructor(callbacks: RealtimeCallbacks) {
+  constructor(callbacks: RealtimeCallbacks, taskSubtype?: string) {
     this.callbacks = callbacks;
+    this.taskSubtype = taskSubtype ?? 'dialogue';
   }
 
   get isConnected() { return this._isConnected; }
@@ -728,11 +733,11 @@ export class NativeWSRealtimeSession implements IRealtimeSession {
   }
 }
 
-export function createRealtimeSession(callbacks: RealtimeCallbacks): IRealtimeSession {
+export function createRealtimeSession(callbacks: RealtimeCallbacks, taskSubtype?: string): IRealtimeSession {
   if (isWebRTCAvailable()) {
     console.log('[Realtime] Using WebRTC session');
-    return new WebRTCRealtimeSession(callbacks);
+    return new WebRTCRealtimeSession(callbacks, taskSubtype);
   }
   console.log('[Realtime] Using native WebSocket session');
-  return new NativeWSRealtimeSession(callbacks);
+  return new NativeWSRealtimeSession(callbacks, taskSubtype);
 }

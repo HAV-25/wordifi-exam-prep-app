@@ -252,7 +252,7 @@ export default function SprechenRealtimeScreen() {
           console.log('[SprechenRealtime] Error:', msg);
           if (isMountedRef.current) setErrorMsg(msg);
         },
-      });
+      }, taskSubtype);
 
       if (realtimeSession instanceof NativeWSRealtimeSession) {
         realtimeSession.onAiAudioReady = () => {
