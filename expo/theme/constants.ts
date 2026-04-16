@@ -106,7 +106,7 @@ export const MOCK_TEST_QUESTION_COUNTS: Record<string, Record<string, Record<num
   B1: {
     Hören:            { 1: 10, 2: 5, 3: 7, 4: 8 },
     Lesen:            { 1: 6,  2: 6, 3: 7, 4: 7, 5: 4 },
-    Sprachbausteine:  { 1: 1,  2: 1 },
+    // Sprachbausteine: count comes from DB (no override needed)
     Schreiben:        { 1: 1,  2: 1, 3: 1 },
   },
 };

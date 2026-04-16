@@ -138,13 +138,16 @@ export async function fetchAvailableTeile(level: string): Promise<TeilInfo[]> {
   for (const entry of grouped.values()) {
     const examCount = MOCK_TEST_QUESTION_COUNTS[level]?.[entry.section]?.[entry.teil];
     const displayCount = examCount ?? entry.count;
+    // Sprachbausteine questions are gap-fill (each has ~10 blanks) — ~60s per question.
+    // Other sections use ~45s per question.
+    const secsPerQuestion = entry.section === 'Sprachbausteine' ? 60 : 45;
     result.push({
       section: entry.section,
       teil: entry.teil,
       question_type: entry.question_type,
       structure_type: entry.structure_type,
       q_count: displayCount,
-      estimated_minutes: Math.max(1, Math.round((displayCount * 45) / 60)),
+      estimated_minutes: Math.max(1, Math.round((displayCount * secsPerQuestion) / 60)),
     });
   }
 
