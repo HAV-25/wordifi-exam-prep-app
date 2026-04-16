@@ -4,10 +4,11 @@
  * Animation: rows reveal top→down staggered, then progress bar fills, then CTA fades in
  */
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Dimensions, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { ArrowRight } from 'lucide-react-native';
+import ConfettiBurst, { type ConfettiBurstRef } from '@/components/ConfettiBurst';
 import { ScreenLayout } from '@/components/ScreenLayout';
 import {
   onboardingStore,
@@ -58,6 +59,7 @@ export default function PlanBuilderScreen() {
   const buildingOpacity  = useRef(new Animated.Value(0)).current; // fades in with progress, then out
   const ctaOpacity       = useRef(new Animated.Value(0)).current;
   const [done, setDone]  = useState(false);
+  const confettiRef      = useRef<ConfettiBurstRef>(null);
 
   useEffect(() => {
     const rowSeq = rowAnims.map((anim, i) =>
@@ -81,7 +83,11 @@ export default function PlanBuilderScreen() {
     // CTA + footer fade in
     Animated.timing(ctaOpacity, { toValue: 1, duration: 400, delay: CTA_DELAY, useNativeDriver: true }).start(() => setDone(true));
     // Bar fill uses width (non-native) — must run separately
-    Animated.timing(progressWidth, { toValue: 1, duration: PROG_DUR, delay: PROG_DELAY + 300, useNativeDriver: false }).start();
+    Animated.timing(progressWidth, { toValue: 1, duration: PROG_DUR, delay: PROG_DELAY + 300, useNativeDriver: false }).start(() => {
+      // Fire confetti from center of the screen when bar completes
+      const { width, height } = Dimensions.get('window');
+      confettiRef.current?.burst(width / 2, height * 0.45);
+    });
   }, []);
 
   const barWidth = progressWidth.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] });
@@ -113,6 +119,9 @@ export default function PlanBuilderScreen() {
 
   return (
     <View style={styles.root}>
+      {/* Confetti burst — fires when progress bar completes */}
+      <ConfettiBurst ref={confettiRef} />
+
       {/* Decorative orbs */}
       <View style={[styles.orb, styles.orbOne]} />
       <View style={[styles.orb, styles.orbTwo]} />
