@@ -269,6 +269,7 @@ export default function MockScreen() {
         <Pressable style={styles.modalOverlay} onPress={closeSetup}>
           <Pressable style={styles.modalSheet} onPress={() => {}}>
             <View style={styles.modalHandle} />
+            <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
 
             <View style={styles.modalHeader}>
               <Trophy color={Colors.accent} size={28} />
@@ -363,6 +364,7 @@ export default function MockScreen() {
                 </View>
               </View>
             </View>
+            </ScrollView>
           </Pressable>
         </Pressable>
       </Modal>
@@ -576,9 +578,11 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
-    padding: 24,
-    gap: 14,
-    paddingBottom: 24,
+    paddingHorizontal: 24,
+    paddingTop: 20,
+    paddingBottom: 16,
+    gap: 12,
+    maxHeight: '85%',
   },
   modalHandle: {
     width: 40,
