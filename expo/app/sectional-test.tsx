@@ -238,10 +238,15 @@ export default function SectionalTestScreen() {
     if (!currentQuestion) return null;
 
     const category = currentMeta?.question_category;
+    // For hybrid teils (e.g. B1 Hören T1), category is 'hybrid' but individual
+    // questions have question_type 'true_false' or 'mcq'. Check both.
+    const isBinaryByCategory = category === 'true_false' || category === 'yes_no';
+    const isBinaryByQuestionType = currentQuestion.question_type === 'true_false' || currentQuestion.question_type === 'ja_nein';
 
     // True/False or Yes/No — binary horizontal layout
-    if (category === 'true_false' || category === 'yes_no') {
-      const fallbackOpts = category === 'yes_no'
+    if (isBinaryByCategory || isBinaryByQuestionType) {
+      const isYesNo = category === 'yes_no' || currentQuestion.question_type === 'ja_nein';
+      const fallbackOpts = isYesNo
         ? [{ key: 'ja', text: 'Ja' }, { key: 'nein', text: 'Nein' }]
         : [{ key: 'richtig', text: 'Richtig' }, { key: 'falsch', text: 'Falsch' }];
       const opts = currentQuestion.options?.length > 0

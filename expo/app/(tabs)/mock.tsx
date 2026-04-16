@@ -579,10 +579,10 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     paddingHorizontal: 24,
-    paddingTop: 20,
-    paddingBottom: 16,
-    gap: 12,
-    maxHeight: '85%',
+    paddingTop: 24,
+    paddingBottom: 32,
+    gap: 16,
+    maxHeight: '88%',
   },
   modalHandle: {
     width: 40,
@@ -718,7 +718,8 @@ const styles = StyleSheet.create({
     fontWeight: '700' as const,
   },
   modalActions: {
-    gap: 10,
+    gap: 14,
+    paddingTop: 4,
   },
   startButton: {
     minHeight: 54,

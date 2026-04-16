@@ -130,10 +130,13 @@ export default function PracticeScreen() {
     }
 
     const category = meta?.question_category;
+    const isBinaryByCategory = category === 'true_false' || category === 'yes_no';
+    const isBinaryByQuestionType = currentQuestion.question_type === 'true_false' || currentQuestion.question_type === 'ja_nein';
 
     // True/False or Yes/No — binary horizontal layout
-    if (category === 'true_false' || category === 'yes_no') {
-      const fallbackOpts = category === 'yes_no'
+    if (isBinaryByCategory || isBinaryByQuestionType) {
+      const isYesNo = category === 'yes_no' || currentQuestion.question_type === 'ja_nein';
+      const fallbackOpts = isYesNo
         ? [{ key: 'ja', text: 'Ja' }, { key: 'nein', text: 'Nein' }]
         : [{ key: 'richtig', text: 'Richtig' }, { key: 'falsch', text: 'Falsch' }];
       const dbOptions = currentQuestion.options.length > 0
