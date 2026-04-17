@@ -176,7 +176,7 @@ export default function MockTestV2Screen() {
         try {
           const scores = await completeMockV2(mockTestId, results as SavedSectionResult[]);
           router.replace({
-            pathname: '/mock-results',
+            pathname: '/mock-results-v2' as any,
             params: {
               mockTestId,
               level,
@@ -185,7 +185,6 @@ export default function MockTestV2Screen() {
               set2ScorePct: String(scores.set2Pct),
               overallPass: scores.overallPass ? '1' : '0',
               resultsJson: JSON.stringify(results),
-              v2: '1',
             },
           });
         } catch (err) {
