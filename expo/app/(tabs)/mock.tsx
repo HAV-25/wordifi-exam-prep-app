@@ -19,6 +19,7 @@ import { PaywallModal } from '@/components/PaywallModal';
 import Colors from '@/constants/colors';
 import { MOCK_V2_ENABLED } from '@/lib/featureFlags';
 import { abandonMockV2, fetchResumableMockV2 } from '@/lib/mockV2Helpers';
+import { getBlueprint } from '@/lib/examBlueprint';
 import {
   checkMockRetestAvailability,
   fetchMockQuestions,
@@ -200,6 +201,29 @@ export default function MockScreen() {
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          {/* Resume banner — shows if a V2 session is pending */}
+          {MOCK_V2_ENABLED && resumable ? (
+            <View style={styles.resumeBanner}>
+              <View style={styles.resumeBannerLeft}>
+                <Trophy color={Colors.accent} size={22} />
+                <View style={styles.resumeBannerText}>
+                  <Text style={styles.resumeBannerTitle}>Mock Test in progress</Text>
+                  <Text style={styles.resumeBannerSub}>
+                    {resumable.level} · Saved {new Date(resumable.savedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.resumeBannerActions}>
+                <Pressable style={styles.resumeBtn} onPress={handleResume} testID="mock-resume-btn">
+                  <Text style={styles.resumeBtnText}>Resume</Text>
+                </Pressable>
+                <Pressable onPress={handleStartFresh} testID="mock-discard-btn" hitSlop={8}>
+                  <X color={Colors.textMuted} size={18} />
+                </Pressable>
+              </View>
+            </View>
+          ) : null}
+
           {allLevels.map((level) => {
             const isTarget = level === targetLevel;
             const levelInfo = isTarget ? info : null;
@@ -353,14 +377,47 @@ export default function MockScreen() {
                   <Text style={styles.sectionCellTime}>{timing.lesenMinutes} min</Text>
                 </View>
               </View>
-              <View style={[styles.sectionCell, styles.sectionCellLocked]}>
-                <PenLine color={Colors.textMuted} size={22} />
-                <Text style={[styles.sectionCellName, styles.sectionCellNameMuted]}>Schreiben</Text>
-              </View>
-              <View style={[styles.sectionCell, styles.sectionCellLocked]}>
-                <Mic color={Colors.textMuted} size={22} />
-                <Text style={[styles.sectionCellName, styles.sectionCellNameMuted]}>Sprechen</Text>
-              </View>
+              {MOCK_V2_ENABLED ? (
+                <>
+                  <View style={[styles.sectionCell, styles.sectionCellActive]}>
+                    <PenLine color="#8B5CF6" size={22} />
+                    <Text style={styles.sectionCellName}>Schreiben</Text>
+                    <View style={styles.sectionCellMeta}>
+                      <Text style={styles.sectionCellQ}>
+                        {getBlueprint(targetLevel).find((s) => s.section === 'Schreiben')?.teils.length ?? 0} tasks
+                      </Text>
+                      <View style={styles.sectionCellDot} />
+                      <Text style={styles.sectionCellTime}>
+                        {getBlueprint(targetLevel).find((s) => s.section === 'Schreiben')?.timeMinutes ?? 0} min
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={[styles.sectionCell, styles.sectionCellActive]}>
+                    <Mic color="#F97316" size={22} />
+                    <Text style={styles.sectionCellName}>Sprechen</Text>
+                    <View style={styles.sectionCellMeta}>
+                      <Text style={styles.sectionCellQ}>
+                        {getBlueprint(targetLevel).find((s) => s.section === 'Sprechen')?.teils.length ?? 0} tasks
+                      </Text>
+                      <View style={styles.sectionCellDot} />
+                      <Text style={styles.sectionCellTime}>
+                        {getBlueprint(targetLevel).find((s) => s.section === 'Sprechen')?.timeMinutes ?? 0} min
+                      </Text>
+                    </View>
+                  </View>
+                </>
+              ) : (
+                <>
+                  <View style={[styles.sectionCell, styles.sectionCellLocked]}>
+                    <PenLine color={Colors.textMuted} size={22} />
+                    <Text style={[styles.sectionCellName, styles.sectionCellNameMuted]}>Schreiben</Text>
+                  </View>
+                  <View style={[styles.sectionCell, styles.sectionCellLocked]}>
+                    <Mic color={Colors.textMuted} size={22} />
+                    <Text style={[styles.sectionCellName, styles.sectionCellNameMuted]}>Sprechen</Text>
+                  </View>
+                </>
+              )}
               {targetLevel === 'B1' ? (
                 <View style={[styles.sectionCell, styles.sectionCellActive, styles.sectionCellFullWidth]}>
                   <Puzzle color="#A37A00" size={22} />
@@ -499,6 +556,26 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600' as const,
   },
+  resumeBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFFBEB',
+    borderColor: '#FDE68A',
+    borderWidth: 1,
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    marginBottom: 16,
+    gap: 12,
+  },
+  resumeBannerLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
+  resumeBannerText: { flex: 1 },
+  resumeBannerTitle: { fontSize: 14, fontWeight: '800' as const, color: '#92400E' },
+  resumeBannerSub: { fontSize: 12, fontWeight: '500' as const, color: '#B45309', marginTop: 2 },
+  resumeBannerActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  resumeBtn: { backgroundColor: Colors.primary, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8 },
+  resumeBtnText: { color: '#fff', fontSize: 13, fontWeight: '800' as const },
   scrollContent: {
     padding: 20,
     paddingTop: 8,
