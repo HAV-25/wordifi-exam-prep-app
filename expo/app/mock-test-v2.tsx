@@ -31,6 +31,12 @@ import {
 } from '@/lib/examBlueprint';
 import { MOCK_V2_ENABLED } from '@/lib/featureFlags';
 import { useAuth } from '@/providers/AuthProvider';
+import { supabase } from '@/lib/supabaseClient';
+import { shuffleArray } from '@/theme/constants';
+import type { AppQuestion } from '@/types/database';
+import { SectionPlayerMCQ, type MCQSectionResult } from '@/components/mockv2/SectionPlayerMCQ';
+import { SectionPlayerSchreiben, type SchreibenSectionResult } from '@/components/mockv2/SectionPlayerSchreiben';
+import { SectionPlayerSprechen, type SprechenSectionResult } from '@/components/mockv2/SectionPlayerSprechen';
 
 // ─── Phase state machine ──────────────────────────────────────────────────────
 type Phase =
@@ -136,7 +142,7 @@ export default function MockTestV2Screen() {
     return (
       <SafeAreaView style={styles.screen}>
         <Stack.Screen options={{ title: '', headerShown: true, headerBackVisible: false }} />
-        <SectionPlaceholder
+        <SectionRouter
           level={level}
           section={section}
           sectionIndex={phase.sectionIndex}
@@ -182,8 +188,8 @@ export default function MockTestV2Screen() {
   return null;
 }
 
-// ─── Section placeholder (Phase 2 will replace with real players) ───────────
-function SectionPlaceholder({
+// ─── Section router — picks the right player per section type ──────────────
+function SectionRouter({
   level,
   section,
   sectionIndex,
@@ -198,38 +204,133 @@ function SectionPlaceholder({
   onComplete: (result: SectionResult) => void;
   onPause: () => void;
 }) {
-  return (
-    <View style={styles.placeholderWrap}>
-      <Text style={styles.placeholderLabel}>
-        Section {sectionIndex + 1} of {totalSections}
-      </Text>
-      <Text style={styles.placeholderTitle}>{section.section}</Text>
-      <Text style={styles.placeholderSub}>
-        {level} · {section.timeMinutes} min · {section.teils.length} Teile
-      </Text>
-      <Text style={styles.placeholderNote}>
-        Section player coming in Phase 2. Tap below to simulate completion.
-      </Text>
-      <Pressable
-        style={styles.simulateBtn}
-        onPress={() =>
-          onComplete({
-            section: section.section,
-            scorePct: 75,
-            questionsCorrect: 15,
-            questionsTotal: 20,
-            timeTakenSeconds: 120,
-          })
+  const [questions, setQuestions] = useState<AppQuestion[] | null>(null);
+  const timeLimitSec = section.timeMinutes * 60;
+
+  useEffect(() => {
+    if (section.section === 'Schreiben' || section.section === 'Sprechen') {
+      setQuestions([]); // These players fetch their own
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from('app_questions')
+        .select('*')
+        .eq('level', level)
+        .eq('section', section.section)
+        .eq('is_active', true);
+      const all = (data ?? []) as AppQuestion[];
+
+      // Pick questions per teil according to blueprint
+      const picked: AppQuestion[] = [];
+      section.teils.forEach((teil, ti) => {
+        const teilPool = all.filter((q) => q.teil === teil);
+        const target = section.questionsPerTeil?.[ti] ?? teilPool.length;
+        // Group by source_clip_id to preserve hybrid pairs
+        const clipGroups = new Map<string, AppQuestion[]>();
+        for (const q of teilPool) {
+          const key = q.source_clip_id ?? q.id;
+          const group = clipGroups.get(key) ?? [];
+          group.push(q);
+          clipGroups.set(key, group);
         }
-      >
-        <Text style={styles.simulateBtnText}>Simulate: Complete with 75%</Text>
-      </Pressable>
-      <Pressable style={styles.pauseBtn} onPress={onPause}>
-        <Pause color={B.muted} size={16} />
-        <Text style={styles.pauseBtnText}>Pause & resume later</Text>
-      </Pressable>
-    </View>
-  );
+        const shuffledGroups = shuffleArray(Array.from(clipGroups.values()));
+        const out: AppQuestion[] = [];
+        for (const g of shuffledGroups) {
+          if (out.length >= target) break;
+          out.push(...g);
+        }
+        const trimmed = out.slice(0, target).sort((a, b) => {
+          const ca = a.source_clip_id ?? '', cb = b.source_clip_id ?? '';
+          if (ca !== cb) return ca < cb ? -1 : 1;
+          return (a.question_number ?? 0) - (b.question_number ?? 0);
+        });
+        picked.push(...trimmed);
+      });
+
+      if (!cancelled) setQuestions(picked);
+    })();
+    return () => { cancelled = true; };
+  }, [level, section.section, section.teils, section.questionsPerTeil]);
+
+  if (!questions) {
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator color={B.primary} size="large" />
+        <Text style={styles.loadingText}>Loading {section.section}...</Text>
+      </View>
+    );
+  }
+
+  // MCQ/TF sections (Hören, Lesen, Sprachbausteine)
+  if (section.section === 'Hören' || section.section === 'Lesen' || section.section === 'Sprachbausteine') {
+    if (questions.length === 0) {
+      return (
+        <View style={styles.center}>
+          <Text style={styles.loadingText}>No {section.section} questions available for {level}.</Text>
+          <Pressable
+            style={styles.simulateBtn}
+            onPress={() => onComplete({ section: section.section, scorePct: 0, questionsCorrect: 0, questionsTotal: 0, timeTakenSeconds: 0 })}
+          >
+            <Text style={styles.simulateBtnText}>Skip section</Text>
+          </Pressable>
+        </View>
+      );
+    }
+    return (
+      <SectionPlayerMCQ
+        level={level}
+        section={section.section}
+        questions={questions}
+        timeLimitSeconds={timeLimitSec}
+        sectionIndex={sectionIndex}
+        totalSections={totalSections}
+        onComplete={(r: MCQSectionResult) => onComplete({
+          section: section.section,
+          scorePct: r.scorePct,
+          questionsCorrect: r.questionsCorrect,
+          questionsTotal: r.questionsTotal,
+          timeTakenSeconds: r.timeTakenSeconds,
+        })}
+      />
+    );
+  }
+
+  if (section.section === 'Schreiben') {
+    return (
+      <SectionPlayerSchreiben
+        level={level}
+        teils={section.teils}
+        timeLimitSeconds={timeLimitSec}
+        sectionIndex={sectionIndex}
+        totalSections={totalSections}
+        onComplete={(r: SchreibenSectionResult) => onComplete({
+          section: 'Schreiben',
+          scorePct: r.overallScorePct,
+          timeTakenSeconds: r.timeTakenSeconds,
+        })}
+      />
+    );
+  }
+
+  if (section.section === 'Sprechen') {
+    return (
+      <SectionPlayerSprechen
+        level={level}
+        teils={section.teils}
+        sectionIndex={sectionIndex}
+        totalSections={totalSections}
+        onComplete={(r: SprechenSectionResult) => onComplete({
+          section: 'Sprechen',
+          scorePct: r.overallScorePct,
+          timeTakenSeconds: r.timeTakenSeconds,
+        })}
+      />
+    );
+  }
+
+  return null;
 }
 
 // ─── Transition screen between sections ─────────────────────────────────────
