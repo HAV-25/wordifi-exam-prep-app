@@ -67,7 +67,7 @@ export default function TimelineScreen() {
           <View style={styles.navSpacer} />
         </View>
 
-        <ScreenLayout footer={ctaFooter} contentContainerStyle={styles.scroll}>
+        <ScreenLayout footer={ctaFooter} contentContainerStyle={styles.scroll} backgroundColor="transparent">
           {/* Headline */}
           <Text style={styles.headline}>How long until your exam date?</Text>
           <Text style={styles.subCopy}>Every window is the right window. What matters is starting today.</Text>

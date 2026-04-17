@@ -108,7 +108,7 @@ export default function TrialTransparencyScreen() {
       <GlowOrb top={-100} right={-100} />
 
       <SafeAreaView edges={['top']} style={styles.safe}>
-        <ScreenLayout footer={ctaFooter} contentContainerStyle={styles.scroll} backgroundColor={colors.background}>
+        <ScreenLayout footer={ctaFooter} contentContainerStyle={styles.scroll} backgroundColor="transparent">
 
           {/* Header */}
           <View style={styles.header}>

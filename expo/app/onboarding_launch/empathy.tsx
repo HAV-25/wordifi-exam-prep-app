@@ -70,7 +70,7 @@ export default function EmpathyScreen() {
           <View style={styles.navSpacer} />
         </View>
 
-        <ScreenLayout footer={ctaFooter} contentContainerStyle={styles.scroll}>
+        <ScreenLayout footer={ctaFooter} contentContainerStyle={styles.scroll} backgroundColor="transparent">
           {/* Headline */}
           <Text style={styles.headline}>This exam matters. Tell us why.</Text>
 

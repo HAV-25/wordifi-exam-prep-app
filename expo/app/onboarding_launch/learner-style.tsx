@@ -58,7 +58,7 @@ export default function LearnerStyleScreen() {
           <Text style={styles.stepLabel}>Step 8 of 10</Text>
         </View>
 
-        <ScreenLayout footer={ctaFooter} contentContainerStyle={styles.scroll}>
+        <ScreenLayout footer={ctaFooter} contentContainerStyle={styles.scroll} backgroundColor="transparent">
           <Text style={styles.headline}>Which style describes you best?</Text>
           <Text style={styles.subCopy}>Pick the one that feels most like you.</Text>
 

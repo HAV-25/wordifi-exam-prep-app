@@ -157,7 +157,7 @@ export default function PlanSummaryScreen() {
       <GlowOrb top={-100} right={-100} />
 
       <SafeAreaView edges={['top']} style={styles.safe}>
-        <ScreenLayout footer={ctaFooter} contentContainerStyle={styles.scroll} backgroundColor={colors.background}>
+        <ScreenLayout footer={ctaFooter} contentContainerStyle={styles.scroll} backgroundColor="transparent">
 
           {/* ── Header (static) ──────────────────────────────────────────────── */}
           <View style={styles.header}>
