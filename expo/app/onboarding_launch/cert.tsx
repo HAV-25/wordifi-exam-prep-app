@@ -10,6 +10,7 @@ import { router } from 'expo-router';
 import { onboardingStore } from './_store';
 import { ArrowLeft } from 'lucide-react-native';
 import { ScreenLayout } from '@/components/ScreenLayout';
+import { ConvictionAnswerCard } from '@/components/onboarding/ConvictionAnswerCard';
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 
@@ -22,10 +23,19 @@ const CERTS: { id: CertId; emoji: string; title: string; subtitle: string }[] = 
   { id: 'not_sure', emoji: '🤔', title: 'Not sure yet',    subtitle: "We'll help you figure out the right one" },
 ];
 
+// Conviction copy for Screen 02 — hardcoded per OB-01; moves to shared lookup in OB-05
+const CERT_CONVICTIONS: Record<CertId, { emoji: string; copy: string }> = {
+  goethe:   { emoji: '🎓', copy: 'Perfect. Wordifi has every Goethe section covered.' },
+  telc:     { emoji: '✅', copy: "Smart. Wordifi's mock tests are built for TELC." },
+  osd:      { emoji: '🏅', copy: 'Exactly right. Wordifi knows every ÖSD section.' },
+  not_sure: { emoji: '💡', copy: 'No problem. Wordifi will find the right exam for you.' },
+};
+
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function CertScreen() {
   const [selected, setSelected] = useState<CertId | null>(null);
+  const [continueActive, setContinueActive] = useState(false);
 
   function handleContinue() {
     if (!selected) return;
@@ -36,16 +46,16 @@ export default function CertScreen() {
   const ctaFooter = (
     <Pressable
       onPress={handleContinue}
-      disabled={!selected}
+      disabled={!continueActive}
       style={({ pressed }) => [
         styles.ctaButton,
-        !selected && styles.ctaDisabled,
-        pressed && selected && styles.ctaPressed,
+        !continueActive && styles.ctaDisabled,
+        pressed && continueActive && styles.ctaPressed,
       ]}
       accessibilityRole="button"
       accessibilityLabel="Continue"
     >
-      <Text style={[styles.ctaText, !selected && styles.ctaTextDisabled]}>Continue →</Text>
+      <Text style={[styles.ctaText, !continueActive && styles.ctaTextDisabled]}>Continue →</Text>
     </Pressable>
   );
 
@@ -73,16 +83,14 @@ export default function CertScreen() {
           {/* Cards */}
           <View style={styles.cardList}>
             {CERTS.map((cert) => (
-              <Pressable
+              <ConvictionAnswerCard
                 key={cert.id}
+                conviction={CERT_CONVICTIONS[cert.id]}
+                isSelected={selected === cert.id}
                 onPress={() => setSelected(cert.id)}
-                style={({ pressed }) => [
-                  styles.card,
-                  selected === cert.id && styles.cardSelected,
-                  pressed && styles.cardPressed,
-                ]}
-                accessibilityRole="radio"
-                accessibilityState={{ selected: selected === cert.id }}
+                onFlipComplete={() => setContinueActive(true)}
+                cardStyle={styles.card}
+                cardBorderRadius={12}
                 accessibilityLabel={cert.title}
               >
                 <Text style={styles.emoji}>{cert.emoji}</Text>
@@ -92,7 +100,7 @@ export default function CertScreen() {
                   </Text>
                   <Text style={styles.cardSubtitle}>{cert.subtitle}</Text>
                 </View>
-              </Pressable>
+              </ConvictionAnswerCard>
             ))}
           </View>
         </ScreenLayout>
