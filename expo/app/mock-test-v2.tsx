@@ -9,10 +9,11 @@
  */
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { ArrowRight, Pause, Trophy } from 'lucide-react-native';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  AppState,
   BackHandler,
   Platform,
   Pressable,
@@ -37,6 +38,12 @@ import type { AppQuestion } from '@/types/database';
 import { SectionPlayerMCQ, type MCQSectionResult } from '@/components/mockv2/SectionPlayerMCQ';
 import { SectionPlayerSchreiben, type SchreibenSectionResult } from '@/components/mockv2/SectionPlayerSchreiben';
 import { SectionPlayerSprechen, type SprechenSectionResult } from '@/components/mockv2/SectionPlayerSprechen';
+import {
+  completeMockV2,
+  createMockV2Session,
+  saveMockV2State,
+  type SavedSectionResult,
+} from '@/lib/mockV2Helpers';
 
 // ─── Phase state machine ──────────────────────────────────────────────────────
 type Phase =
@@ -56,26 +63,75 @@ type SectionResult = {
 };
 
 export default function MockTestV2Screen() {
-  const params = useLocalSearchParams<{ level?: string; mockTestId?: string }>();
-  const { profile } = useAuth();
+  const params = useLocalSearchParams<{
+    level?: string;
+    mockTestId?: string;
+    resumeStateJson?: string;
+  }>();
+  const { profile, user } = useAuth();
   const level = params.level ?? profile?.target_level ?? 'B1';
+  const userId = user?.id ?? '';
 
   const blueprint = useMemo(() => getBlueprint(level), [level]);
 
   const [phase, setPhase] = useState<Phase>({ type: 'loading' });
   const [results, setResults] = useState<SectionResult[]>([]);
-  const mockTestId = params.mockTestId ?? '';
+  const [mockTestId, setMockTestId] = useState<string>(params.mockTestId ?? '');
+  const sessionStartedAtRef = useRef<string>(new Date().toISOString());
 
-  // ── Feature flag gate ────────────────────────────────────────────────────
+  // ── Feature flag gate + session init (fresh or resumed) ──────────────────
   useEffect(() => {
     if (!MOCK_V2_ENABLED) {
       console.log('[MockV2] Flag OFF — redirecting to /mock-test');
       router.replace('/mock-test');
       return;
     }
-    // Start with first section
-    setPhase({ type: 'section', sectionIndex: 0 });
+    (async () => {
+      try {
+        // Resume path: params includes an existing mockTestId + resumeStateJson
+        if (params.mockTestId && params.resumeStateJson) {
+          const saved = JSON.parse(params.resumeStateJson) as {
+            phaseSectionIndex: number;
+            results: SavedSectionResult[];
+            startedAt: string;
+          };
+          sessionStartedAtRef.current = saved.startedAt;
+          setResults(saved.results as SectionResult[]);
+          setPhase({ type: 'section', sectionIndex: saved.phaseSectionIndex });
+          console.log('[MockV2] Resumed at section', saved.phaseSectionIndex);
+          return;
+        }
+        // Fresh start
+        if (userId) {
+          const id = await createMockV2Session(userId, level, profile?.exam_type ?? 'TELC');
+          setMockTestId(id);
+        }
+        setPhase({ type: 'section', sectionIndex: 0 });
+      } catch (err) {
+        console.log('[MockV2] init error', err);
+        setPhase({ type: 'section', sectionIndex: 0 });
+      }
+    })();
   }, []);
+
+  // ── AppState listener: save on background ───────────────────────────────
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (next) => {
+      if (next === 'background' && mockTestId && phase.type === 'section') {
+        void saveMockV2State(
+          mockTestId,
+          {
+            level,
+            phaseSectionIndex: phase.sectionIndex,
+            results: results as SavedSectionResult[],
+            startedAt: sessionStartedAtRef.current,
+          },
+          blueprint[phase.sectionIndex]?.section ?? 'horen'
+        );
+      }
+    });
+    return () => sub.remove();
+  }, [mockTestId, phase, results, level, blueprint]);
 
   // ── Android back button handler ──────────────────────────────────────────
   useEffect(() => {
@@ -88,24 +144,61 @@ export default function MockTestV2Screen() {
   }, []);
 
   // ── Phase transitions ────────────────────────────────────────────────────
-  const handleSectionComplete = useCallback((result: SectionResult) => {
-    setResults((prev) => [...prev, result]);
+  const handleSectionComplete = useCallback(async (result: SectionResult) => {
+    const newResults = [...results, result];
+    setResults(newResults);
     setPhase((prev) => {
       if (prev.type !== 'section') return prev;
       return { type: 'transition', fromSectionIndex: prev.sectionIndex };
     });
-  }, []);
+    // Save after each section (completed section included in state)
+    if (mockTestId && phase.type === 'section') {
+      await saveMockV2State(
+        mockTestId,
+        {
+          level,
+          phaseSectionIndex: phase.sectionIndex + 1, // next section to play
+          results: newResults as SavedSectionResult[],
+          startedAt: sessionStartedAtRef.current,
+        },
+        blueprint[phase.sectionIndex + 1]?.section ?? 'completed'
+      );
+    }
+  }, [results, mockTestId, phase, level, blueprint]);
 
-  const handleContinueToNext = useCallback(() => {
-    setPhase((prev) => {
-      if (prev.type !== 'transition') return prev;
-      const nextIndex = prev.fromSectionIndex + 1;
-      if (nextIndex >= blueprint.length) {
-        return { type: 'submitting' };
+  const handleContinueToNext = useCallback(async () => {
+    if (phase.type !== 'transition') return;
+    const nextIndex = phase.fromSectionIndex + 1;
+    if (nextIndex >= blueprint.length) {
+      // All sections done → finalize
+      setPhase({ type: 'submitting' });
+      if (mockTestId) {
+        try {
+          const scores = await completeMockV2(mockTestId, results as SavedSectionResult[]);
+          router.replace({
+            pathname: '/mock-results',
+            params: {
+              mockTestId,
+              level,
+              overallScorePct: String(scores.overallPct),
+              set1ScorePct: String(scores.set1Pct),
+              set2ScorePct: String(scores.set2Pct),
+              overallPass: scores.overallPass ? '1' : '0',
+              resultsJson: JSON.stringify(results),
+              v2: '1',
+            },
+          });
+        } catch (err) {
+          console.log('[MockV2] completion error', err);
+          setPhase({ type: 'completed' });
+        }
+      } else {
+        setPhase({ type: 'completed' });
       }
-      return { type: 'section', sectionIndex: nextIndex };
-    });
-  }, [blueprint.length]);
+      return;
+    }
+    setPhase({ type: 'section', sectionIndex: nextIndex });
+  }, [phase, blueprint, mockTestId, results, level]);
 
   const handlePauseAndExit = useCallback(() => {
     Alert.alert(
@@ -116,15 +209,25 @@ export default function MockTestV2Screen() {
         {
           text: 'Save & exit',
           style: 'destructive',
-          onPress: () => {
-            // TODO Phase 3: save state to mock_tests.saved_state
-            console.log('[MockV2] Pause & exit — save state here');
+          onPress: async () => {
+            if (mockTestId && phase.type === 'section') {
+              await saveMockV2State(
+                mockTestId,
+                {
+                  level,
+                  phaseSectionIndex: phase.sectionIndex,
+                  results: results as SavedSectionResult[],
+                  startedAt: sessionStartedAtRef.current,
+                },
+                blueprint[phase.sectionIndex]?.section ?? 'horen'
+              );
+            }
             router.back();
           },
         },
       ]
     );
-  }, []);
+  }, [mockTestId, phase, results, level, blueprint]);
 
   // ── Render ───────────────────────────────────────────────────────────────
   if (phase.type === 'loading') {

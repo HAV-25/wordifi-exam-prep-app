@@ -17,6 +17,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { EmptyState } from '@/components/EmptyState';
 import { PaywallModal } from '@/components/PaywallModal';
 import Colors from '@/constants/colors';
+import { MOCK_V2_ENABLED } from '@/lib/featureFlags';
+import { abandonMockV2, fetchResumableMockV2 } from '@/lib/mockV2Helpers';
 import {
   checkMockRetestAvailability,
   fetchMockQuestions,
@@ -70,6 +72,15 @@ export default function MockScreen() {
   const info = infoQuery.data ?? null;
   const timing = getMockTiming(targetLevel);
 
+  // Resumable V2 session query
+  const resumeQuery = useQuery({
+    queryKey: ['mock-v2-resumable', userId],
+    enabled: Boolean(userId) && MOCK_V2_ENABLED,
+    queryFn: () => fetchResumableMockV2(userId),
+    staleTime: 30_000,
+  });
+  const resumable = resumeQuery.data ?? null;
+
   const openSetup = useCallback(async () => {
     if (!info) return;
     if (!mockEnabled) {
@@ -111,6 +122,17 @@ export default function MockScreen() {
     if (setup.isStarting || setup.isLocked) return;
     setSetup((prev) => ({ ...prev, isStarting: true }));
 
+    // ── V2 flow: route to /mock-test-v2 ─────────────────────────────────
+    if (MOCK_V2_ENABLED) {
+      setSetup((prev) => ({ ...prev, visible: false, isStarting: false }));
+      router.push({
+        pathname: '/mock-test-v2' as any,
+        params: { level: targetLevel },
+      });
+      return;
+    }
+
+    // ── V1 flow (original): fetch Hören/Lesen/Sprachbausteine ───────────
     try {
       const questions = await fetchMockQuestions(targetLevel);
       if (questions.horen.length === 0 && questions.lesen.length === 0) {
@@ -137,6 +159,27 @@ export default function MockScreen() {
       setSetup((prev) => ({ ...prev, isStarting: false }));
     }
   }, [setup.isStarting, setup.isLocked, setup.isTimed, targetLevel, examType]);
+
+  // Handle resume tap from the resume banner
+  const handleResume = useCallback(() => {
+    if (!resumable) return;
+    router.push({
+      pathname: '/mock-test-v2' as any,
+      params: {
+        level: resumable.level,
+        mockTestId: resumable.id,
+        resumeStateJson: JSON.stringify(resumable.savedState),
+      },
+    });
+  }, [resumable]);
+
+  // Handle start fresh (abandon existing resumable)
+  const handleStartFresh = useCallback(async () => {
+    if (resumable) {
+      await abandonMockV2(resumable.id);
+      await resumeQuery.refetch();
+    }
+  }, [resumable, resumeQuery]);
 
   const allLevels = ['A1', 'A2', 'B1'] as const;
 
