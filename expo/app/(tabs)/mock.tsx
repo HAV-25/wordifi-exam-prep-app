@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
-import { BookOpen, Clock, Headphones, Lock, Monitor, Play, Shield, Trophy, X } from 'lucide-react-native';
+import { BookOpen, Clock, Headphones, Lock, Mic, Monitor, PenLine, Play, Puzzle, Shield, Sparkles, Trophy, X } from 'lucide-react-native';
 import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
@@ -272,36 +272,63 @@ export default function MockScreen() {
             <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
 
             <View style={styles.modalHeader}>
-              <Trophy color={Colors.accent} size={28} />
+              <View style={styles.modalIconWrap}>
+                <Trophy color={Colors.accent} size={26} />
+              </View>
               <View style={styles.modalHeaderText}>
                 <Text style={styles.modalTitle}>Mock Exam — {targetLevel}</Text>
-                <Text style={styles.modalSubtitle}>Hören + Lesen</Text>
+                <Text style={styles.modalSubtitle}>Complete exam simulation</Text>
               </View>
               <Pressable
                 accessibilityLabel="Cancel"
                 onPress={closeSetup}
                 hitSlop={8}
+                style={styles.modalClose}
                 testID="cancel-mock-button"
               >
-                <X color={Colors.textMuted} size={22} />
+                <X color={Colors.textMuted} size={18} />
               </Pressable>
             </View>
 
-            <View style={styles.timingCard}>
-              <Text style={styles.timingTitle}>Section Timing</Text>
-              <View style={styles.timingRow}>
-                <View style={styles.timingItem}>
-                  <Headphones color="#1565C0" size={16} />
-                  <Text style={styles.timingLabel}>Hören</Text>
-                  <Text style={styles.timingValue}>{timing.horenMinutes} min</Text>
-                </View>
-                <View style={styles.timingDivider} />
-                <View style={styles.timingItem}>
-                  <BookOpen color="#6A1B9A" size={16} />
-                  <Text style={styles.timingLabel}>Lesen</Text>
-                  <Text style={styles.timingValue}>{timing.lesenMinutes} min</Text>
+            {/* Section grid: Row 1 Hören + Lesen, Row 2 Schreiben + Sprechen, Row 3 Sprachbausteine (B1 only) */}
+            <View style={styles.sectionGrid}>
+              <View style={[styles.sectionCell, styles.sectionCellActive]}>
+                <Headphones color="#2B70EF" size={22} />
+                <Text style={styles.sectionCellName}>Hören</Text>
+                <View style={styles.sectionCellMeta}>
+                  {info ? <Text style={styles.sectionCellQ}>{info.horenCount} Q</Text> : null}
+                  {info ? <View style={styles.sectionCellDot} /> : null}
+                  <Text style={styles.sectionCellTime}>{timing.horenMinutes} min</Text>
                 </View>
               </View>
+              <View style={[styles.sectionCell, styles.sectionCellActive]}>
+                <BookOpen color="#22C55E" size={22} />
+                <Text style={styles.sectionCellName}>Lesen</Text>
+                <View style={styles.sectionCellMeta}>
+                  {info ? <Text style={styles.sectionCellQ}>{info.lesenCount} Q</Text> : null}
+                  {info ? <View style={styles.sectionCellDot} /> : null}
+                  <Text style={styles.sectionCellTime}>{timing.lesenMinutes} min</Text>
+                </View>
+              </View>
+              <View style={[styles.sectionCell, styles.sectionCellLocked]}>
+                <PenLine color={Colors.textMuted} size={22} />
+                <Text style={[styles.sectionCellName, styles.sectionCellNameMuted]}>Schreiben</Text>
+              </View>
+              <View style={[styles.sectionCell, styles.sectionCellLocked]}>
+                <Mic color={Colors.textMuted} size={22} />
+                <Text style={[styles.sectionCellName, styles.sectionCellNameMuted]}>Sprechen</Text>
+              </View>
+              {targetLevel === 'B1' ? (
+                <View style={[styles.sectionCell, styles.sectionCellActive, styles.sectionCellFullWidth]}>
+                  <Puzzle color="#A37A00" size={22} />
+                  <Text style={styles.sectionCellName}>Sprachbausteine</Text>
+                  <View style={styles.sectionCellMeta}>
+                    <Text style={styles.sectionCellQ}>20 Q</Text>
+                    <View style={styles.sectionCellDot} />
+                    <Text style={styles.sectionCellTime}>15 min</Text>
+                  </View>
+                </View>
+              ) : null}
             </View>
 
             <Pressable
@@ -356,11 +383,14 @@ export default function MockScreen() {
                   </>
                 )}
               </Pressable>
-              <View style={[styles.desktopButton, { opacity: 0.55 }]}>
-                <Monitor color={Colors.textMuted} size={16} />
-                <Text style={[styles.desktopButtonText, { color: Colors.textMuted }]}>Continue on Computer</Text>
-                <View style={styles.comingSoonPill}>
-                  <Text style={styles.comingSoonText}>Coming Soon</Text>
+              <View style={styles.desktopButtonWrap}>
+                <View style={styles.floatingPill}>
+                  <Text style={styles.floatingPillText}>Coming Soon</Text>
+                  <Sparkles color="#374151" size={10} />
+                </View>
+                <View style={[styles.desktopButton, { opacity: 0.55 }]}>
+                  <Monitor color={Colors.textMuted} size={16} />
+                  <Text style={[styles.desktopButtonText, { color: Colors.textMuted }]}>Continue on Computer</Text>
                 </View>
               </View>
             </View>
@@ -618,8 +648,114 @@ const styles = StyleSheet.create({
   },
   modalSubtitle: {
     fontSize: 14,
+    fontWeight: '500' as const,
+    color: Colors.textMuted,
+  },
+  modalIconWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: 'rgba(0,229,182,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalClose: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // ─── Section grid ─────────────────────────────────────────────────────────
+  sectionGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  sectionCell: {
+    width: '48.5%',
+    minHeight: 92,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingVertical: 16,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    position: 'relative',
+  },
+  sectionCellActive: {
+    backgroundColor: '#FFFFFF',
+  },
+  sectionCellLocked: {
+    backgroundColor: '#FAFAFA',
+    borderColor: '#F1F5F9',
+    opacity: 0.5,
+  },
+  sectionCellFullWidth: {
+    width: '100%',
+  },
+  sectionCellName: {
+    fontSize: 13,
+    fontWeight: '700' as const,
+    color: '#374151',
+    textAlign: 'center',
+  },
+  sectionCellNameMuted: {
+    color: Colors.textMuted,
+  },
+  sectionCellMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  sectionCellQ: {
+    fontSize: 12,
+    fontWeight: '700' as const,
+    color: Colors.primary,
+  },
+  sectionCellTime: {
+    fontSize: 11,
     fontWeight: '600' as const,
     color: Colors.textMuted,
+  },
+  sectionCellDot: {
+    width: 3,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: '#CBD5E1',
+  },
+
+  // ─── Floating pill (for "Continue on Computer") ──────────────────────────
+  desktopButtonWrap: {
+    position: 'relative',
+  },
+  floatingPill: {
+    position: 'absolute',
+    top: -11,
+    right: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#F0C808',
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    zIndex: 2,
+    shadowColor: '#F0C808',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+  floatingPillText: {
+    fontSize: 10,
+    fontWeight: '800' as const,
+    color: '#374151',
+    letterSpacing: 0.2,
   },
   timingCard: {
     backgroundColor: Colors.surfaceMuted,
@@ -762,13 +898,14 @@ const styles = StyleSheet.create({
     fontWeight: '700' as const,
   },
   desktopButton: {
-    minHeight: 48,
-    borderRadius: 24,
-    backgroundColor: Colors.surfaceMuted,
+    minHeight: 52,
+    borderRadius: 999,
+    backgroundColor: '#F1F5F9',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: 10,
+    paddingHorizontal: 20,
   },
   desktopButtonText: {
     color: Colors.primary,
