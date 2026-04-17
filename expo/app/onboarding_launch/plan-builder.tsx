@@ -7,6 +7,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Dimensions, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import * as Haptics from 'expo-haptics';
 import { ArrowRight } from 'lucide-react-native';
 import ConfettiBurst, { type ConfettiBurstRef } from '@/components/ConfettiBurst';
 import { ScreenLayout } from '@/components/ScreenLayout';
@@ -106,7 +107,7 @@ export default function PlanBuilderScreen() {
     <Animated.View style={{ opacity: ctaOpacity }}>
       <Text style={styles.footerText}>No one else has a plan exactly like this one.</Text>
       <Pressable
-        onPress={() => done && router.push('/onboarding_launch/gap-analysis')}
+        onPress={() => { if (!done) return; Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push('/onboarding_launch/gap-analysis'); }}
         style={styles.cta}
         accessibilityRole="button"
         accessibilityLabel="See my plan"

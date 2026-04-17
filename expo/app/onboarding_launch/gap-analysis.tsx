@@ -17,6 +17,7 @@ import {
   HARDEST_DISPLAY,
 } from './_store';
 import { colors } from '@/theme';
+import { GlowOrb } from '@/components/GlowOrb';
 
 // ─── InfoRow ─────────────────────────────────────────────────────────────────
 
@@ -68,9 +69,7 @@ export default function GapAnalysisScreen() {
 
   return (
     <View style={styles.root}>
-      {/* Decorative blurred orbs */}
-      <View style={[styles.orb, styles.orbTopRight]} />
-      <View style={[styles.orb, styles.orbBottomLeft]} />
+      <GlowOrb top={-100} right={-100} />
 
       <SafeAreaView edges={['top']} style={styles.safe}>
         <ScreenLayout
@@ -135,11 +134,6 @@ export default function GapAnalysisScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background, overflow: 'hidden' },
-
-  // ── Decorative orbs ─────────────────────────────────────────────────────────
-  orb:           { position: 'absolute', borderRadius: 999, opacity: 0.18 },
-  orbTopRight:   { width: 180, height: 180, backgroundColor: '#F0C808',   top: -72,   right: -64 },
-  orbBottomLeft: { width: 220, height: 220, backgroundColor: colors.primary, bottom: -110, left: -80 },
 
   // ── Layout ──────────────────────────────────────────────────────────────────
   safe:       { flex: 1, paddingHorizontal: 24, paddingTop: 28 },

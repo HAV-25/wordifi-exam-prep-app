@@ -31,7 +31,7 @@ export default function ReadinessScreen() {
   function handleContinue() {
     if (!selected) return;
     onboardingStore.readiness = selected;
-    router.push('/onboarding_launch/readiness-check');
+    router.push('/onboarding_launch/hardest');
   }
 
   const ctaFooter = (

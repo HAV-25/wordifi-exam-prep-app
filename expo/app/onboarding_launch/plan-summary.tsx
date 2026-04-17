@@ -13,7 +13,9 @@ import React, { useEffect, useRef } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import * as Haptics from 'expo-haptics';
 import { ArrowRight, CheckCircle2 } from 'lucide-react-native';
+import { GlowOrb } from '@/components/GlowOrb';
 import { ScreenLayout } from '@/components/ScreenLayout';
 import {
   onboardingStore,
@@ -134,7 +136,7 @@ export default function PlanSummaryScreen() {
   const ctaFooter = (
     <Animated.View style={{ opacity: ctaOpacity }}>
       <Pressable
-        onPress={() => router.push('/onboarding_launch/trial-transparency')}
+        onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push('/onboarding_launch/trial-transparency'); }}
         style={({ pressed }) => [styles.cta, pressed && styles.ctaPressed]}
         accessibilityRole="button"
         accessibilityLabel="Yes — start my plan today"
@@ -152,8 +154,7 @@ export default function PlanSummaryScreen() {
 
   return (
     <View style={styles.root}>
-      {/* Yellow radial glow top-right */}
-      <View style={styles.glow} />
+      <GlowOrb top={-100} right={-100} />
 
       <SafeAreaView edges={['top']} style={styles.safe}>
         <ScreenLayout footer={ctaFooter} contentContainerStyle={styles.scroll} backgroundColor={colors.background}>
@@ -265,18 +266,6 @@ export default function PlanSummaryScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background, overflow: 'hidden' },
-
-  // Soft yellow glow top-right
-  glow: {
-    position: 'absolute',
-    top: -90,
-    right: -80,
-    width: 280,
-    height: 280,
-    borderRadius: 140,
-    backgroundColor: '#F0C808',
-    opacity: 0.10,
-  },
 
   safe:   { flex: 1 },
   scroll: { paddingHorizontal: 24, paddingTop: 44 },

@@ -10,6 +10,7 @@ import { router } from 'expo-router';
 import { CheckCircle2 } from 'lucide-react-native';
 import { colors } from '@/theme';
 import { ScreenLayout } from '@/components/ScreenLayout';
+import { GlowOrb } from '@/components/GlowOrb';
 
 const BENEFITS = [
   { title: 'One notification per day',               sub: 'Only when your streak is at risk' },
@@ -68,8 +69,7 @@ export default function NotificationsScreen() {
 
   return (
     <View style={styles.root}>
-      {/* Yellow glow orb top-right */}
-      <View style={styles.backgroundGlow} />
+      <GlowOrb top={-100} right={-100} />
 
       <SafeAreaView edges={['top']} style={styles.safe}>
         <ScreenLayout
@@ -123,18 +123,6 @@ export default function NotificationsScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background, overflow: 'hidden' },
-
-  // Yellow glow orb
-  backgroundGlow: {
-    position: 'absolute',
-    top: -96,
-    right: -72,
-    width: 248,
-    height: 248,
-    borderRadius: 124,
-    backgroundColor: '#F0C808',
-    opacity: 0.14,
-  },
 
   safe:        { flex: 1, paddingHorizontal: 24, paddingTop: 32 },
   contentWrap: { flex: 1, zIndex: 2 },

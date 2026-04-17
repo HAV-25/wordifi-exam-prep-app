@@ -11,6 +11,7 @@ import { ArrowLeft } from 'lucide-react-native';
 import { onboardingStore, LearnerStyleId, LEARNER_STYLE_DISPLAY } from './_store';
 import { colors } from '@/theme';
 import { ScreenLayout } from '@/components/ScreenLayout';
+import { GlowOrb } from '@/components/GlowOrb';
 
 const OPTIONS: LearnerStyleId[] = ['sprinter', 'builder', 'sniper', 'explorer'];
 
@@ -41,8 +42,7 @@ export default function LearnerStyleScreen() {
 
   return (
     <View style={styles.root}>
-      {/* Yellow glow top-right */}
-      <View style={styles.glow} />
+      <GlowOrb top={-100} right={-100} />
 
       {/* 4px progress bar */}
       <View style={styles.progressTrack}>
@@ -103,18 +103,6 @@ export default function LearnerStyleScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background, overflow: 'hidden' },
-
-  // Yellow radial glow top-right
-  glow: {
-    position: 'absolute',
-    top: -80,
-    right: -80,
-    width: 240,
-    height: 240,
-    borderRadius: 120,
-    backgroundColor: '#F0C808',
-    opacity: 0.13,
-  },
 
   // Progress bar
   progressTrack: { height: 4, backgroundColor: '#E2E8F0', width: '100%' },

@@ -13,6 +13,7 @@ import { router } from 'expo-router';
 import { ArrowRight } from 'lucide-react-native';
 import { colors } from '@/theme';
 import { ScreenLayout } from '@/components/ScreenLayout';
+import { GlowOrb } from '@/components/GlowOrb';
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 
@@ -104,8 +105,7 @@ export default function TrialTransparencyScreen() {
 
   return (
     <View style={styles.root}>
-      {/* Yellow glow top-right */}
-      <View style={styles.glow} />
+      <GlowOrb top={-100} right={-100} />
 
       <SafeAreaView edges={['top']} style={styles.safe}>
         <ScreenLayout footer={ctaFooter} contentContainerStyle={styles.scroll} backgroundColor={colors.background}>
@@ -163,17 +163,6 @@ export default function TrialTransparencyScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background, overflow: 'hidden' },
-
-  glow: {
-    position: 'absolute',
-    top: -90,
-    right: -80,
-    width: 280,
-    height: 280,
-    borderRadius: 140,
-    backgroundColor: '#F0C808',
-    opacity: 0.10,
-  },
 
   safe:   { flex: 1 },
   scroll: { paddingHorizontal: 24, paddingTop: 44 },

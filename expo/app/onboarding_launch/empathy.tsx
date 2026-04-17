@@ -10,6 +10,7 @@ import { router } from 'expo-router';
 import { ArrowLeft } from 'lucide-react-native';
 import { onboardingStore } from './_store';
 import { ScreenLayout } from '@/components/ScreenLayout';
+import { GlowOrb } from '@/components/GlowOrb';
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 
@@ -53,6 +54,7 @@ export default function EmpathyScreen() {
 
   return (
     <View style={styles.root}>
+      <GlowOrb top={-100} right={-100} />
       {/* Progress bar */}
       <View style={styles.progressTrack}>
         <View style={[styles.progressFill, { width: '30%' }]} />
@@ -106,10 +108,7 @@ export default function EmpathyScreen() {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: '#F8FAFF',
-  },
+  root: { flex: 1, backgroundColor: '#F8FAFF', overflow: 'hidden' },
 
   // Progress
   progressTrack: {

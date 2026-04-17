@@ -10,6 +10,7 @@ import { router } from 'expo-router';
 import { ArrowLeft } from 'lucide-react-native';
 import { onboardingStore, TimelineId } from './_store';
 import { ScreenLayout } from '@/components/ScreenLayout';
+import { GlowOrb } from '@/components/GlowOrb';
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 
@@ -50,6 +51,7 @@ export default function TimelineScreen() {
 
   return (
     <View style={styles.root}>
+      <GlowOrb top={-100} right={-100} />
       {/* Progress bar */}
       <View style={styles.progressTrack}>
         <View style={[styles.progressFill, { width: '40%' }]} />
@@ -104,7 +106,7 @@ export default function TimelineScreen() {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#F8FAFF' },
+  root: { flex: 1, backgroundColor: '#F8FAFF', overflow: 'hidden' },
 
   progressTrack: { height: 4, backgroundColor: '#EBF1FF', width: '100%' },
   progressFill: { height: '100%', backgroundColor: '#2B70EF', borderTopRightRadius: 4, borderBottomRightRadius: 4 },

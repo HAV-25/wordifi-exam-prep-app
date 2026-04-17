@@ -83,8 +83,8 @@ export const HARDEST_DISPLAY: Record<HardestId, { emoji: string; label: string }
 
 export const DAILY_MINUTES_DISPLAY: Record<DailyMinutes, { label: string; description: string; emoji: string; recommended?: boolean }> = {
   5:  { label: '5 minutes',           description: 'Just the essentials every day',    emoji: '⚡' },
-  15: { label: '10 to 15 minutes',    description: 'My daily sweet spot',              emoji: '✅', recommended: true },
-  25: { label: '20 to 30 minutes',    description: 'I am serious about this',          emoji: '💪' },
+  15: { label: '10 to 15 minutes',    description: 'My daily sweet spot',              emoji: '✅' },
+  25: { label: '20 to 30 minutes',    description: 'I am serious about this',          emoji: '💪', recommended: true },
   30: { label: 'More than 30 minutes',description: 'I am in full preparation mode',    emoji: '🔥' },
 };
 
