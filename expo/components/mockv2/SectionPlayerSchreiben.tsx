@@ -21,12 +21,14 @@ import { B } from '@/theme/banani';
 import type { AppQuestion } from '@/types/database';
 import { SCHREIBEN_TASK_TYPE, type AssessmentResult } from '@/types/schreiben';
 
+export type SchreibenTeilResult = {
+  teil: number;
+  userText: string;
+  assessment: AssessmentResult | null;
+};
+
 export type SchreibenSectionResult = {
-  teilResults: Array<{
-    teil: number;
-    userText: string;
-    assessment: AssessmentResult | null;
-  }>;
+  teilResults: SchreibenTeilResult[];
   overallScorePct: number;  // average of all teils
   timeTakenSeconds: number;
 };
@@ -117,12 +119,16 @@ export function SectionPlayerSchreiben({ level, teils, timeLimitSeconds, onCompl
   }, [remainingSeconds, timerPulse]);
 
   // ── Handle submission of current teil ────────────────────────────────
+  // Mock V2: silent eval. User sees "Saved — scoring in background" overlay
+  // and can advance to next teil without seeing the score. All results
+  // aggregated + revealed only at the end of the mock.
   const handleSubmitTeil = useCallback(async (userText: string, wordCount: number) => {
     if (!currentQuestion) return;
     setIsLoading(true);
     setIsSubmitted(true);
     try {
       const assessment = await assessSchreiben(currentQuestion, userText, wordCount, taskType, null);
+      // Store but DON'T surface — final results screen shows it
       setCurrentAssessment(assessment);
       setTeilResults((prev) => [...prev, { teil: currentTeil, userText, assessment }]);
     } catch (err) {
@@ -190,24 +196,37 @@ export function SectionPlayerSchreiben({ level, teils, timeLimitSeconds, onCompl
         </View>
       </View>
 
-      {/* Body — reuse SchreibenQuestion */}
+      {/* Body — reuse SchreibenQuestion. Pass assessment=null to hide inline score. */}
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
-        <SchreibenQuestion
-          question={currentQuestion}
-          task_type={taskType}
-          onSubmit={handleSubmitTeil}
-          isSubmitted={isSubmitted}
-          isLoading={isLoading}
-          assessment={currentAssessment}
-        />
+        {isSubmitted && !isLoading ? (
+          // Silent "Saved" state — no score revealed
+          <View style={styles.savedCard}>
+            <View style={styles.savedIconWrap}>
+              <Text style={styles.savedIcon}>✓</Text>
+            </View>
+            <Text style={styles.savedTitle}>Teil {currentTeil} saved</Text>
+            <Text style={styles.savedSub}>
+              Your answer has been recorded. Full feedback will be shown at the end of the mock.
+            </Text>
+          </View>
+        ) : (
+          <SchreibenQuestion
+            question={currentQuestion}
+            task_type={taskType}
+            onSubmit={handleSubmitTeil}
+            isSubmitted={false}  /* always false to prevent inline result render */
+            isLoading={isLoading}
+            assessment={null}    /* never pass assessment — hidden until end */
+          />
+        )}
       </ScrollView>
 
-      {/* Footer: only shows after assessment */}
-      {isSubmitted && currentAssessment && !isLoading ? (
+      {/* Footer: Next button appears once scoring call finishes (even silently) */}
+      {isSubmitted && !isLoading ? (
         <View style={styles.footer}>
           <Pressable style={styles.nextBtn} onPress={handleNextTeil}>
             <Text style={styles.nextBtnText}>
-              {isLastTeil ? 'Finish Schreiben' : `Next: Teil ${currentTeilIndex + 2}`}
+              {isLastTeil ? 'Finish Schreiben' : `Continue to Teil ${currentTeilIndex + 2}`}
             </Text>
           </Pressable>
         </View>
@@ -245,4 +264,20 @@ const styles = StyleSheet.create({
   nextBtnText: { color: '#fff', fontSize: 16, fontWeight: '800' as const },
   skipBtn: { marginTop: 16, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 999, backgroundColor: '#F1F5F9' },
   skipBtnText: { color: B.muted, fontSize: 14, fontWeight: '700' as const },
+
+  // Silent "saved" state — shown in place of the assessment result
+  savedCard: {
+    backgroundColor: B.card, borderRadius: 20, padding: 28,
+    alignItems: 'center', gap: 12,
+    borderWidth: 1, borderColor: B.border,
+    marginVertical: 20,
+  },
+  savedIconWrap: {
+    width: 72, height: 72, borderRadius: 36,
+    backgroundColor: 'rgba(34,197,94,0.12)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  savedIcon: { fontSize: 40, color: '#22C55E', fontWeight: '800' as const },
+  savedTitle: { fontSize: 20, fontWeight: '800' as const, color: B.questionColor, marginTop: 4 },
+  savedSub: { fontSize: 14, fontWeight: '500' as const, color: B.muted, textAlign: 'center', lineHeight: 20, paddingHorizontal: 16 },
 });

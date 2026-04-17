@@ -98,8 +98,7 @@ export function SectionPlayerSprechen({ level, teils, onComplete, sectionIndex, 
           <View style={styles.divider} />
 
           <Text style={styles.instruction}>
-            For the compressed V1 build, Sprechen uses a demo score. Full inline integration
-            with the realtime flow comes in the next iteration.
+            Your response will be recorded and saved. Full feedback is revealed at the end of the mock.
           </Text>
 
           <Pressable
@@ -109,7 +108,7 @@ export function SectionPlayerSprechen({ level, teils, onComplete, sectionIndex, 
           >
             <Play color="#fff" size={18} />
             <Text style={styles.startBtnText}>
-              {isLastTeil ? 'Finish Sprechen (demo)' : 'Complete Teil (demo)'}
+              {isLastTeil ? 'Finish Sprechen' : `Continue to Teil ${currentTeil + 1}`}
             </Text>
           </Pressable>
         </View>

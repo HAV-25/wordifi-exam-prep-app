@@ -55,13 +55,25 @@ type Phase =
   | { type: 'submitting' }
   | { type: 'completed' };
 
-// Per-section results collected during the test run
+// Per-section results collected during the test run.
+// Extended with detail payloads for the end-of-test results screen.
 type SectionResult = {
   section: ExamSectionKey;
-  scorePct: number;  // 0-100, -1 = not yet scored (Schreiben/Sprechen aggregate inline)
+  scorePct: number;
   questionsCorrect?: number;
   questionsTotal?: number;
   timeTakenSeconds: number;
+  /** Full question objects (MCQ/TF/matching/Sprachbausteine). */
+  questions?: unknown[];
+  /** Selected answers keyed by question_id. */
+  answers?: Record<string, string>;
+  /** Schreiben: per-teil user text + AI assessment. Sprechen: per-teil scores. */
+  teilAssessments?: Array<{
+    teil: number;
+    userText?: string;
+    assessment?: unknown;
+    scores?: { overall?: number; fluency?: number; grammar?: number; vocabulary?: number };
+  }>;
 };
 
 export default function MockTestV2Screen() {
@@ -427,6 +439,8 @@ function SectionRouter({
           questionsCorrect: r.questionsCorrect,
           questionsTotal: r.questionsTotal,
           timeTakenSeconds: r.timeTakenSeconds,
+          questions: r.questions,
+          answers: r.answers,
         })}
       />
     );
@@ -446,6 +460,9 @@ function SectionRouter({
           questionsCorrect: r.questionsCorrect,
           questionsTotal: r.questionsTotal,
           timeTakenSeconds: r.timeTakenSeconds,
+          // Sprachbausteine captures per-blank answers on both teils.
+          // Store a compact payload for final review.
+          answers: { ...r.t1Answers, ...r.t2Answers } as Record<string, string>,
         })}
       />
     );
@@ -463,6 +480,11 @@ function SectionRouter({
           section: 'Schreiben',
           scorePct: r.overallScorePct,
           timeTakenSeconds: r.timeTakenSeconds,
+          teilAssessments: r.teilResults.map((t) => ({
+            teil: t.teil,
+            userText: t.userText,
+            assessment: t.assessment,
+          })),
         })}
       />
     );
@@ -479,6 +501,10 @@ function SectionRouter({
           section: 'Sprechen',
           scorePct: r.overallScorePct,
           timeTakenSeconds: r.timeTakenSeconds,
+          teilAssessments: r.teilScores.map((s) => ({
+            teil: s.teil,
+            scores: { overall: s.overall, fluency: s.fluency, grammar: s.grammar, vocabulary: s.vocabulary },
+          })),
         })}
       />
     );
@@ -490,32 +516,27 @@ function SectionRouter({
 // ─── Transition screen between sections ─────────────────────────────────────
 function TransitionScreen({
   completedSection,
-  lastResult,
   nextSection,
   isLastSection,
   onContinue,
   onPause,
 }: {
   completedSection: ExamBlueprintSection;
-  lastResult: SectionResult | null;
+  lastResult: SectionResult | null; // kept in prop signature for caller compatibility, not used
   nextSection: ExamBlueprintSection | undefined;
   isLastSection: boolean;
   onContinue: () => void;
   onPause: () => void;
 }) {
-  const scoreText = lastResult
-    ? lastResult.questionsCorrect != null
-      ? `${lastResult.questionsCorrect}/${lastResult.questionsTotal} · ${Math.round(lastResult.scorePct)}%`
-      : 'Submitted for AI evaluation'
-    : '';
-
   return (
     <View style={styles.transitionWrap}>
       <View style={styles.transitionCheck}>
         <Trophy color={B.success} size={40} />
       </View>
       <Text style={styles.transitionTitle}>{completedSection.section} complete</Text>
-      {scoreText ? <Text style={styles.transitionScore}>{scoreText}</Text> : null}
+      <Text style={styles.transitionNeutralSub}>
+        Your answers are saved. Results will be shown at the end of the mock.
+      </Text>
 
       <View style={styles.transitionDivider} />
 
@@ -581,7 +602,7 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center', marginBottom: 8,
   },
   transitionTitle: { fontSize: 26, fontWeight: '800' as const, color: B.questionColor, textAlign: 'center' },
-  transitionScore: { fontSize: 18, fontWeight: '700' as const, color: B.primary, marginTop: 4 },
+  transitionNeutralSub: { fontSize: 14, fontWeight: '500' as const, color: B.muted, textAlign: 'center', lineHeight: 20, marginTop: 8, paddingHorizontal: 24 },
   transitionDivider: { width: '60%', height: 1, backgroundColor: B.border, marginVertical: 20 },
   transitionNextLabel: { fontSize: 12, fontWeight: '700' as const, color: B.muted, textTransform: 'uppercase' as const, letterSpacing: 0.6 },
   transitionNextName: { fontSize: 22, fontWeight: '800' as const, color: B.primary, marginTop: 4 },

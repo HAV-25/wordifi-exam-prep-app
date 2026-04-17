@@ -29,6 +29,7 @@ import { useQuestionMeta } from '@/lib/useQuestionTypeMeta';
 
 export type MCQSectionResult = {
   answers: Record<string, string>;
+  questions: AppQuestion[];
   scorePct: number;
   questionsCorrect: number;
   questionsTotal: number;
@@ -74,7 +75,7 @@ export function SectionPlayerMCQ({
     }, 0);
     const total = questions.length;
     const scorePct = total > 0 ? Math.round((correct / total) * 100) : 0;
-    onComplete({ answers, scorePct, questionsCorrect: correct, questionsTotal: total, timeTakenSeconds: timeTaken });
+    onComplete({ answers, questions, scorePct, questionsCorrect: correct, questionsTotal: total, timeTakenSeconds: timeTaken });
   }, [answers, questions, onComplete]);
 
   useEffect(() => {

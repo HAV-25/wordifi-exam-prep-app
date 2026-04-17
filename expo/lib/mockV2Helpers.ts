@@ -10,6 +10,18 @@ export type SavedSectionResult = {
   questionsCorrect?: number;
   questionsTotal?: number;
   timeTakenSeconds: number;
+  /** Full question objects for final review. Hören/Lesen/Sprachbausteine only. */
+  questions?: unknown[];
+  /** Selected answers keyed by question_id (lowercase option.key). */
+  answers?: Record<string, string>;
+  /** Schreiben/Sprechen: per-teil AI assessments. */
+  teilAssessments?: Array<{
+    teil: number;
+    userText?: string;
+    assessment?: unknown;
+    transcript?: string;
+    scores?: { fluency?: number; grammar?: number; vocabulary?: number; overall?: number };
+  }>;
 };
 
 export type MockV2SavedState = {
