@@ -149,6 +149,8 @@ export function SectionPlayerMCQ({
   const isBinaryByType = currentQuestion.question_type === 'true_false' || currentQuestion.question_type === 'ja_nein';
   const isBinary = isBinaryByCategory || isBinaryByType;
   const isYesNo = category === 'yes_no' || currentQuestion.question_type === 'ja_nein';
+  const isMatching = category === 'matching';
+  const LETTERS = ['a', 'b', 'c', 'd', 'e', 'f'];
 
   return (
     <View style={styles.wrap}>
@@ -204,6 +206,31 @@ export function SectionPlayerMCQ({
                     testID={`mockv2-option-${option.key}`}
                   />
                 </View>
+              );
+            })}
+          </View>
+        ) : isMatching ? (
+          // Matching (e.g. B1 Hören T4 speaker_match) — show a/b/c/d letter badges
+          // instead of raw DB keys (which may be speaker names like "julia").
+          // option.key is still what gets persisted on tap — scoring unaffected.
+          <View style={styles.optionsWrap}>
+            {(currentQuestion.options ?? []).map((option, idx) => {
+              const normKey = option.key.toLowerCase();
+              const badgeLetter = LETTERS[idx] ?? String(idx + 1);
+              const leadingNode = (
+                <View style={styles.matchBadge}>
+                  <Text style={styles.matchBadgeText}>{badgeLetter}</Text>
+                </View>
+              );
+              return (
+                <OptionButton
+                  key={`${currentQuestion.id}-${option.key}`}
+                  label={option.text}
+                  leadingNode={leadingNode}
+                  selected={selectedAnswer === normKey}
+                  onPress={() => setAnswers((p) => ({ ...p, [currentQuestion.id]: normKey }))}
+                  testID={`mockv2-option-${option.key}`}
+                />
               );
             })}
           </View>
@@ -271,6 +298,12 @@ const styles = StyleSheet.create({
   optionsWrap: { gap: 10 },
   binaryRow: { flexDirection: 'row', gap: 10 },
   binaryFlex: { flex: 1 },
+  matchBadge: {
+    width: 32, height: 32, borderRadius: 16,
+    backgroundColor: 'rgba(43,112,239,0.12)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  matchBadgeText: { fontSize: 16, fontWeight: '800' as const, color: B.primary },
 
   // Footer
   footer: { padding: 20, paddingTop: 12, backgroundColor: B.card, borderTopWidth: 1, borderTopColor: B.border },

@@ -4,6 +4,7 @@ import { BookOpen, Clock, Headphones, Lock, Mic, Monitor, PenLine, Play, Puzzle,
 import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Animated,
   Modal,
   Pressable,
@@ -18,7 +19,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { PaywallModal } from '@/components/PaywallModal';
 import Colors from '@/constants/colors';
 import { MOCK_V2_ENABLED } from '@/lib/featureFlags';
-import { abandonMockV2, fetchResumableMockV2 } from '@/lib/mockV2Helpers';
+import { abandonMockV2, fetchActiveMockV2, fetchResumableMockV2 } from '@/lib/mockV2Helpers';
 import { getBlueprint } from '@/lib/examBlueprint';
 import {
   checkMockRetestAvailability,
@@ -82,12 +83,9 @@ export default function MockScreen() {
   });
   const resumable = resumeQuery.data ?? null;
 
-  const openSetup = useCallback(async () => {
+  // Inner setup opener — actual modal + retest check (used after any guards pass)
+  const openSetupInner = useCallback(async () => {
     if (!info) return;
-    if (!mockEnabled) {
-      setShowPaywall(true);
-      return;
-    }
     setSetup({
       visible: true,
       info,
@@ -109,7 +107,59 @@ export default function MockScreen() {
     } catch {
       setSetup((prev) => ({ ...prev, isLoadingRetest: false }));
     }
-  }, [info, userId, targetLevel, mockEnabled]);
+  }, [info, userId, targetLevel]);
+
+  // Outer gate: paywall + active-session check before opening the setup modal.
+  const openSetup = useCallback(async () => {
+    if (!info) return;
+    if (!mockEnabled) {
+      setShowPaywall(true);
+      return;
+    }
+
+    // Active session check — prevent concurrent mocks.
+    if (MOCK_V2_ENABLED) {
+      try {
+        const active = await fetchActiveMockV2(userId);
+        if (active) {
+          Alert.alert(
+            'Active Mock Test',
+            `You have a ${active.level} mock test in progress. Resume it or discard to start a fresh one.`,
+            [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Discard & start new',
+                style: 'destructive',
+                onPress: async () => {
+                  await abandonMockV2(active.id);
+                  await resumeQuery.refetch();
+                  await openSetupInner();
+                },
+              },
+              {
+                text: 'Resume',
+                onPress: () => {
+                  router.push({
+                    pathname: '/mock-test-v2' as any,
+                    params: {
+                      level: active.level,
+                      mockTestId: active.id,
+                      resumeStateJson: JSON.stringify(active.savedState),
+                    },
+                  });
+                },
+              },
+            ]
+          );
+          return;
+        }
+      } catch (err) {
+        console.log('[Mock] fetchActiveMockV2 failed, proceeding to normal setup', err);
+      }
+    }
+
+    await openSetupInner();
+  }, [info, userId, mockEnabled, openSetupInner, resumeQuery]);
 
   const closeSetup = useCallback(() => {
     setSetup((prev) => ({ ...prev, visible: false }));

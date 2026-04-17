@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabaseClient';
+import { fetchRecentlyAnsweredIds, partitionByDedup } from '@/lib/questionDedup';
 import { MOCK_TEST_QUESTION_COUNTS, shuffleArray, XP_RATES } from '@/theme/constants';
 import type { AppQuestion, UserProfile } from '@/types/database';
 import * as Sentry from '@sentry/react-native';
@@ -202,9 +203,10 @@ export async function checkRetestAvailability(
 export async function fetchSectionalQuestions(
   level: string,
   section: string,
-  teil: number
+  teil: number,
+  userId?: string
 ): Promise<AppQuestion[]> {
-  console.log('sectionalHelpers fetchSectionalQuestions', { level, section, teil });
+  console.log('sectionalHelpers fetchSectionalQuestions', { level, section, teil, dedup: !!userId });
 
   const { data, error } = await supabase
     .from('app_questions')
@@ -224,37 +226,86 @@ export async function fetchSectionalQuestions(
   const targetCount = MOCK_TEST_QUESTION_COUNTS[level]?.[section]?.[teil];
 
   if (targetCount && allQuestions.length > targetCount) {
-    // For hybrid teils (e.g. B1 Hören T1 = TF+MCQ per audio clip),
-    // shuffle by clip group so paired questions stay together.
+    // ── Dedup: prefer clip-groups with unseen questions; fall back to oldest-seen ──
+    // Group by source_clip_id so hybrid TF+MCQ pairs stay together.
     const clipGroups = new Map<string, AppQuestion[]>();
     for (const q of allQuestions) {
-      const groupKey = q.source_clip_id ?? q.id; // ungrouped questions use their own id
+      const groupKey = q.source_clip_id ?? q.id;
       const group = clipGroups.get(groupKey) ?? [];
       group.push(q);
       clipGroups.set(groupKey, group);
     }
 
-    // Shuffle the clip groups, then flatten and take up to targetCount
-    const shuffledGroups = shuffleArray(Array.from(clipGroups.values()));
+    let unseenGroups: AppQuestion[][] = [];
+    let seenGroupsOldestFirst: AppQuestion[][] = [];
+
+    if (userId) {
+      const dedup = await fetchRecentlyAnsweredIds(userId);
+      // A clip group is "unseen" if ALL its questions are unseen
+      // A "seen" group's age = max (most-recent) created_at of its questions
+      const seenWithAge: Array<{ group: AppQuestion[]; mostRecent: string }> = [];
+      for (const group of clipGroups.values()) {
+        const anySeen = group.some((q) => dedup.seen.has(q.id));
+        if (!anySeen) {
+          unseenGroups.push(group);
+        } else {
+          const mostRecent = group.reduce((acc, q) => {
+            const ts = dedup.seenAt.get(q.id) ?? '';
+            return ts > acc ? ts : acc;
+          }, '');
+          seenWithAge.push({ group, mostRecent });
+        }
+      }
+      // Oldest-seen first
+      seenWithAge.sort((a, b) => a.mostRecent.localeCompare(b.mostRecent));
+      seenGroupsOldestFirst = seenWithAge.map((x) => x.group);
+    } else {
+      unseenGroups = Array.from(clipGroups.values());
+    }
+
+    // Shuffle within each tier (unseen-shuffled then seen-oldest-shuffled-lightly)
+    const prioritized = [
+      ...shuffleArray(unseenGroups),
+      ...seenGroupsOldestFirst, // NOT shuffled — keep oldest-first for consistent fallback
+    ];
+
     const selected: AppQuestion[] = [];
-    for (const group of shuffledGroups) {
+    for (const group of prioritized) {
       if (selected.length >= targetCount) break;
       selected.push(...group);
     }
-    // Trim to exact target in case last group pushed over
     const trimmed = selected.slice(0, targetCount);
-    // Sort by clip group first (keeps TF+MCQ pairs together), then by question_number within
     trimmed.sort((a, b) => {
       const clipA = a.source_clip_id ?? '';
       const clipB = b.source_clip_id ?? '';
       if (clipA !== clipB) return clipA < clipB ? -1 : 1;
       return (a.question_number ?? 0) - (b.question_number ?? 0);
     });
-    console.log('fetchSectionalQuestions selected', { total: allQuestions.length, target: targetCount, selected: trimmed.length });
+    console.log('fetchSectionalQuestions selected', {
+      total: allQuestions.length,
+      target: targetCount,
+      unseenGroups: unseenGroups.length,
+      seenGroups: seenGroupsOldestFirst.length,
+      selected: trimmed.length,
+    });
     return trimmed;
   }
 
-  // Always sort by question_number to preserve paired ordering (TF then MCQ per audio)
+  // Pool fits target — still dedup-order if userId provided, then sort for pairing
+  if (userId && allQuestions.length > 0) {
+    try {
+      const dedup = await fetchRecentlyAnsweredIds(userId);
+      // Not enough to subset, but still surface unseen first in case caller slices further
+      const { unseen, seenOldestFirst } = partitionByDedup(allQuestions, dedup);
+      const ordered = [...unseen, ...seenOldestFirst];
+      // Preserve paired ordering when rendered
+      ordered.sort((a, b) => (a.question_number ?? 0) - (b.question_number ?? 0));
+      return ordered;
+    } catch {
+      // fall through
+    }
+  }
+
   allQuestions.sort((a, b) => (a.question_number ?? 0) - (b.question_number ?? 0));
   console.log('fetchSectionalQuestions returning all', { total: allQuestions.length, targetCount });
   return allQuestions;
@@ -406,9 +457,10 @@ function scoreBlankAnswers(
 }
 
 export async function fetchSprachbausteineQuestions(
-  level: string
+  level: string,
+  userId?: string
 ): Promise<{ t1: AppQuestion | null; t2: AppQuestion | null }> {
-  console.log('sectionalHelpers fetchSprachbausteineQuestions', level);
+  console.log('sectionalHelpers fetchSprachbausteineQuestions', { level, dedup: !!userId });
 
   const { data, error } = await supabase
     .from('app_questions')
@@ -424,13 +476,27 @@ export async function fetchSprachbausteineQuestions(
   }
 
   const all = (data ?? []) as AppQuestion[];
-  const t1Pool = shuffleArray(all.filter((q) => q.teil === 1));
-  const t2Pool = shuffleArray(all.filter((q) => q.teil === 2));
+  const t1All = all.filter((q) => q.teil === 1);
+  const t2All = all.filter((q) => q.teil === 2);
 
-  return {
-    t1: t1Pool[0] ?? null,
-    t2: t2Pool[0] ?? null,
+  // Apply dedup: prefer unseen; fall back to oldest-seen
+  const pickOne = async (pool: AppQuestion[]): Promise<AppQuestion | null> => {
+    if (pool.length === 0) return null;
+    if (!userId) return shuffleArray(pool)[0] ?? null;
+    try {
+      const dedup = await fetchRecentlyAnsweredIds(userId);
+      const { unseen, seenOldestFirst } = partitionByDedup(pool, dedup);
+      if (unseen.length > 0) return shuffleArray(unseen)[0] ?? null;
+      return seenOldestFirst[0] ?? null; // oldest-seen fallback
+    } catch {
+      return shuffleArray(pool)[0] ?? null;
+    }
   };
+
+  const t1 = await pickOne(t1All);
+  const t2 = await pickOne(t2All);
+
+  return { t1, t2 };
 }
 
 export async function completeSprachbausteineSession(params: {

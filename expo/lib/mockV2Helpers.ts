@@ -55,6 +55,38 @@ export async function saveMockV2State(mockTestId: string, state: MockV2SavedStat
   if (error) console.log('[MockV2] saveState error', error);
 }
 
+/**
+ * Fetch ANY active mock session (no time cutoff) — used to block new starts.
+ * Different from fetchResumableMockV2 which is 24h-scoped for the Resume banner.
+ */
+export async function fetchActiveMockV2(userId: string): Promise<{
+  id: string;
+  level: string;
+  savedState: MockV2SavedState;
+  currentPhase: string;
+  savedAt: string;
+} | null> {
+  if (!userId) return null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase.from('mock_tests') as any)
+    .select('id, level, saved_state, current_phase, saved_at')
+    .eq('user_id', userId)
+    .eq('v2_flow', true)
+    .eq('is_abandoned', false)
+    .is('completed_at', null)
+    .order('saved_at', { ascending: false })
+    .limit(1);
+  if (error || !data || data.length === 0) return null;
+  const row = data[0] as { id: string; level: string; saved_state: MockV2SavedState; current_phase: string; saved_at: string };
+  return {
+    id: row.id,
+    level: row.level,
+    savedState: row.saved_state,
+    currentPhase: row.current_phase,
+    savedAt: row.saved_at,
+  };
+}
+
 /** Fetch latest resumable mock session (within 24 hours). */
 export async function fetchResumableMockV2(userId: string): Promise<{
   id: string;

@@ -37,7 +37,9 @@ import { shuffleArray } from '@/theme/constants';
 import type { AppQuestion } from '@/types/database';
 import { SectionPlayerMCQ, type MCQSectionResult } from '@/components/mockv2/SectionPlayerMCQ';
 import { SectionPlayerSchreiben, type SchreibenSectionResult } from '@/components/mockv2/SectionPlayerSchreiben';
+import { SectionPlayerSprachbausteine } from '@/components/mockv2/SectionPlayerSprachbausteine';
 import { SectionPlayerSprechen, type SprechenSectionResult } from '@/components/mockv2/SectionPlayerSprechen';
+import { fetchRecentlyAnsweredIds } from '@/lib/questionDedup';
 import {
   completeMockV2,
   createMockV2Session,
@@ -249,6 +251,7 @@ export default function MockTestV2Screen() {
           section={section}
           sectionIndex={phase.sectionIndex}
           totalSections={blueprint.length}
+          userId={userId}
           onComplete={handleSectionComplete}
           onPause={handlePauseAndExit}
         />
@@ -296,6 +299,7 @@ function SectionRouter({
   section,
   sectionIndex,
   totalSections,
+  userId,
   onComplete,
   onPause,
 }: {
@@ -303,6 +307,7 @@ function SectionRouter({
   section: ExamBlueprintSection;
   sectionIndex: number;
   totalSections: number;
+  userId: string;
   onComplete: (result: SectionResult) => void;
   onPause: () => void;
 }) {
@@ -310,8 +315,9 @@ function SectionRouter({
   const timeLimitSec = section.timeMinutes * 60;
 
   useEffect(() => {
-    if (section.section === 'Schreiben' || section.section === 'Sprechen') {
-      setQuestions([]); // These players fetch their own
+    // These players fetch their own questions internally
+    if (section.section === 'Schreiben' || section.section === 'Sprechen' || section.section === 'Sprachbausteine') {
+      setQuestions([]);
       return;
     }
     let cancelled = false;
@@ -323,6 +329,12 @@ function SectionRouter({
         .eq('section', section.section)
         .eq('is_active', true);
       const all = (data ?? []) as AppQuestion[];
+
+      // Fetch 30-day seen questions once for dedup
+      let dedup: { seen: Set<string>; seenAt: Map<string, string> } = { seen: new Set(), seenAt: new Map() };
+      if (userId) {
+        try { dedup = await fetchRecentlyAnsweredIds(userId); } catch { /* fall back to no dedup */ }
+      }
 
       // Pick questions per teil according to blueprint
       const picked: AppQuestion[] = [];
@@ -337,9 +349,30 @@ function SectionRouter({
           group.push(q);
           clipGroups.set(key, group);
         }
-        const shuffledGroups = shuffleArray(Array.from(clipGroups.values()));
+
+        // Dedup-aware partitioning at clip-group level
+        const unseenGroups: AppQuestion[][] = [];
+        const seenGroupsWithAge: Array<{ group: AppQuestion[]; age: string }> = [];
+        for (const g of clipGroups.values()) {
+          const anySeen = g.some((q) => dedup.seen.has(q.id));
+          if (!anySeen) {
+            unseenGroups.push(g);
+          } else {
+            const mostRecent = g.reduce((acc, q) => {
+              const ts = dedup.seenAt.get(q.id) ?? '';
+              return ts > acc ? ts : acc;
+            }, '');
+            seenGroupsWithAge.push({ group: g, age: mostRecent });
+          }
+        }
+        seenGroupsWithAge.sort((a, b) => a.age.localeCompare(b.age));
+        const prioritized = [
+          ...shuffleArray(unseenGroups),
+          ...seenGroupsWithAge.map((x) => x.group),
+        ];
+
         const out: AppQuestion[] = [];
-        for (const g of shuffledGroups) {
+        for (const g of prioritized) {
           if (out.length >= target) break;
           out.push(...g);
         }
@@ -354,7 +387,7 @@ function SectionRouter({
       if (!cancelled) setQuestions(picked);
     })();
     return () => { cancelled = true; };
-  }, [level, section.section, section.teils, section.questionsPerTeil]);
+  }, [level, section.section, section.teils, section.questionsPerTeil, userId]);
 
   if (!questions) {
     return (
@@ -365,8 +398,8 @@ function SectionRouter({
     );
   }
 
-  // MCQ/TF sections (Hören, Lesen, Sprachbausteine)
-  if (section.section === 'Hören' || section.section === 'Lesen' || section.section === 'Sprachbausteine') {
+  // MCQ/TF sections (Hören, Lesen only — Sprachbausteine has its own player)
+  if (section.section === 'Hören' || section.section === 'Lesen') {
     if (questions.length === 0) {
       return (
         <View style={styles.center}>
@@ -390,6 +423,25 @@ function SectionRouter({
         totalSections={totalSections}
         onComplete={(r: MCQSectionResult) => onComplete({
           section: section.section,
+          scorePct: r.scorePct,
+          questionsCorrect: r.questionsCorrect,
+          questionsTotal: r.questionsTotal,
+          timeTakenSeconds: r.timeTakenSeconds,
+        })}
+      />
+    );
+  }
+
+  if (section.section === 'Sprachbausteine') {
+    return (
+      <SectionPlayerSprachbausteine
+        level={level}
+        userId={userId}
+        timeLimitSeconds={timeLimitSec}
+        sectionIndex={sectionIndex}
+        totalSections={totalSections}
+        onComplete={(r) => onComplete({
+          section: 'Sprachbausteine',
           scorePct: r.scorePct,
           questionsCorrect: r.questionsCorrect,
           questionsTotal: r.questionsTotal,
