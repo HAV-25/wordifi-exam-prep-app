@@ -37,7 +37,7 @@ function splitStimulus(text: string): Array<{ kind: 'text'; value: string } | { 
 }
 
 function performanceLabel(score: number): { text: string; color: string } {
-  if (score >= 70) return { text: 'Sehr gut! Exam-ready performance', color: colors.green };
+  if (score >= 70) return { text: 'Excellent! Exam-ready performance', color: colors.green };
   if (score >= 40) return { text: 'Good progress — keep practising', color: colors.amber };
   return { text: 'Every blank is a learning step 💪', color: colors.navy };
 }
@@ -188,10 +188,10 @@ export default function SprachbausteineResultsScreen() {
 
   return (
     <View style={styles.screen}>
-      <Stack.Screen options={{ title: 'Ergebnisse', headerShown: false }} />
+      <Stack.Screen options={{ title: 'Results', headerShown: false }} />
 
       <ScrollView
-        contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 100 }]}
+        contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 140 }]}
         showsVerticalScrollIndicator={false}
       >
         {/* Score header */}
@@ -201,7 +201,7 @@ export default function SprachbausteineResultsScreen() {
             <Text style={styles.scoreSectionName}>Sprachbausteine</Text>
             <Text style={[styles.perfLabel, { color: perf.color }]}>{perf.text}</Text>
             <Text style={styles.scoreDetail}>
-              {totalCorrect}/{totalBlanks} Lücken korrekt · {formatDuration(timeTaken)}
+              {totalCorrect}/{totalBlanks} gaps correct · {formatDuration(timeTaken)}
             </Text>
           </View>
         </View>
@@ -209,7 +209,7 @@ export default function SprachbausteineResultsScreen() {
         {/* T1 feedback */}
         {t1Question && (
           <BlankFeedback
-            label="Teil 1 — Wortkasten"
+            label="Teil 1 — Word Bank"
             question={t1Question}
             userAnswers={t1Answers}
           />
@@ -225,14 +225,24 @@ export default function SprachbausteineResultsScreen() {
         )}
       </ScrollView>
 
-      {/* Footer */}
+      {/* Footer — two CTAs match other results screens; primary returns to Sectional,
+          secondary returns home. Fixes prior freeze caused by single router.replace('/'). */}
       <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
         <Pressable
-          onPress={() => router.replace('/')}
+          onPress={() => router.replace('/(tabs)/tests')}
           style={styles.ctaBtn}
-          accessibilityLabel="Done"
+          accessibilityLabel="Back to Sectional"
+          testID="sprachbausteine-results-back-sectional"
         >
-          <Text style={styles.ctaBtnText}>Fertig</Text>
+          <Text style={styles.ctaBtnText}>Back to Sectional</Text>
+        </Pressable>
+        <Pressable
+          onPress={() => router.replace('/')}
+          style={styles.ctaBtnSecondary}
+          accessibilityLabel="Home"
+          testID="sprachbausteine-results-home"
+        >
+          <Text style={styles.ctaBtnSecondaryText}>Home</Text>
         </Pressable>
       </View>
     </View>
@@ -411,6 +421,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
     borderTopWidth: 1,
     borderTopColor: Colors.border,
+    gap: 10,
   },
   ctaBtn: {
     backgroundColor: colors.blue,
@@ -422,5 +433,16 @@ const styles = StyleSheet.create({
     fontFamily: 'Outfit_800ExtraBold',
     fontSize: 16,
     color: '#FFFFFF',
+  },
+  ctaBtnSecondary: {
+    backgroundColor: '#F1F5F9',
+    borderRadius: 16,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  ctaBtnSecondaryText: {
+    fontFamily: 'Outfit_800ExtraBold',
+    fontSize: 15,
+    color: colors.navy,
   },
 });

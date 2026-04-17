@@ -120,17 +120,19 @@ export default function SprachbausteineTestScreen() {
   const sessionStartTimeRef = useRef<number>(Date.now());
   const progressAnim = useRef(new Animated.Value(0)).current;
 
-  // Progress: T1 = 0-50%, T2 = 50-100%
+  // Progress: T1 = 0-50%, T2 = 50-100%. In single-teil mode, progress covers full 0-100%.
   useEffect(() => {
-    const target = phase === 't1' ? 0 : 50;
+    const isSingleTeilMode = !t1Question || !t2Question;
+    const target = isSingleTeilMode ? 0 : (phase === 't1' ? 0 : 50);
     Animated.timing(progressAnim, { toValue: target, duration: 300, useNativeDriver: false }).start();
-  }, [phase, progressAnim]);
+  }, [phase, progressAnim, t1Question, t2Question]);
 
-  // Create session on mount
+  // Create session on mount — supports single-teil mode (one of t1/t2 may be null)
   useEffect(() => {
-    if (!t1Question || !t2Question || !userId) return;
-    // total blanks = 18 (10 + 8), stored at session level
-    const totalBlanks = 18;
+    if ((!t1Question && !t2Question) || !userId) return;
+    // total blanks depends on which teils are present:
+    //   Teil 1 only = 10 blanks, Teil 2 only = 8 blanks, both = 18
+    const totalBlanks = (t1Question ? 10 : 0) + (t2Question ? 8 : 0);
     createSectionalSession({
       userId,
       level,
@@ -222,16 +224,10 @@ export default function SprachbausteineTestScreen() {
     ]);
   }, [phase, t1Question]);
 
-  const handleContinueToT2 = useCallback(() => {
-    if (!t2Question) {
-      // Single-teil mode: skip t2, go directly to submit
-      void handleSubmit();
-      return;
-    }
-    Animated.timing(progressAnim, { toValue: 50, duration: 300, useNativeDriver: false }).start();
-    setPhase('t2');
-  }, [progressAnim, t2Question, handleSubmit]);
-
+  // NOTE: handleSubmit declared BEFORE handleContinueToT2 because the latter
+  // references it in single-teil mode (t2Question === null). Previously this
+  // created a temporal dead-zone crash — tap "Continue" on Teil 1 alone → app
+  // freeze. Declaration order matters here.
   const handleSubmit = useCallback(async () => {
     if (isSubmitting || !sessionId) return;
     // Need at least one question
@@ -279,6 +275,16 @@ export default function SprachbausteineTestScreen() {
     }
   }, [isSubmitting, sessionId, t1Question, t2Question, t1Answers, t2Answers, userId, profile, refreshProfile, level]);
 
+  const handleContinueToT2 = useCallback(() => {
+    if (!t2Question) {
+      // Single-teil mode: skip t2, go directly to submit
+      void handleSubmit();
+      return;
+    }
+    Animated.timing(progressAnim, { toValue: 50, duration: 300, useNativeDriver: false }).start();
+    setPhase('t2');
+  }, [progressAnim, t2Question, handleSubmit]);
+
   const progressWidth = progressAnim.interpolate({ inputRange: [0, 100], outputRange: ['0%', '100%'] });
 
   // ─── Empty guard ─────────────────────────────────────────────────────────────
@@ -291,10 +297,10 @@ export default function SprachbausteineTestScreen() {
         <Stack.Screen options={{ title: 'Sprachbausteine', headerShown: false }} />
         <View style={styles.emptyWrap}>
           <Text style={styles.emptyEmoji}>📚</Text>
-          <Text style={styles.emptyTitle}>Noch keine Fragen verfügbar</Text>
-          <Text style={styles.emptyDesc}>Dieser Abschnitt wird bald freigeschaltet.</Text>
+          <Text style={styles.emptyTitle}>No questions available yet</Text>
+          <Text style={styles.emptyDesc}>This section will be unlocked soon.</Text>
           <Pressable onPress={() => router.back()} style={styles.emptyBackButton}>
-            <Text style={styles.emptyBackText}>Zurück</Text>
+            <Text style={styles.emptyBackText}>Back</Text>
           </Pressable>
         </View>
       </View>
@@ -342,8 +348,8 @@ export default function SprachbausteineTestScreen() {
         <View style={styles.sectionLabel}>
           <Text style={styles.sectionLabelText}>
             {isT1Phase
-              ? 'Teil 1 — Ergänzen Sie die Lücken mit Wörtern aus dem Wortkasten'
-              : 'Teil 2 — Wählen Sie die richtige Antwort (a, b oder c)'}
+              ? 'Teil 1 — Fill in the gaps with words from the word bank'
+              : 'Teil 2 — Choose the correct answer (a, b, or c)'}
           </Text>
         </View>
 
@@ -385,8 +391,8 @@ export default function SprachbausteineTestScreen() {
         {isT1Phase && (
           <View style={styles.wordBank}>
             <View style={styles.wordBankHeader}>
-              <Text style={styles.wordBankTitle}>Wortkasten</Text>
-              <Text style={styles.wordBankCount}>{t1AvailableWords.length} übrig</Text>
+              <Text style={styles.wordBankTitle}>Word Bank</Text>
+              <Text style={styles.wordBankCount}>{t1AvailableWords.length} remaining</Text>
             </View>
             <View style={styles.wordChipRow}>
               {t1Words.map((word) => {
@@ -447,21 +453,25 @@ export default function SprachbausteineTestScreen() {
         )}
       </ScrollView>
 
-      {/* Footer CTA */}
+      {/* Footer CTA — single-teil mode uses "Complete Test" since there's no Teil 2 */}
       <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
         <Pressable
           onPress={isT1Phase ? handleContinueToT2 : handleSubmit}
           disabled={!canProceed || isSubmitting}
           style={[styles.ctaBtn, (!canProceed || isSubmitting) && styles.ctaBtnDisabled]}
-          accessibilityLabel={isT1Phase ? 'Continue to Teil 2' : 'Submit'}
+          accessibilityLabel={isT1Phase && t2Question ? 'Continue to Teil 2' : 'Submit'}
         >
           <Text style={styles.ctaBtnText}>
-            {isSubmitting ? 'Wird gespeichert…' : isT1Phase ? 'Weiter zu Teil 2 →' : 'Test abschließen'}
+            {isSubmitting
+              ? 'Saving…'
+              : isT1Phase && t2Question
+                ? 'Continue to Teil 2 →'
+                : 'Complete Test'}
           </Text>
         </Pressable>
         {isT1Phase && !t1AllFilled && (
           <Text style={styles.footerHint}>
-            {Object.keys(t1Answers).length}/10 Lücken ausgefüllt
+            {Object.keys(t1Answers).length}/10 gaps filled
           </Text>
         )}
       </View>
