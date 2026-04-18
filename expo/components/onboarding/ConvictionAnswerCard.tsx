@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, StyleProp, ViewStyle } from 'react-native';
 import Animated, {
   useSharedValue,
@@ -9,6 +9,7 @@ import Animated, {
   runOnJS,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
+import { ConfettiParticles } from './ConfettiParticles';
 
 export type ConvictionEntry = { emoji: string; copy: string };
 
@@ -35,6 +36,7 @@ export function ConvictionAnswerCard({
 }: Props) {
   const flipProgress = useSharedValue(0);
   const pressScale = useSharedValue(1);
+  const [particlesActive, setParticlesActive] = useState(false);
 
   useEffect(() => {
     if (isSelected) {
@@ -42,10 +44,15 @@ export function ConvictionAnswerCard({
         1,
         { duration: 300, easing: Easing.out(Easing.back(1.5)) },
         (finished) => {
-          if (finished && onFlipComplete) runOnJS(onFlipComplete)();
+          if (finished) {
+            if (onFlipComplete) runOnJS(onFlipComplete)();
+            runOnJS(setParticlesActive)(true);
+          }
         },
       );
     } else {
+      // OB-04: also call setParticlesActive(false) here so particles reset
+      // and replay fresh when this card is tapped again after a flip-back.
       flipProgress.value = withTiming(0, {
         duration: 300,
         easing: Easing.out(Easing.back(1.5)),
@@ -101,6 +108,8 @@ export function ConvictionAnswerCard({
         >
           <Text style={styles.backEmoji}>{conviction.emoji}</Text>
           <Text style={styles.backCopy}>{conviction.copy}</Text>
+          {/* Confetti particles — absolutely positioned, zIndex 0 */}
+          <ConfettiParticles active={particlesActive} />
         </Animated.View>
       </Pressable>
     </Animated.View>

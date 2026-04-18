@@ -6,7 +6,7 @@ Execute top to bottom. One task at a time. Stop after each and wait for PO revie
 |------|-------|--------|
 | [OB-00](tasks/OB-00-investigation.md) | Codebase investigation & setup | [x] |
 | [OB-01](tasks/OB-01-install-reanimated-and-copy-data.md) | Install Reanimated + conviction copy data file | [x] |
-| [OB-02](tasks/OB-02-conviction-card-component.md) | ConvictionCard flip component | [ ] |
+| [OB-02](tasks/OB-02-conviction-card-component.md) | ConvictionCard flip component | [x] |
 | [OB-03](tasks/OB-03-confetti-particles.md) | ConfettiParticles sub-component | [ ] |
 | [OB-04](tasks/OB-04-screen-02-cert.md) | Wire Screen 02 — cert.tsx | [ ] |
 | [OB-05](tasks/OB-05-screen-03-level.md) | Wire Screen 03 — level.tsx | [ ] |

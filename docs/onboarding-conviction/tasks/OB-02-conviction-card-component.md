@@ -1,93 +1,88 @@
-# OB-02 — ConvictionCard Flip Component
+# OB-02 — Confetti particle layer on the yellow conviction face
 
-**Status:** [ ]  
-**Brief sections:** §2 (interaction flow), §4.1, §4.2, §4.3, §5.1, §5.2, §5.3, §5.4, §5.5
+## Read first (in this order)
+1. /docs/onboarding-conviction/AGENT_CONTEXT.md
+2. /docs/onboarding-conviction/OB-00-discovery.md
+3. Your own OB-01 implementation (ConvictionAnswerCard.tsx) and OB-01
+   task report — you need to build on top of this component
+4. Wordifi_Conviction_Card_Implementation_Brief.docx
+   — section 4.4 ONLY
 
----
+DO NOT read brief 4.3 (hold timer) or 5.5 (accessibility). Those are
+OB-04 and OB-03.
 
-## Objective
-Build `expo/components/onboarding/ConvictionCard.tsx` — the self-contained flip card component. No confetti yet (OB-03).
+## Goal
+Add a subtle confetti particle layer to the yellow conviction face
+of ConvictionAnswerCard per brief section 4.4. 5 particles float
+upward and fade out, staggered, staying contained within the card.
 
----
+## Current state to build on
+OB-01 established:
+- Reanimated 4.1.7 installed and working
+- ConvictionAnswerCard at expo/components/onboarding/ConvictionAnswerCard.tsx
+- Screen 02 (cert.tsx) uses the component with 4 options
+- Yellow face holds indefinitely (no auto flip-back — that's OB-04)
 
-## Component API
+## Explicitly OUT of scope
+- Auto flip-back timer — OB-04 still owns this
+- Particle cleanup on flip-back — there IS no flip-back yet. For this
+  task, particles animate on flip-TO-yellow and then stay in their
+  final (faded-out, invisible) state. OB-04 will wire the reset when
+  the flip-back is implemented.
+- Reduce-motion handling for particles — OB-03 owns this
+- Wiring into other screens — OB-05+
+- Changing the front face, the flip animation, the haptics, the press
+  feedback, or the Continue button behaviour — all OB-01 work, leave it alone
 
-```ts
-type ConvictionCardProps = {
-  // Answer card content (front face)
-  children: React.ReactNode;
+## Particle specification (brief 4.4, verbatim)
+- Count: 5
+- Size: random between 3px and 6px
+- Colours: rotate through rgba(255,255,255,0.4) and rgba(201,168,0,0.6)
+- Shape: small circles (border radius = half of size)
+- Float distance: 7px upward (translateY 0 → -7)
+- Opacity animation: 0.8 → 0 over the same duration
+- Duration: 2500ms
+- Stagger: each particle starts with a random delay between 0ms and 400ms
+- Positions (absolute, per brief):
+    { top: '15%', left: '8%' }
+    { top: '20%', right: '10%' }
+    { bottom: '25%', left: '15%' }
+    { bottom: '20%', right: '8%' }
+    { top: '50%', right: '5%' }
 
-  // Conviction data (back face) — null means no conviction for this card
-  conviction: { emoji: string; copy: string } | null;
+## Architecture
+Create ConfettiParticles as either:
+- A sub-component inside ConvictionAnswerCard.tsx, OR
+- A separate file at expo/components/onboarding/ConfettiParticles.tsx
 
-  // Whether this card is currently selected (drives selected-state style on flip-back)
-  isSelected: boolean;
+Use your judgement based on the current file's size and existing
+patterns. Document the choice.
 
-  // Fires when user taps — parent sets selected state and passes it back via isSelected
-  onSelect: () => void;
+Particles render ONLY on the yellow (back) face. zIndex 0 or below
+the text. overflow: 'hidden' on parent clips to card bounds.
 
-  // Fires when Continue should activate (flip animation complete)
-  onFlipComplete: () => void;
-};
-```
+## When do particles animate?
+Trigger when the flip-to-yellow animation completes (same moment
+Continue activates). Do NOT trigger on every render.
 
----
+## Performance
+One shared value per particle. Drive translateY and opacity from a
+single progress value via interpolate. No setInterval, no
+requestAnimationFrame, no JS-thread loop.
 
-## Implementation notes
+## Acceptance
+- 5 particles on yellow face after flip completes
+- Random size 3–6px, correct colours, circle shape
+- Float 7px up, fade 0.8 → 0 over 2500ms, staggered 0–400ms
+- Clipped to card bounds
+- Other 3 cards do not render particles
+- Card dimensions unchanged vs OB-01 baseline
+- TC-012 still passes
 
-### Dimensions (§5.1)
-Cards have no fixed height in existing screens — height is driven by content + padding. Use `onLayout` on the outer container to capture height at render time. Both faces share the same container, so they're inherently the same size.
-
-### Flip animation (§4.1)
-- `flipProgress` shared value: 0 = front, 1 = back
-- Front face: rotateY 0 → 180 deg, backfaceVisibility hidden
-- Back face: rotateY 180 → 360 deg, backfaceVisibility hidden, position absolute inset 0
-- Duration 300ms, `Easing.out(Easing.back(1.5))`
-- Content swap happens at 50% (invisible midpoint) via conditional render gated on `flipProgress.value >= 0.5` — use a derived value or `runOnJS` callback at midpoint
-
-### Hold + auto flip-back (§4.3)
-- `HOLD_DURATION = 2500` ms
-- `onFlipComplete()` is called when flip lands (after 300ms)
-- `setTimeout` of 2500ms triggers flip-back
-- Store the timer ref in `useRef` so it can be cancelled
-- If component unmounts, clear the timer
-
-### Continue button integration (§5.4)
-- `onFlipComplete` fires → parent activates Continue
-- If user taps Continue while yellow face is showing, parent calls a cancel ref or the timer clears automatically on navigation (unmount clears it)
-
-### Reduce Motion (§5.5)
-```ts
-import { AccessibilityInfo } from 'react-native';
-const reduceMotion = await AccessibilityInfo.isReduceMotionEnabled();
-```
-If true: skip rotation, show yellow face as instant background color change for 2.5s, then flip back.
-
-### Haptics (§5.3)
-```ts
-import * as Haptics from 'expo-haptics';
-Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); // on pressIn
-```
-
-### Press scale (§4.2)
-Scale 1 → 0.97 on pressIn (100ms), back to 1 on pressOut (100ms). Applied to the outer container.
-
-### Yellow face anatomy (§5.2)
-```
-Row: [Emoji 30px, marginRight 12] + [Copy Outfit_800ExtraBold 16px #374151 flex:1 lineHeight 22]
-Background: #F0C808, borderRadius matches front card, paddingH 16 paddingV 12, overflow hidden
-```
-Confetti placeholder View added here (absoluteFill, zIndex 0) — wired up in OB-03.
-
----
-
-## Acceptance criteria
-- [ ] Flip animation completes in 300ms, spring feel
-- [ ] Only tapped card flips — siblings are completely static
-- [ ] Yellow face shows for 2.5s then auto flip-back
-- [ ] Continue activates immediately when yellow face appears (onFlipComplete called)
-- [ ] Press scale 0.97 on tap down
-- [ ] Light haptic on tap down
-- [ ] Reduce Motion: instant color swap, no rotation
-- [ ] Timer cleared on unmount (no memory leak)
-- [ ] TypeScript strict — no `any`
+## Do not touch
+- Everything in AGENT_CONTEXT.md "do not touch"
+- Front face, flip animation, haptics, press scale, Continue button (OB-01)
+- All other question and value screens
+- onboarding_launch_v1_2026-04-05/
+- Onboarding store / OnboardingAnswers type
+- Supabase, Edge Functions, migrations
