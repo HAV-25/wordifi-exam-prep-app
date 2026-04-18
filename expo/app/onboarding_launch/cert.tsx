@@ -11,6 +11,7 @@ import { onboardingStore } from './_store';
 import { ArrowLeft } from 'lucide-react-native';
 import { ScreenLayout } from '@/components/ScreenLayout';
 import { ConvictionAnswerCard } from '@/components/onboarding/ConvictionAnswerCard';
+import { CERT_CONVICTIONS } from '@/components/onboarding/convictionLookup';
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 
@@ -22,14 +23,6 @@ const CERTS: { id: CertId; emoji: string; title: string; subtitle: string }[] = 
   { id: 'osd',      emoji: '📝', title: 'ÖSD',             subtitle: 'Recognised across Austria, Germany and Switzerland' },
   { id: 'not_sure', emoji: '🤔', title: 'Not sure yet',    subtitle: "We'll help you figure out the right one" },
 ];
-
-// Conviction copy for Screen 02 — hardcoded per OB-01; moves to shared lookup in OB-05
-const CERT_CONVICTIONS: Record<CertId, { emoji: string; copy: string }> = {
-  goethe:   { emoji: '🎓', copy: 'Perfect. Wordifi has every Goethe section covered.' },
-  telc:     { emoji: '✅', copy: "Smart. Wordifi's mock tests are built for TELC." },
-  osd:      { emoji: '🏅', copy: 'Exactly right. Wordifi knows every ÖSD section.' },
-  not_sure: { emoji: '💡', copy: 'No problem. Wordifi will find the right exam for you.' },
-};
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
