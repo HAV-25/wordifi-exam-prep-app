@@ -8,10 +8,10 @@ Execute top to bottom. One task at a time. Stop after each and wait for PO revie
 | [OB-01](tasks/OB-01-install-reanimated-and-copy-data.md) | Install Reanimated + conviction copy data file | [x] |
 | [OB-02](tasks/OB-02-conviction-card-component.md) | ConvictionCard flip component | [x] |
 | [OB-03](tasks/OB-03-confetti-particles.md) | ConfettiParticles sub-component | [x] |
-| [OB-04](tasks/OB-04-screen-02-cert.md) | Wire Screen 02 — cert.tsx | [x] |
-| [OB-05](tasks/OB-05-screen-03-level.md) | Wire Screen 03 — level.tsx | [ ] |
-| [OB-06](tasks/OB-06-screen-04-empathy.md) | Wire Screen 04 — empathy.tsx | [ ] |
-| [OB-07](tasks/OB-07-screen-05-timeline.md) | Wire Screen 05 — timeline.tsx | [ ] |
-| [OB-08](tasks/OB-08-screen-06-readiness.md) | Wire Screen 06 — readiness.tsx | [ ] |
-| [OB-09](tasks/OB-09-screen-07-hardest.md) | Wire Screen 07 — hardest.tsx | [ ] |
-| [OB-10](tasks/OB-10-screens-11-13.md) | Wire Screens 11 + 13 — daily-commitment + learner-style | [ ] |
+| [OB-04](tasks/OB-04-screen-02-cert.md) | Wire Screen 02 — cert.tsx + auto flip-back | [x] |
+| [OB-05](tasks/OB-05-conviction-lookup.md) | Shared conviction lookup — 8 screens, 37 entries, data only | [x] |
+| [OB-06](tasks/OB-06-screens-02-03.md) | Screen 02 refactor (inline → lookup) + Screen 03 wiring | [ ] |
+| [OB-07](tasks/OB-07-screens-04-05.md) | Screens 04 + 05 wiring — empathy + timeline | [ ] |
+| [OB-08](tasks/OB-08-screens-06-07-11-13.md) | Screens 06, 07, 11, 13 wiring — readiness + hardest + minutes + learner-style | [ ] |
+| [OB-09](tasks/OB-09-regression.md) | Regression pass — TC-011/012/013 + edge cases + all 8 screens | [ ] |
+| [OB-10](tasks/OB-10-visual-qa.md) | Visual QA against brief — dimensions, timing, colours on every screen | [ ] |
