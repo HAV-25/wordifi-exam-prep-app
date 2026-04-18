@@ -42,9 +42,10 @@ function Particle({ config, active }: ParticleProps) {
         config.delay,
         withTiming(1, { duration: HOLD_DURATION, easing: Easing.linear }),
       );
+    } else {
+      // Reset to 0 so particles replay fresh on the next flip-to-yellow.
+      progress.value = 0;
     }
-    // OB-04: add `else { progress.value = 0; }` here to reset particles
-    // so they replay fresh when the card is re-tapped after a flip-back.
   }, [active]);
 
   const animStyle = useAnimatedStyle(() => ({

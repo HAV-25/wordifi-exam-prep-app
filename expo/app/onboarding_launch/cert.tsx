@@ -3,7 +3,7 @@
  * Source: Banani flow FtXTL2Xb5WF4 / screen p1VdkoULlAk1
  * Step 1 of 10
  */
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -36,8 +36,13 @@ const CERT_CONVICTIONS: Record<CertId, { emoji: string; copy: string }> = {
 export default function CertScreen() {
   const [selected, setSelected] = useState<CertId | null>(null);
   const [continueActive, setContinueActive] = useState(false);
+  // Holds the cancel handle passed by the currently-flipped card via onFlipComplete.
+  // Called in handleContinue to abort any pending flip-back timer (brief 5.4 point 3).
+  const cancelFlipBackRef = useRef<(() => void) | null>(null);
 
   function handleContinue() {
+    cancelFlipBackRef.current?.(); // abort flip-back if yellow face is still showing
+    cancelFlipBackRef.current = null;
     if (!selected) return;
     onboardingStore.cert = selected;
     router.push('/onboarding_launch/level');
@@ -88,8 +93,11 @@ export default function CertScreen() {
                 conviction={CERT_CONVICTIONS[cert.id]}
                 isSelected={selected === cert.id}
                 onPress={() => setSelected(cert.id)}
-                onFlipComplete={() => setContinueActive(true)}
-                cardStyle={styles.card}
+                onFlipComplete={(cancelFn) => {
+                  setContinueActive(true);
+                  cancelFlipBackRef.current = cancelFn;
+                }}
+                cardStyle={[styles.card, selected === cert.id && styles.cardSelected]}
                 cardBorderRadius={12}
                 accessibilityLabel={cert.title}
               >
@@ -191,7 +199,7 @@ const styles = StyleSheet.create({
   },
   cardSelected: {
     borderColor: '#2B70EF',
-    backgroundColor: '#F0F5FF',
+    backgroundColor: '#ECF2FE', // brief §step-6: soft Primary Blue tint (was #F0F5FF in OB-01 scaffold)
   },
   cardPressed: {
     transform: [{ scale: 0.98 }],
