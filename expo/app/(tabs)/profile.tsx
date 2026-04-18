@@ -1,35 +1,38 @@
 import * as Clipboard from 'expo-clipboard';
 import { router } from 'expo-router';
 import {
-  CheckCircle2,
+  Calendar,
   ChevronRight,
   Clock,
   Copy,
   CreditCard,
+  FileText,
   Flame,
   Gift,
-  Info,
   LogOut,
   Pencil,
-  Share2 as ShareIcon,
   Star,
-  TrendingUp,
   Trophy,
+  X,
 } from 'lucide-react-native';
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
+  Alert,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
   Pressable,
   ScrollView,
-  Share,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 
 import Colors from '@/constants/colors';
-import { colors, spacing, radius } from '@/theme';
+import { colors, spacing } from '@/theme';
 import { presentAdaptyPaywall, syncSubscriptionAfterPurchase } from '@/lib/adaptyPaywall';
 import { supabase } from '@/lib/supabaseClient';
 import { useHomeData } from '@/lib/useHomeData';
@@ -37,6 +40,7 @@ import { useAccess } from '@/providers/AccessProvider';
 import { useAuth } from '@/providers/AuthProvider';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
+
 const PAID_TIERS = new Set([
   'monthly',
   'quarterly',
@@ -62,28 +66,25 @@ const UPGRADE_SUBTITLE: Record<string, string> = {
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
+
 function formatLong(iso: string | null | undefined): string {
   if (!iso) return '—';
   return new Date(iso).toLocaleDateString('en-GB', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
+    day: 'numeric', month: 'short', year: 'numeric',
   });
 }
 
 function formatShort(iso: string | null | undefined): string {
   if (!iso) return '—';
   return new Date(iso).toLocaleDateString('en-GB', {
-    day: 'numeric',
-    month: 'short',
+    day: 'numeric', month: 'short',
   });
 }
 
 function formatMonthYear(iso: string | null | undefined): string {
   if (!iso) return '—';
   return new Date(iso).toLocaleDateString('en-GB', {
-    month: 'short',
-    year: 'numeric',
+    month: 'short', year: 'numeric',
   });
 }
 
@@ -93,108 +94,65 @@ function daysUntil(iso: string | null | undefined): number | null {
   now.setHours(0, 0, 0, 0);
   const d = new Date(iso);
   d.setHours(0, 0, 0, 0);
-  const diff = Math.ceil((d.getTime() - now.getTime()) / 86_400_000);
-  return diff;
-}
-
-function extractPlanHighlights(json: unknown): string[] {
-  if (!json || typeof json !== 'object') return [];
-  const obj = json as Record<string, unknown>;
-  const out: string[] = [];
-
-  if (typeof obj.weekly_goal_sessions === 'number') {
-    out.push(`Practice ${obj.weekly_goal_sessions} session${obj.weekly_goal_sessions !== 1 ? 's' : ''} per week`);
-  }
-  if (typeof obj.focus_section === 'string') {
-    out.push(`Focus section: ${obj.focus_section}`);
-  }
-  if (Array.isArray(obj.mock_test_dates) && obj.mock_test_dates.length > 0) {
-    out.push(`Mock test: ${formatShort(obj.mock_test_dates[0] as string)}`);
-  }
-  // Pick up any other top-level string values we haven't used
-  for (const [k, v] of Object.entries(obj)) {
-    if (out.length >= 3) break;
-    if (typeof v === 'string' && v.trim() && !['focus_section'].includes(k)) {
-      out.push(v.trim());
-    }
-  }
-  return out.slice(0, 3);
-}
-
-// ─── Skeleton block ───────────────────────────────────────────────────────────
-function SkeletonRow({ height = 18, width = '60%', marginBottom = 8 }: {
-  height?: number; width?: number | `${number}%`; marginBottom?: number
-}) {
-  return (
-    <View
-      style={{
-        height,
-        width: width as number | `${number}%`,
-        borderRadius: 6,
-        backgroundColor: Colors.surfaceMuted,
-        marginBottom,
-      }}
-    />
-  );
+  return Math.ceil((d.getTime() - now.getTime()) / 86_400_000);
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
+
 function InfoRow({
   label,
   children,
   showDivider = true,
+  onPress,
 }: {
   label: string;
   children: React.ReactNode;
   showDivider?: boolean;
+  onPress?: () => void;
 }) {
+  const inner = (
+    <View style={styles.infoRow}>
+      <Text style={styles.rowLabel}>{label}</Text>
+      <View style={styles.rowValueGroup}>{children}</View>
+    </View>
+  );
   return (
     <>
-      <View style={styles.infoRow}>
-        <Text style={styles.infoLabel}>{label}</Text>
-        <View style={styles.infoRight}>{children}</View>
-      </View>
+      {onPress ? (
+        <Pressable onPress={onPress} accessibilityRole="button">{inner}</Pressable>
+      ) : inner}
       {showDivider && <View style={styles.rowDivider} />}
     </>
   );
 }
 
-function ActionRow({
-  icon,
-  label,
-  right,
-  onPress,
-  showDivider = true,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  right?: React.ReactNode;
-  onPress?: () => void;
-  showDivider?: boolean;
-}) {
+function TierBadge({ tier, isPaid }: { tier: string; isPaid: boolean }) {
+  const bg: string = isPaid ? 'rgba(34,197,94,0.15)' : tier === 'free_trial' ? '#FFF8E1' : Colors.background;
+  const textColor: string = isPaid ? '#15803D' : tier === 'free_trial' ? '#F57F17' : Colors.textMuted;
+  const label = isPaid ? 'Active' : tier === 'free_trial' ? 'Trial' : 'Free';
   return (
-    <>
-      <Pressable style={styles.actionRow} onPress={onPress} accessibilityRole="button">
-        <View style={styles.actionIcon}>{icon}</View>
-        <Text style={styles.actionLabel}>{label}</Text>
-        <View style={styles.actionRight}>
-          {right}
-          <ChevronRight size={16} color={Colors.textMuted} />
-        </View>
-      </Pressable>
-      {showDivider && <View style={styles.rowDivider} />}
-    </>
+    <View style={[styles.statusPill, { backgroundColor: bg }]}>
+      <Text style={[styles.statusPillText, { color: textColor }]}>{label}</Text>
+    </View>
   );
 }
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
+
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
-  const { profile, user, signOut, refreshProfile, isLoading } = useAuth();
+  const { profile, user, signOut, refreshProfile } = useAuth();
   const { refreshAccess } = useAccess();
   const { leaderboardPercentile } = useHomeData();
 
-  // tier_config display names (graceful fallback if table missing / schema differs)
+  // Player identity edit sheet state
+  const [editSheetVisible, setEditSheetVisible] = useState(false);
+  const [editFirstName, setEditFirstName] = useState('');
+  const [editLastName, setEditLastName] = useState('');
+  const [editTag, setEditTag] = useState('');
+  const [tagSaving, setTagSaving] = useState(false);
+
+  // Tier config display names
   const tierConfigQuery = useQuery({
     queryKey: ['tier-config'],
     queryFn: async (): Promise<Record<string, string>> => {
@@ -203,8 +161,7 @@ export default function ProfileScreen() {
       if (error || !data) return {};
       return Object.fromEntries(
         (data as Array<{ tier_name: string; display_name: string }>).map((r) => [
-          r.tier_name,
-          r.display_name,
+          r.tier_name, r.display_name,
         ])
       );
     },
@@ -212,12 +169,11 @@ export default function ProfileScreen() {
   });
 
   const tierDisplayName = useCallback(
-    (tier: string) =>
-      tierConfigQuery.data?.[tier] ?? TIER_DISPLAY_FALLBACK[tier] ?? tier,
-    [tierConfigQuery.data]
+    (tier: string) => tierConfigQuery.data?.[tier] ?? TIER_DISPLAY_FALLBACK[tier] ?? tier,
+    [tierConfigQuery.data],
   );
 
-  // Derived values
+  // Derived
   const tier = profile?.subscription_tier ?? 'free';
   const showUpgradeCard = FREE_TIERS.has(tier);
   const isPaid = PAID_TIERS.has(tier);
@@ -225,29 +181,53 @@ export default function ProfileScreen() {
     ?.trial_expires_at as string | null ?? null;
   const trialActive = profile?.trial_active ?? false;
 
+  const displayName = profile?.player_name?.trim() || user?.email?.split('@')[0] || 'You';
+
   const avatarLetter = useMemo(() => {
     const name = profile?.player_name?.trim();
     if (name) return name[0]!.toUpperCase();
-    const email = user?.email?.trim();
-    if (email) return email[0]!.toUpperCase();
-    return '?';
+    return (user?.email?.[0] ?? '?').toUpperCase();
   }, [profile?.player_name, user?.email]);
 
   const examDays = daysUntil(profile?.exam_date);
-  const planHighlights = useMemo(
-    () => extractPlanHighlights(profile?.study_plan_json),
-    [profile?.study_plan_json]
-  );
+  const certLabel = [profile?.exam_type?.toUpperCase(), profile?.target_level]
+    .filter(Boolean)
+    .join(' · ') || null;
 
-  const leaderboardLabel = leaderboardPercentile != null
-    ? `Top ${leaderboardPercentile}%`
-    : '—';
+  // Open edit sheet and pre-fill
+  const openEditSheet = useCallback(() => {
+    const name = profile?.player_name?.trim() ?? '';
+    // Attempt to split existing name into first/last; tag stays as-is
+    const parts = name.split(' ');
+    setEditFirstName(parts[0] ?? '');
+    setEditLastName(parts.slice(1).join(' '));
+    setEditTag(name); // current player_name is the tag
+    setEditSheetVisible(true);
+  }, [profile?.player_name]);
+
+  const handleSaveTag = useCallback(async () => {
+    const tag = editTag.trim();
+    if (!tag || !user?.id) return;
+    setTagSaving(true);
+    try {
+      await (supabase.from('profiles') as any)
+        .update({ player_name: tag })
+        .eq('id', user.id);
+      await refreshProfile();
+      setEditSheetVisible(false);
+    } catch {
+      Alert.alert('Error', 'Could not save your Wordifi Tag. Please try again.');
+    } finally {
+      setTagSaving(false);
+    }
+  }, [editTag, user?.id, refreshProfile]);
 
   const handleCopyEmail = useCallback(async () => {
     if (user?.email) await Clipboard.setStringAsync(user.email);
   }, [user?.email]);
 
   const handleReferFriend = useCallback(async () => {
+    const { Share } = await import('react-native');
     const code = profile?.referral_code;
     if (!code) return;
     await Share.share({
@@ -262,7 +242,7 @@ export default function ProfileScreen() {
 
   const navigateUpgrade = useCallback(async () => {
     try {
-      const result = await presentAdaptyPaywall(async () => {
+      await presentAdaptyPaywall(async () => {
         if (user?.id) {
           await syncSubscriptionAfterPurchase(user.id);
           await refreshAccess();
@@ -276,171 +256,127 @@ export default function ProfileScreen() {
     <View style={[styles.screen, { paddingTop: insets.top }]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[
-          styles.scrollContent,
-          { paddingBottom: insets.bottom + 32 },
-        ]}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 32 }]}
       >
-        {/* ── Header ──────────────────────────────────────────── */}
-        <View style={styles.header}>
-          {/* Sign-out */}
+        {/* ── Header actions ─────────────────────────────────────────── */}
+        <View style={styles.headerActions}>
           <Pressable
             onPress={handleSignOut}
-            style={styles.signOutBtn}
+            style={styles.logoutBtn}
             accessibilityLabel="Sign out"
           >
-            <LogOut size={20} color={Colors.textMuted} />
+            <LogOut size={24} color={Colors.textMuted} />
           </Pressable>
+        </View>
 
-          {/* Avatar */}
+        {/* ── Identity block ─────────────────────────────────────────── */}
+        <View style={styles.identityBlock}>
           <View style={styles.avatar}>
             <Text style={styles.avatarText}>{avatarLetter}</Text>
           </View>
 
-          {/* Name */}
-          {isLoading ? (
-            <SkeletonRow width={120} height={22} marginBottom={6} />
-          ) : (
-            <Text style={styles.playerName}>
-              {profile?.player_name?.trim() || user?.email?.split('@')[0] || 'You'}
-            </Text>
-          )}
+          {/* Name + pen */}
+          <Pressable
+            style={styles.nameRow}
+            onPress={openEditSheet}
+            accessibilityLabel="Edit player identity"
+            accessibilityRole="button"
+          >
+            <Text style={styles.userName}>{displayName}</Text>
+            <Pencil size={16} color={Colors.textMuted} style={styles.namePen} />
+          </Pressable>
 
-          {/* Exam type · Level */}
-          {isLoading ? (
-            <SkeletonRow width={80} height={14} marginBottom={0} />
-          ) : (
-            <Text style={styles.headerSub}>
-              {[profile?.exam_type?.toUpperCase(), profile?.target_level]
-                .filter(Boolean)
-                .join(' · ') || '—'}
-            </Text>
+          {/* Certification pill */}
+          {certLabel && (
+            <View style={styles.certPill}>
+              <Text style={styles.certPillText}>{certLabel}</Text>
+            </View>
           )}
         </View>
 
-        {/* ── Card 1 — General Profile Information ────────────── */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>PROFILE</Text>
+        {/* ── Countdown card ─────────────────────────────────────────── */}
+        {examDays !== null && examDays > 0 && (
+          <View style={styles.countdownCard}>
+            <Text style={styles.countdownNumber}>{examDays}</Text>
+            <Text style={styles.countdownLabel}>
+              days to your {profile?.target_level} {profile?.exam_type?.toUpperCase()} exam
+            </Text>
+          </View>
+        )}
 
-          {isLoading ? (
-            <>
-              <SkeletonRow width="80%" />
-              <SkeletonRow width="60%" />
-              <SkeletonRow width="70%" />
-            </>
-          ) : (
-            <>
-              {/* Complete your profile banner */}
-              {!profile?.target_level && (
-                <Pressable
-                  onPress={() => router.push('/profile-setup' as never)}
-                  style={styles.profileBanner}
-                  accessibilityRole="button"
-                  accessibilityLabel="Complete your profile"
-                >
-                  <Info size={16} color={colors.primary} />
-                  <Text style={styles.profileBannerText}>Complete your profile to get started</Text>
-                  <ChevronRight size={16} color={colors.primary} />
-                </Pressable>
-              )}
-
-              {/* Email row */}
-              <InfoRow label="Email">
-                <Text style={styles.infoValue} numberOfLines={1}>
-                  {user?.email ?? '—'}
-                </Text>
-                <Pressable onPress={handleCopyEmail} style={styles.iconBtn} accessibilityLabel="Copy email">
-                  <Copy size={16} color={Colors.textMuted} />
-                </Pressable>
-              </InfoRow>
-
-              {/* Level row — tappable */}
-              <Pressable
-                onPress={() => router.push('/profile-setup' as never)}
-                accessibilityRole="button"
-                accessibilityLabel="Edit level"
-              >
-                <InfoRow label="Level">
-                  <View style={styles.levelPill}>
-                    <Text style={styles.levelPillText}>{profile?.target_level ?? '—'}</Text>
-                  </View>
-                  <Pencil size={14} color={Colors.textMuted} style={{ marginLeft: 6 }} />
-                </InfoRow>
-              </Pressable>
-
-              {/* Exam date row — tappable */}
-              <Pressable
-                onPress={() => router.push('/profile-setup' as never)}
-                accessibilityRole="button"
-                accessibilityLabel="Edit exam date"
-              >
-                <InfoRow label="Target exam" showDivider={false}>
-                  <Text style={styles.infoValue}>{formatLong(profile?.exam_date)}</Text>
-                  {examDays !== null && examDays > 0 ? (
-                    <View style={styles.daysBadge}>
-                      <Text style={styles.daysBadgeText}>{examDays} days</Text>
-                    </View>
-                  ) : examDays !== null && examDays <= 0 ? (
-                    <Text style={[styles.infoValue, { color: Colors.accent }]}>Completed</Text>
-                  ) : null}
-                  <Pencil size={14} color={Colors.textMuted} style={{ marginLeft: 6 }} />
-                </InfoRow>
-              </Pressable>
-            </>
-          )}
-
-          {/* Divider before readiness */}
-          <View style={styles.sectionDivider} />
-
-          {/* Readiness score */}
-          <Text style={styles.cardLabel}>EXAM READINESS</Text>
-          {isLoading ? (
-            <SkeletonRow width={100} height={40} />
-          ) : (
-            <>
-              <View style={styles.readinessRow}>
-                <Text style={styles.readinessNumber}>
-                  {Math.round(profile?.readiness_score ?? 0)}
-                </Text>
-                <Text style={styles.readinessPct}>%</Text>
-              </View>
-              <View style={styles.progressTrack}>
-                <View
-                  style={[
-                    styles.progressFill,
-                    { width: `${Math.min(profile?.readiness_score ?? 0, 100)}%` },
-                  ]}
-                />
-              </View>
-            </>
-          )}
-
-          {/* Gamification icons row */}
-          <View style={styles.gamRow}>
-            <View style={styles.gamItem}>
-              <Flame size={20} color={colors.flagRed} />
-              <Text style={styles.gamValue}>
-                {isLoading ? '—' : (profile?.streak_count ?? 0)}
+        {/* ── Progress card ──────────────────────────────────────────── */}
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionLabel}>Your Progress</Text>
+          <View style={styles.progressGrid}>
+            <View style={styles.statItem}>
+              <Text style={styles.statEmoji}>🔥</Text>
+              <Text style={styles.statValue}>{profile?.streak_count ?? 0}</Text>
+              <Text style={styles.statName}>days streak</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Text style={styles.statEmoji}>⭐</Text>
+              <Text style={styles.statValue}>{profile?.xp_total ?? 0}</Text>
+              <Text style={styles.statName}>XP earned</Text>
+            </View>
+            <View style={styles.statItem}>
+              <FileText size={20} color={Colors.primary} />
+              <Text style={styles.statValue}>
+                {(profile as any)?.total_questions_answered ?? '—'}
               </Text>
+              <Text style={styles.statName}>questions</Text>
             </View>
-            <View style={styles.gamItem}>
-              <Star size={20} color={colors.flagGold} />
-              <Text style={styles.gamValue}>
-                {isLoading ? '—' : (profile?.xp_total ?? 0)}
+            <View style={styles.statItem}>
+              <Clock size={20} color={Colors.primary} />
+              <Text style={styles.statValue}>
+                {(profile as any)?.total_practice_minutes
+                  ? `${Math.round((profile as any).total_practice_minutes / 60)}h`
+                  : '—'}
               </Text>
-            </View>
-            <View style={styles.gamItem}>
-              <Trophy size={20} color={Colors.primary} />
-              <Text style={styles.gamValue}>{leaderboardLabel}</Text>
-            </View>
-            <View style={styles.gamItem}>
-              <TrendingUp size={20} color={Colors.accent} />
-              <Text style={styles.gamValue}>—</Text>
+              <Text style={styles.statName}>time practiced</Text>
             </View>
           </View>
         </View>
 
-        {/* ── Card 2 — Upgrade Alert (conditional) ────────────── */}
+        {/* ── Profile details card ────────────────────────────────────── */}
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionLabel}>Profile</Text>
+
+          <InfoRow label="Email">
+            <Text style={styles.rowValue} numberOfLines={1}>{user?.email ?? '—'}</Text>
+            <Pressable onPress={handleCopyEmail} hitSlop={8} accessibilityLabel="Copy email">
+              <Copy size={16} color={Colors.textMuted} />
+            </Pressable>
+          </InfoRow>
+
+          <InfoRow
+            label="Level"
+            onPress={() => router.push('/profile-setup' as never)}
+          >
+            <View style={styles.levelPill}>
+              <Text style={styles.levelPillText}>{profile?.target_level ?? '—'}</Text>
+            </View>
+            <Pencil size={14} color={Colors.textMuted} />
+          </InfoRow>
+
+          <InfoRow
+            label="Target exam"
+            onPress={() => router.push('/profile-setup' as never)}
+          >
+            <Text style={styles.rowValue}>{profile?.exam_type ?? '—'}</Text>
+            <Pencil size={14} color={Colors.textMuted} />
+          </InfoRow>
+
+          <InfoRow
+            label="Exam date"
+            showDivider={false}
+            onPress={() => router.push('/profile-setup' as never)}
+          >
+            <Text style={styles.rowValue}>{formatLong(profile?.exam_date)}</Text>
+            <Calendar size={14} color={Colors.textMuted} />
+          </InfoRow>
+        </View>
+
+        {/* ── Upgrade card (conditional) ──────────────────────────────── */}
         {showUpgradeCard && (
           <Pressable style={styles.upgradeCard} onPress={navigateUpgrade} accessibilityRole="button">
             <View style={styles.upgradeLeft}>
@@ -451,9 +387,7 @@ export default function ProfileScreen() {
               {trialActive && trialExpiresAt ? (
                 <View style={styles.trialRow}>
                   <Clock size={12} color={colors.flagGold} />
-                  <Text style={styles.trialText}>
-                    Trial ends {formatShort(trialExpiresAt)}
-                  </Text>
+                  <Text style={styles.trialText}>Trial ends {formatShort(trialExpiresAt)}</Text>
                 </View>
               ) : null}
             </View>
@@ -463,121 +397,156 @@ export default function ProfileScreen() {
           </Pressable>
         )}
 
-        {/* ── Card 3 — Preparation Plan & Subscription ─────────── */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>YOUR PLAN</Text>
+        {/* ── Subscription card ───────────────────────────────────────── */}
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionLabel}>Subscription</Text>
 
-          {/* Section A — Plan highlights */}
-          {isLoading ? (
-            <>
-              <SkeletonRow width="75%" />
-              <SkeletonRow width="65%" />
-            </>
-          ) : planHighlights.length > 0 ? (
-            planHighlights.map((line, i) => (
-              <View key={i} style={styles.planRow}>
-                <CheckCircle2 size={16} color={Colors.accent} style={styles.planIcon} />
-                <Text style={styles.planText}>{line}</Text>
-              </View>
-            ))
-          ) : (
-            <View style={styles.planRow}>
-              <Info size={16} color={Colors.textMuted} style={styles.planIcon} />
-              <Text style={[styles.planText, styles.planTextMuted]}>
-                Complete onboarding to generate your plan
-              </Text>
-            </View>
+          <InfoRow label="Plan">
+            <Text style={styles.rowValue}>{tierDisplayName(tier)}</Text>
+            <TierBadge tier={tier} isPaid={isPaid} />
+          </InfoRow>
+
+          {profile?.subscription_valid_until && (
+            <InfoRow label="Renews">
+              <Text style={styles.rowValue}>{formatLong(profile.subscription_valid_until)}</Text>
+            </InfoRow>
           )}
 
-          <View style={styles.sectionDivider} />
+          <InfoRow label="Member since" showDivider={false}>
+            <Text style={styles.rowValue}>{formatMonthYear(profile?.created_at)}</Text>
+          </InfoRow>
 
-          {/* Section B — Subscription rows */}
-          <Text style={styles.cardLabel}>SUBSCRIPTION</Text>
+          {/* Action rows */}
+          <View style={styles.actionDivider} />
 
-          {isLoading ? (
-            <>
-              <SkeletonRow width="60%" />
-              <SkeletonRow width="50%" />
-            </>
-          ) : (
-            <>
-              {/* Plan row */}
-              <InfoRow label="Plan">
-                <Text style={styles.infoValue}>{tierDisplayName(tier)}</Text>
-                <TierBadge tier={tier} isPaid={isPaid} />
-              </InfoRow>
-
-              {/* Renewal row */}
-              {profile?.subscription_valid_until ? (
-                <InfoRow label="Renews">
-                  <Text style={styles.infoValue}>
-                    {formatLong(profile.subscription_valid_until)}
-                  </Text>
-                </InfoRow>
-              ) : null}
-
-              {/* Member since */}
-              <InfoRow label="Member since" showDivider={false}>
-                <Text style={styles.infoValue}>{formatMonthYear(profile?.created_at)}</Text>
-              </InfoRow>
-            </>
-          )}
-
-          <View style={styles.sectionDivider} />
-
-          {/* Section C — Actions */}
-          <ActionRow
-            icon={<CreditCard size={18} color={Colors.primary} />}
-            label="View subscription options"
+          <Pressable
+            style={styles.actionRow}
             onPress={navigateUpgrade}
-          />
-          <ActionRow
-            icon={<Gift size={18} color={Colors.accent} />}
-            label="Refer a friend"
-            right={
-              profile?.referral_code ? (
+            accessibilityRole="button"
+          >
+            <CreditCard size={20} color={Colors.primary} />
+            <Text style={styles.actionLabel}>View subscription options</Text>
+            <ChevronRight size={16} color={Colors.textMuted} />
+          </Pressable>
+
+          {profile?.referral_code && (
+            <>
+              <View style={styles.rowDivider} />
+              <Pressable
+                style={styles.actionRow}
+                onPress={handleReferFriend}
+                accessibilityRole="button"
+              >
+                <Gift size={20} color={Colors.accent} />
+                <Text style={styles.actionLabel}>Refer a friend</Text>
                 <View style={styles.refCodePill}>
                   <Text style={styles.refCodeText}>{profile.referral_code}</Text>
                 </View>
-              ) : null
-            }
-            onPress={handleReferFriend}
-            showDivider={false}
-          />
+                <ChevronRight size={16} color={Colors.textMuted} />
+              </Pressable>
+            </>
+          )}
         </View>
       </ScrollView>
-    </View>
-  );
-}
 
-// ─── Tier badge ───────────────────────────────────────────────────────────────
-function TierBadge({ tier, isPaid }: { tier: string; isPaid: boolean }) {
-  let bg: string = Colors.background;
-  let textColor: string = Colors.textMuted;
-  let label = 'Free';
+      {/* ── Player Identity Edit Sheet ──────────────────────────────── */}
+      <Modal
+        visible={editSheetVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setEditSheetVisible(false)}
+      >
+        <KeyboardAvoidingView
+          style={styles.modalOuter}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <Pressable style={styles.modalBackdrop} onPress={() => setEditSheetVisible(false)} />
+          <View style={[styles.editSheet, { paddingBottom: insets.bottom + 24 }]}>
+            <View style={styles.sheetHandle} />
 
-  if (isPaid) {
-    bg = '#E8F5E9';
-    textColor = '#2E7D32';
-    label = 'Active';
-  } else if (tier === 'free_trial') {
-    bg = '#FFF8E1';
-    textColor = '#F57F17';
-    label = 'Trial';
-  }
+            {/* Sheet header */}
+            <View style={styles.sheetHeader}>
+              <Text style={styles.sheetTitle}>Player Identity</Text>
+              <Pressable
+                onPress={() => setEditSheetVisible(false)}
+                hitSlop={8}
+                style={styles.sheetClose}
+                accessibilityLabel="Close"
+              >
+                <X size={20} color={Colors.textMuted} />
+              </Pressable>
+            </View>
+            <Text style={styles.sheetSubtitle}>
+              Your real name is private. Your Wordifi Tag appears on the leaderboard.
+            </Text>
 
-  return (
-    <View style={[styles.tierBadge, { backgroundColor: bg }]}>
-      <Text style={[styles.tierBadgeText, { color: textColor }]}>{label}</Text>
+            {/* Name fields */}
+            <Text style={styles.fieldLabel}>Your name</Text>
+            <View style={styles.nameFields}>
+              <TextInput
+                style={[styles.input, styles.inputHalf]}
+                value={editFirstName}
+                onChangeText={setEditFirstName}
+                placeholder="First name"
+                placeholderTextColor={Colors.textMuted}
+                autoCapitalize="words"
+                returnKeyType="next"
+              />
+              <TextInput
+                style={[styles.input, styles.inputHalf]}
+                value={editLastName}
+                onChangeText={setEditLastName}
+                placeholder="Last name"
+                placeholderTextColor={Colors.textMuted}
+                autoCapitalize="words"
+                returnKeyType="next"
+              />
+            </View>
+
+            {/* Wordifi Tag */}
+            <Text style={styles.fieldLabel}>
+              Wordifi Tag{' '}
+              <Text style={styles.fieldLabelRequired}>*</Text>
+            </Text>
+            <TextInput
+              style={styles.input}
+              value={editTag}
+              onChangeText={setEditTag}
+              placeholder="e.g. GoetheSlayer99"
+              placeholderTextColor={Colors.textMuted}
+              autoCapitalize="none"
+              returnKeyType="done"
+              onSubmitEditing={handleSaveTag}
+            />
+            <Text style={styles.fieldHint}>
+              This is how rivals see you on the leaderboard. Make it legendary.
+            </Text>
+
+            {/* Save */}
+            <Pressable
+              style={[styles.saveBtn, (!editTag.trim() || tagSaving) && styles.saveBtnDisabled]}
+              onPress={handleSaveTag}
+              disabled={!editTag.trim() || tagSaving}
+              accessibilityLabel="Save player identity"
+            >
+              <Text style={styles.saveBtnText}>
+                {tagSaving ? 'Saving…' : 'Save'}
+              </Text>
+            </Pressable>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
-const CARD_RADIUS = 24;
-const CARD_PADDING = spacing.xxl;  // 24px
-const CARD_MARGIN_H = spacing.xxl; // 24px
-const CARD_MARGIN_B = spacing.lg;  // 16px
+
+const CARD_RADIUS = 20;
+const CARD_PADDING_H = 20;
+const CARD_PADDING_V = 24;
+const CARD_MARGIN_H = 24;
+const CARD_MARGIN_B = 24;
 
 const styles = StyleSheet.create({
   screen: {
@@ -585,222 +554,250 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
   },
   scrollContent: {
-    paddingTop: 0,
+    paddingBottom: 32,
   },
 
-  // ── Header ─────────────────────────────────────────────────────────────────
-  header: {
+  // Header actions
+  headerActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    paddingHorizontal: CARD_MARGIN_H,
+    paddingTop: 16,
+    paddingBottom: 0,
+  },
+  logoutBtn: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // Identity block
+  identityBlock: {
     alignItems: 'center',
     paddingHorizontal: CARD_MARGIN_H,
-    paddingTop: spacing.xxxl,  // 32px
-    paddingBottom: spacing.lg, // 16px
-  },
-  signOutBtn: {
-    position: 'absolute',
-    top: spacing.xxxl,
-    right: CARD_MARGIN_H,
-    padding: spacing.sm,
+    paddingBottom: 16,
   },
   avatar: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: 88,
+    height: 88,
+    borderRadius: 44,
     backgroundColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 12,
+    marginBottom: 16,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 24,
+    elevation: 6,
   },
   avatarText: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: Colors.white,
     fontFamily: 'Outfit_800ExtraBold',
+    fontSize: 36,
+    color: '#FFFFFF',
+    lineHeight: 44,
   },
-  playerName: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: Colors.primaryDeep,
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  userName: {
     fontFamily: 'Outfit_800ExtraBold',
-    textAlign: 'center',
-    marginBottom: 4,
+    fontSize: 26,
+    color: Colors.textBody,
+    letterSpacing: -0.5,
+    lineHeight: 32,
   },
-  headerSub: {
-    fontSize: 14,
-    fontWeight: '400',
-    color: Colors.textMuted,
-    fontFamily: 'NunitoSans_400Regular',
-    textAlign: 'center',
-  },
-
-  // ── Card shell ─────────────────────────────────────────────────────────────
-  card: {
-    backgroundColor: Colors.white,
-    borderRadius: CARD_RADIUS,
+  namePen: {
+    marginTop: 2,
+  } as object,
+  certPill: {
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: Colors.border,
-    padding: CARD_PADDING,
-    marginHorizontal: CARD_MARGIN_H,
-    marginBottom: CARD_MARGIN_B,
+    borderRadius: 999,
+    paddingVertical: 6,
+    paddingHorizontal: 16,
   },
-  cardTitle: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: Colors.textMuted,
+  certPillText: {
     fontFamily: 'NunitoSans_600SemiBold',
-    letterSpacing: 0.8,
-    marginBottom: 16,
-  },
-  cardLabel: {
-    fontSize: 13,
-    fontWeight: '600',
+    fontSize: 14,
     color: Colors.textMuted,
-    fontFamily: 'NunitoSans_600SemiBold',
-    letterSpacing: 0.8,
-    marginBottom: 12,
   },
 
-  // ── Info rows ──────────────────────────────────────────────────────────────
+  // Countdown card
+  countdownCard: {
+    marginHorizontal: CARD_MARGIN_H,
+    marginBottom: CARD_MARGIN_B,
+    backgroundColor: '#ECF2FE',
+    borderRadius: CARD_RADIUS,
+    paddingVertical: 24,
+    paddingHorizontal: CARD_PADDING_H,
+    alignItems: 'center',
+  },
+  countdownNumber: {
+    fontFamily: 'Outfit_800ExtraBold',
+    fontSize: 56,
+    color: '#F59E0B',
+    lineHeight: 60,
+    letterSpacing: -1,
+    marginBottom: 8,
+  },
+  countdownLabel: {
+    fontFamily: 'NunitoSans_400Regular',
+    fontSize: 15,
+    color: Colors.textMuted,
+  },
+
+  // Section card shell
+  sectionCard: {
+    marginHorizontal: CARD_MARGIN_H,
+    marginBottom: CARD_MARGIN_B,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: CARD_RADIUS,
+    paddingHorizontal: CARD_PADDING_H,
+    paddingVertical: CARD_PADDING_V,
+    shadowColor: '#374151',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.03,
+    shadowRadius: 20,
+    elevation: 1,
+  },
+  sectionLabel: {
+    fontFamily: 'NunitoSans_600SemiBold',
+    fontSize: 12,
+    color: Colors.textMuted,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+    marginBottom: 24,
+  },
+
+  // Progress grid
+  progressGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 0,
+  },
+  statItem: {
+    width: '50%',
+    alignItems: 'center',
+    paddingBottom: 28,
+    gap: 8,
+  },
+  statEmoji: {
+    fontSize: 22,
+    lineHeight: 26,
+  },
+  statValue: {
+    fontFamily: 'Outfit_800ExtraBold',
+    fontSize: 32,
+    color: Colors.primary,
+    lineHeight: 36,
+    letterSpacing: -0.5,
+  },
+  statName: {
+    fontFamily: 'NunitoSans_400Regular',
+    fontSize: 14,
+    color: Colors.textMuted,
+  },
+
+  // Info rows
   infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 10,
-    gap: 8,
+    justifyContent: 'space-between',
+    paddingVertical: 18,
   },
-  infoLabel: {
-    fontSize: 13,
-    fontWeight: '400',
-    color: Colors.textMuted,
+  rowLabel: {
     fontFamily: 'NunitoSans_400Regular',
-    flex: 1,
+    fontSize: 15,
+    color: Colors.textMuted,
   },
-  infoRight: {
+  rowValueGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    flexShrink: 1,
+    gap: 12,
   },
-  infoValue: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.primaryDeep,
+  rowValue: {
     fontFamily: 'NunitoSans_600SemiBold',
-    textAlign: 'right',
+    fontSize: 15,
+    color: Colors.textBody,
     flexShrink: 1,
-  },
-  iconBtn: {
-    padding: 2,
   },
   rowDivider: {
-    height: 0.5,
-    backgroundColor: Colors.border,
-  },
-  sectionDivider: {
     height: 1,
     backgroundColor: Colors.border,
-    marginVertical: 16,
   },
 
-  // ── Level pill ─────────────────────────────────────────────────────────────
+  // Level pill
   levelPill: {
-    backgroundColor: Colors.primary,
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 2,
+    backgroundColor: '#ECF2FE',
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
   },
   levelPillText: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: Colors.white,
     fontFamily: 'Outfit_800ExtraBold',
+    fontSize: 14,
+    color: Colors.primary,
+    lineHeight: 18,
   },
 
-  // ── Days badge ─────────────────────────────────────────────────────────────
-  daysBadge: {
+  // Status pill (subscription)
+  statusPill: {
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  statusPillText: {
+    fontFamily: 'NunitoSans_600SemiBold',
+    fontSize: 12,
+    lineHeight: 16,
+  },
+
+  // Action rows
+  actionDivider: {
+    height: 1,
+    backgroundColor: Colors.border,
+    marginTop: 20,
+    marginBottom: 0,
+  },
+  actionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 20,
+  },
+  actionLabel: {
+    fontFamily: 'NunitoSans_600SemiBold',
+    fontSize: 15,
+    color: Colors.textBody,
+    flex: 1,
+  },
+
+  // Referral code pill
+  refCodePill: {
     backgroundColor: Colors.background,
-    borderRadius: 8,
+    borderRadius: 6,
     paddingHorizontal: 8,
     paddingVertical: 3,
   },
-  daysBadgeText: {
+  refCodeText: {
+    fontFamily: 'NunitoSans_600SemiBold',
     fontSize: 12,
-    fontWeight: '600',
     color: Colors.primary,
-    fontFamily: 'NunitoSans_600SemiBold',
   },
 
-  // ── Profile incomplete banner ──────────────────────────────────────────────
-  profileBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: `${colors.primary}12`,
-    borderRadius: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    marginBottom: 16,
-  },
-  profileBannerText: {
-    flex: 1,
-    fontSize: 13,
-    fontFamily: 'NunitoSans_600SemiBold',
-    color: colors.primary,
-  },
-
-  // ── Readiness ──────────────────────────────────────────────────────────────
-  readinessRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 2,
-    marginBottom: 10,
-  },
-  readinessNumber: {
-    fontSize: 40,
-    fontWeight: '800',
-    color: Colors.primaryDeep,
-    fontFamily: 'Outfit_800ExtraBold',
-    lineHeight: 46,
-  },
-  readinessPct: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: Colors.accent,
-    fontFamily: 'Outfit_800ExtraBold',
-  },
-  progressTrack: {
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: Colors.border,
-    overflow: 'hidden',
-    marginBottom: 16,
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: 3,
-    backgroundColor: Colors.primary,
-  },
-
-  // ── Gamification row ───────────────────────────────────────────────────────
-  gamRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-  },
-  gamItem: {
-    alignItems: 'center',
-    gap: 4,
-  },
-  gamValue: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: Colors.primaryDeep,
-    fontFamily: 'NunitoSans_600SemiBold',
-  },
-
-  // ── Upgrade card ───────────────────────────────────────────────────────────
+  // Upgrade card
   upgradeCard: {
     backgroundColor: Colors.primary,
     borderRadius: CARD_RADIUS,
-    padding: CARD_PADDING,
+    padding: CARD_PADDING_V,
     marginHorizontal: CARD_MARGIN_H,
     marginBottom: CARD_MARGIN_B,
     flexDirection: 'row',
@@ -812,16 +809,14 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   upgradeTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: Colors.white,
     fontFamily: 'Outfit_800ExtraBold',
+    fontSize: 18,
+    color: Colors.white,
   },
   upgradeSubtitle: {
-    fontSize: 13,
-    fontWeight: '400',
-    color: 'rgba(255,255,255,0.75)',
     fontFamily: 'NunitoSans_400Regular',
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.75)',
   },
   trialRow: {
     flexDirection: 'row',
@@ -830,10 +825,9 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   trialText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: colors.flagGold,
     fontFamily: 'NunitoSans_600SemiBold',
+    fontSize: 12,
+    color: colors.flagGold,
   },
   upgradeArrow: {
     width: 40,
@@ -844,76 +838,120 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  // ── Plan highlights ────────────────────────────────────────────────────────
-  planRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
-    marginBottom: 10,
-  },
-  planIcon: {
-    marginTop: 1,
-  } as object,
-  planText: {
+  // Edit sheet modal
+  modalOuter: {
     flex: 1,
-    fontSize: 14,
-    fontWeight: '400',
-    color: Colors.primaryDeep,
+    justifyContent: 'flex-end',
+  },
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(15,31,61,0.4)',
+  },
+  editSheet: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 24,
+    paddingTop: 12,
+    shadowColor: '#374151',
+    shadowOffset: { width: 0, height: -6 },
+    shadowOpacity: 0.08,
+    shadowRadius: 24,
+    elevation: 12,
+  },
+  sheetHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: Colors.textMuted,
+    alignSelf: 'center',
+    marginBottom: 20,
+    opacity: 0.35,
+  },
+  sheetHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  sheetTitle: {
+    fontFamily: 'Outfit_800ExtraBold',
+    fontSize: 22,
+    color: Colors.textBody,
+    lineHeight: 28,
+  },
+  sheetClose: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sheetSubtitle: {
     fontFamily: 'NunitoSans_400Regular',
-    lineHeight: 20,
-  },
-  planTextMuted: {
-    color: Colors.textMuted,
-    fontStyle: 'italic',
-  },
-
-  // ── Tier badge ─────────────────────────────────────────────────────────────
-  tierBadge: {
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  tierBadgeText: {
-    fontSize: 12,
-    fontWeight: '600',
-    fontFamily: 'NunitoSans_600SemiBold',
-  },
-
-  // ── Action rows ────────────────────────────────────────────────────────────
-  actionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    gap: 12,
-  },
-  actionIcon: {
-    width: 24,
-    alignItems: 'center',
-  },
-  actionLabel: {
-    flex: 1,
     fontSize: 14,
-    fontWeight: '600',
-    color: Colors.primaryDeep,
-    fontFamily: 'NunitoSans_600SemiBold',
-  },
-  actionRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
+    color: Colors.textMuted,
+    lineHeight: 20,
+    marginBottom: 24,
   },
 
-  // ── Referral code pill ─────────────────────────────────────────────────────
-  refCodePill: {
-    backgroundColor: Colors.background,
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  refCodeText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: Colors.primary,
+  // Form fields
+  fieldLabel: {
     fontFamily: 'NunitoSans_600SemiBold',
+    fontSize: 13,
+    color: Colors.textBody,
+    marginBottom: 8,
+  },
+  fieldLabelRequired: {
+    color: Colors.primary,
+  },
+  nameFields: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 20,
+  },
+  input: {
+    height: 52,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    fontFamily: 'NunitoSans_400Regular',
+    fontSize: 16,
+    color: Colors.textBody,
+    backgroundColor: '#FFFFFF',
+    marginBottom: 0,
+  },
+  inputHalf: {
+    flex: 1,
+  },
+  fieldHint: {
+    fontFamily: 'NunitoSans_400Regular',
+    fontSize: 13,
+    color: Colors.textMuted,
+    marginTop: 8,
+    marginBottom: 28,
+    lineHeight: 18,
+  },
+
+  // Save button
+  saveBtn: {
+    height: 56,
+    borderRadius: 16,
+    backgroundColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 14,
+    elevation: 4,
+  },
+  saveBtnDisabled: {
+    opacity: 0.4,
+  },
+  saveBtnText: {
+    fontFamily: 'Outfit_800ExtraBold',
+    fontSize: 17,
+    color: '#FFFFFF',
   },
 });

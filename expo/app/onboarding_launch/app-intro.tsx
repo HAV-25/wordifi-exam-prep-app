@@ -1,6 +1,6 @@
 /**
- * Onboarding Launch — Screen 01: App Intro
- * Opens with an animated Pacifico wordmark splash, then reveals the full intro.
+ * Onboarding Launch — Screen 01: App Intro (redesigned)
+ * Animated wordmark splash → compact non-scrollable intro with yellow glow.
  */
 import React, { useEffect, useRef, useState } from 'react';
 import {
@@ -14,51 +14,60 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import Svg, { Path } from 'react-native-svg';
-import { ScreenLayout } from '@/components/ScreenLayout';
+import { ArrowRight, ChartColumn, Layers3, Target } from 'lucide-react-native';
+
+import { GlowOrb } from '@/components/GlowOrb';
 import { GermanFlagBadge } from '@/components/GermanFlagBadge';
 
 const LOGO_URI =
   'https://firebasestorage.googleapis.com/v0/b/banani-prod.appspot.com/o/reference-images%2F1cf9115c-bc87-4683-bfd4-0670f0875c39?alt=media&token=c560f38f-1cf6-46fa-9a2e-f86edac2a035';
 
-const ILLUSTRATION_URI =
-  'https://firebasestorage.googleapis.com/v0/b/banani-prod.appspot.com/o/reference-images%2Fd79bb9ce-5b3b-4aee-95d0-527f808ef61c?alt=media&token=940f047b-070d-4b40-866d-57af31f4a89c';
+// ─── Feature pill row ─────────────────────────────────────────────────────────
 
-function ArrowIcon() {
+type FeatureRowProps = {
+  icon: React.ReactNode;
+  iconBg: string;
+  title: string;
+  desc: string;
+};
+
+function FeatureRow({ icon, iconBg, title, desc }: FeatureRowProps) {
   return (
-    <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
-      <Path
-        d="M5 12h14M12 5l7 7-7 7"
-        stroke="white"
-        strokeWidth={3}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </Svg>
+    <View style={styles.featureRow}>
+      <View style={[styles.featureIconBox, { backgroundColor: iconBg }]}>
+        {icon}
+      </View>
+      <View style={styles.featureCopy}>
+        <Text style={styles.featureTitle}>{title}</Text>
+        <Text style={styles.featureDesc}>{desc}</Text>
+      </View>
+    </View>
   );
 }
+
+// ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function AppIntroPolished() {
   const [splashDone, setSplashDone] = useState(false);
 
-  // ── Splash animation values ─────────────────────────────────────────────
-  const wScale = useRef(new Animated.Value(0.3)).current;
-  const wOpacity = useRef(new Animated.Value(0)).current;
-  const wTranslateX = useRef(new Animated.Value(0)).current;
-  const ordifiOpacity = useRef(new Animated.Value(0)).current;
+  // ── Splash animation values ──────────────────────────────────────────────
+  const wScale        = useRef(new Animated.Value(0.3)).current;
+  const wOpacity      = useRef(new Animated.Value(0)).current;
+  const wTranslateX   = useRef(new Animated.Value(0)).current;
+  const ordifiOpacity    = useRef(new Animated.Value(0)).current;
   const ordifiTranslateX = useRef(new Animated.Value(20)).current;
   const taglineOpacity = useRef(new Animated.Value(0)).current;
-  const flagOpacity = useRef(new Animated.Value(0)).current;
-  const splashFadeOut = useRef(new Animated.Value(1)).current;
+  const flagOpacity    = useRef(new Animated.Value(0)).current;
+  const splashFadeOut  = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    // Phase 1: "w" grows from small to full size (center of screen)
+    // Phase 1: "w" grows in
     Animated.parallel([
       Animated.timing(wOpacity, { toValue: 1, duration: 300, useNativeDriver: true }),
       Animated.spring(wScale, { toValue: 1, friction: 6, tension: 80, useNativeDriver: true }),
     ]).start();
 
-    // Phase 2: "w" slides left, "ordifi" flows in from right
+    // Phase 2: "w" slides left, "ordifi" flows in
     const phase2 = setTimeout(() => {
       Animated.parallel([
         Animated.timing(wTranslateX, { toValue: -72, duration: 500, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
@@ -67,7 +76,7 @@ export default function AppIntroPolished() {
       ]).start();
     }, 600);
 
-    // Phase 3: tagline + flag fade in
+    // Phase 3: tagline + flag
     const phase3 = setTimeout(() => {
       Animated.parallel([
         Animated.timing(taglineOpacity, { toValue: 1, duration: 400, useNativeDriver: true }),
@@ -75,13 +84,10 @@ export default function AppIntroPolished() {
       ]).start();
     }, 1400);
 
-    // Phase 4: fade out splash, reveal intro
+    // Phase 4: fade out splash
     const phase4 = setTimeout(() => {
-      Animated.timing(splashFadeOut, {
-        toValue: 0,
-        duration: 400,
-        useNativeDriver: true,
-      }).start(() => setSplashDone(true));
+      Animated.timing(splashFadeOut, { toValue: 0, duration: 400, useNativeDriver: true })
+        .start(() => setSplashDone(true));
     }, 2800);
 
     return () => {
@@ -91,38 +97,10 @@ export default function AppIntroPolished() {
     };
   }, []);
 
-  // ── Intro content (shown after splash) ──────────────────────────────────
-  const ctaFooter = (
-    <View style={styles.ctaContainer}>
-      <Pressable
-        onPress={() => router.push('/onboarding_launch/cert')}
-        style={({ pressed }) => [styles.ctaButton, pressed && styles.ctaPressed]}
-        accessibilityRole="button"
-        accessibilityLabel="Start my plan"
-      >
-        <Text style={styles.ctaText}>Start my plan</Text>
-        <View style={styles.ctaIcon}>
-          <ArrowIcon />
-        </View>
-      </Pressable>
-      <Pressable
-        onPress={() => { router.replace('/auth'); }}
-        accessibilityRole="button"
-        accessibilityLabel="Sign in"
-        style={styles.signInLink}
-      >
-        <Text style={styles.signInText}>
-          Already a Wordifi user?{' '}
-          <Text style={styles.signInLinkText}>Jump straight in</Text>
-        </Text>
-      </Pressable>
-    </View>
-  );
-
   return (
     <View style={styles.root}>
-      {/* Splash overlay — animated wordmark */}
-      {!splashDone ? (
+      {/* ── Splash overlay ────────────────────────────────────────────── */}
+      {!splashDone && (
         <Animated.View style={[styles.splashOverlay, { opacity: splashFadeOut }]}>
           <View style={styles.splashContent}>
             <View style={styles.splashWordmarkRow}>
@@ -151,48 +129,93 @@ export default function AppIntroPolished() {
             </Animated.View>
           </View>
         </Animated.View>
-      ) : null}
+      )}
 
-      {/* Main intro — always rendered (behind splash initially) */}
-      <SafeAreaView style={styles.safeArea} edges={['top']}>
-        <ScreenLayout footer={ctaFooter} contentContainerStyle={styles.screen} backgroundColor="#F8FAFF">
-          <View style={styles.topNav}>
-            <Image source={{ uri: LOGO_URI }} style={styles.logoImg} resizeMode="contain" />
+      {/* ── Main intro ────────────────────────────────────────────────── */}
+      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+        <View style={styles.screen}>
+          {/* Yellow glow — top-right, clipped by root overflow:hidden */}
+          <GlowOrb size={460} top={-160} right={-170} />
+
+          {/* Logo */}
+          <View style={styles.logoWrap}>
+            <Image source={{ uri: LOGO_URI }} style={styles.logo} resizeMode="contain" />
           </View>
-          <View style={styles.contentHeader}>
-            <View style={styles.badgesRow}>
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>50,000+ Learners</Text>
-              </View>
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>A1 TO B</Text>
-              </View>
+
+          {/* Headline block */}
+          <View style={styles.headlineBlock}>
+            <Text style={styles.headline}>
+              {'Goethe.\nTELC.\nOne app.\nOne mission.\n'}
+              <Text style={styles.headlineAccent}>You pass.</Text>
+            </Text>
+
+            <Text style={styles.subline}>
+              Real readiness — built for German certification.
+            </Text>
+
+            {/* Feature pills */}
+            <View style={styles.featurePills}>
+              <FeatureRow
+                iconBg="#2B70EF"
+                icon={<Target size={20} color="#fff" />}
+                title="Exam-accurate practice"
+                desc="Built precisely for Goethe & TELC"
+              />
+              <FeatureRow
+                iconBg="#22C55E"
+                icon={<Layers3 size={20} color="#fff" />}
+                title="Master every section"
+                desc="Hören, Lesen, Schreiben, Sprechen"
+              />
+              <FeatureRow
+                iconBg="#F0C808"
+                icon={<ChartColumn size={20} color="#374151" />}
+                title="Know your readiness daily"
+                desc="Live score updated after every session"
+              />
             </View>
-            <Text style={styles.mainHeading}>
-              {'Goethe. TELC.\nÖSD.\nOne app.\nOne mission.\n'}
-              <Text style={styles.headingBlue}>You pass.</Text>
-            </Text>
-            <Text style={styles.subHeading}>
-              Real readiness — built exclusively for German certification.
-            </Text>
           </View>
-          <View style={styles.illustrationContainer}>
-            <Image
-              source={{ uri: ILLUSTRATION_URI }}
-              style={styles.heroIllustration}
-              resizeMode="contain"
-            />
+
+          {/* CTA */}
+          <View style={styles.ctaWrap}>
+            <Pressable
+              onPress={() => router.push('/onboarding_launch/cert')}
+              style={({ pressed }) => [styles.ctaButton, pressed && styles.ctaPressed]}
+              accessibilityRole="button"
+              accessibilityLabel="Start my plan"
+            >
+              <Text style={styles.ctaText}>Start my plan</Text>
+              <ArrowRight size={22} color="#fff" strokeWidth={2.5} />
+            </Pressable>
+
+            <Pressable
+              onPress={() => router.replace('/auth')}
+              style={styles.signInLink}
+              accessibilityRole="button"
+              accessibilityLabel="Sign in"
+            >
+              <Text style={styles.signInText}>
+                Already a Wordifi user?{' '}
+                <Text style={styles.signInBold}>Jump straight in</Text>
+              </Text>
+            </Pressable>
           </View>
-        </ScreenLayout>
+        </View>
       </SafeAreaView>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#F8FAFF' },
+// ─── Styles ───────────────────────────────────────────────────────────────────
 
-  // ─── Splash overlay ────────────────────────────────────────────────────────
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: '#F8FAFF',
+    overflow: 'hidden',
+  },
+
+  // ── Splash ────────────────────────────────────────────────────────────────
   splashOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: '#F8FAFF',
@@ -201,44 +224,154 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   splashContent: { alignItems: 'center', gap: 16 },
-  splashWordmarkRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'center' },
-  splashW: { fontFamily: 'Pacifico_400Regular', fontSize: 52, color: '#2B70EF', letterSpacing: -1 },
-  splashOrdifi: { fontFamily: 'Pacifico_400Regular', fontSize: 52, color: '#2B70EF', letterSpacing: -1 },
+  splashWordmarkRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'center',
+  },
+  splashW: {
+    fontFamily: 'Pacifico_400Regular',
+    fontSize: 52,
+    color: '#2B70EF',
+    letterSpacing: -1,
+  },
+  splashOrdifi: {
+    fontFamily: 'Pacifico_400Regular',
+    fontSize: 52,
+    color: '#2B70EF',
+    letterSpacing: -1,
+  },
   splashTaglineRow: { marginTop: 4 },
-  splashTagline: { fontSize: 18, fontWeight: '600', color: '#94A3B8' },
-
-  // ─── Main intro ────────────────────────────────────────────────────────────
-  safeArea: { flex: 1, backgroundColor: '#F8FAFF' },
-  screen: { flexGrow: 1, paddingHorizontal: 24, backgroundColor: '#F8FAFF' },
-  topNav: { alignItems: 'center', paddingTop: 16, marginBottom: 32 },
-  logoImg: { height: 44, width: 160 },
-  contentHeader: { alignItems: 'flex-start' },
-  badgesRow: { flexDirection: 'row', gap: 8, marginBottom: 20 },
-  badge: {
-    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999,
-    backgroundColor: 'rgba(43,112,239,0.08)',
+  splashTagline: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#94A3B8',
   },
-  badgeText: { fontSize: 12, fontWeight: '700', color: '#2B70EF', letterSpacing: 0.3, textTransform: 'uppercase' },
-  mainHeading: { fontSize: 36, fontWeight: '800', color: '#0F1F3D', lineHeight: 40, letterSpacing: -0.5, marginBottom: 16 },
-  headingBlue: { color: '#2B70EF' },
-  subHeading: { fontSize: 17, fontWeight: '500', color: '#64748B', lineHeight: 24, marginBottom: 24 },
-  illustrationContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: 16 },
-  heroIllustration: { width: '100%', height: 280, borderRadius: 20 },
 
-  // ─── CTA ───────────────────────────────────────────────────────────────────
-  ctaContainer: { paddingHorizontal: 24, paddingBottom: 12, gap: 16, alignItems: 'center' },
+  // ── Main screen ───────────────────────────────────────────────────────────
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#F8FAFF',
+  },
+  screen: {
+    flex: 1,
+    paddingHorizontal: 24,
+    paddingTop: 28,
+    paddingBottom: 24,
+    position: 'relative',
+  },
+
+  // ── Logo ─────────────────────────────────────────────────────────────────
+  logoWrap: {
+    alignItems: 'center',
+    marginBottom: 32,
+    zIndex: 1,
+  },
+  logo: {
+    width: 82,
+    height: 36,
+  },
+
+  // ── Headline block ────────────────────────────────────────────────────────
+  headlineBlock: {
+    zIndex: 1,
+    gap: 16,
+  },
+  headline: {
+    fontFamily: 'Outfit_800ExtraBold',
+    fontSize: 56,
+    lineHeight: 54,
+    letterSpacing: -1.8,
+    color: '#374151',
+  },
+  headlineAccent: {
+    color: '#2B70EF',
+  },
+  subline: {
+    fontFamily: 'NunitoSans_400Regular',
+    fontSize: 15,
+    lineHeight: 22,
+    fontWeight: '500',
+    color: '#94A3B8',
+  },
+
+  // ── Feature pills ─────────────────────────────────────────────────────────
+  featurePills: {
+    gap: 10,
+    marginTop: 4,
+  },
+  featureRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    minHeight: 56,
+  },
+  featureIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  featureCopy: {
+    flex: 1,
+    gap: 4,
+  },
+  featureTitle: {
+    fontFamily: 'NunitoSans_600SemiBold',
+    fontSize: 17,
+    lineHeight: 20,
+    color: '#374151',
+  },
+  featureDesc: {
+    fontFamily: 'NunitoSans_400Regular',
+    fontSize: 13,
+    lineHeight: 16,
+    color: '#94A3B8',
+  },
+
+  // ── CTA ──────────────────────────────────────────────────────────────────
+  ctaWrap: {
+    marginTop: 24,
+    gap: 16,
+    zIndex: 1,
+  },
   ctaButton: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    backgroundColor: '#2B70EF', borderRadius: 999, paddingVertical: 18,
-    paddingHorizontal: 32, width: '100%', gap: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    minHeight: 64,
+    borderRadius: 999,
+    backgroundColor: '#2B70EF',
+    shadowColor: '#2B70EF',
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: 0.22,
+    shadowRadius: 32,
+    elevation: 6,
   },
-  ctaPressed: { opacity: 0.9 },
-  ctaText: { fontSize: 18, fontWeight: '800', color: '#FFFFFF' },
-  ctaIcon: {
-    width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.2)',
-    alignItems: 'center', justifyContent: 'center',
+  ctaPressed: {
+    opacity: 0.9,
   },
-  signInLink: { paddingVertical: 8 },
-  signInText: { fontSize: 14, fontWeight: '500', color: '#64748B', textAlign: 'center' },
-  signInLinkText: { color: '#2B70EF', fontWeight: '700' },
+  ctaText: {
+    fontFamily: 'Outfit_800ExtraBold',
+    fontSize: 20,
+    letterSpacing: -0.4,
+    color: '#FFFFFF',
+  },
+  signInLink: {
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  signInText: {
+    fontFamily: 'NunitoSans_400Regular',
+    fontSize: 14,
+    color: '#94A3B8',
+    textAlign: 'center',
+  },
+  signInBold: {
+    fontFamily: 'NunitoSans_600SemiBold',
+    color: '#2B70EF',
+  },
 });
