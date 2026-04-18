@@ -1,6 +1,21 @@
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
-import { BookOpen, Clock, Headphones, Lock, Mic, Monitor, PenLine, Play, Puzzle, Shield, Sparkles, Trophy, X } from 'lucide-react-native';
+import {
+  AlertCircle,
+  BookOpen,
+  Check,
+  ChevronDown,
+  Clock,
+  Headphones,
+  Lock,
+  Mic,
+  PenLine,
+  Play,
+  Puzzle,
+  Sparkles,
+  Trophy,
+  X,
+} from 'lucide-react-native';
 import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
@@ -15,25 +30,30 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { EmptyState } from '@/components/EmptyState';
 import { PaywallModal } from '@/components/PaywallModal';
 import Colors from '@/constants/colors';
+import {
+  getBlueprint,
+  getTotalMinutes,
+  type ExamBlueprintSection,
+} from '@/lib/examBlueprint';
 import { MOCK_V2_ENABLED } from '@/lib/featureFlags';
-import { abandonMockV2, fetchActiveMockV2, fetchResumableMockV2 } from '@/lib/mockV2Helpers';
-import { getBlueprint } from '@/lib/examBlueprint';
 import {
   checkMockRetestAvailability,
   fetchMockQuestions,
-  fetchMockTestInfo,
-  getMockTiming,
-  type MockTestInfo,
 } from '@/lib/mockHelpers';
+import {
+  abandonMockV2,
+  fetchActiveMockV2,
+  fetchResumableMockV2,
+} from '@/lib/mockV2Helpers';
 import { useAccess } from '@/providers/AccessProvider';
 import { useAuth } from '@/providers/AuthProvider';
 
+// ─── Types ───────────────────────────────────────────────────────────────────
+
 type SetupState = {
   visible: boolean;
-  info: MockTestInfo | null;
   isTimed: boolean;
   isLocked: boolean;
   retestDate: string | null;
@@ -41,23 +61,50 @@ type SetupState = {
   isStarting: boolean;
 };
 
+// ─── Section config ───────────────────────────────────────────────────────────
+
+const SECTION_ICON_CONFIG: Record<
+  string,
+  { Icon: React.ComponentType<any>; iconColor: string; bgColor: string }
+> = {
+  Hören:           { Icon: Headphones, iconColor: '#2B70EF', bgColor: 'rgba(43,112,239,0.15)' },
+  Lesen:           { Icon: BookOpen,   iconColor: '#22C55E', bgColor: 'rgba(34,197,94,0.15)' },
+  Sprachbausteine: { Icon: Puzzle,     iconColor: '#374151', bgColor: '#F0C808' },
+  Schreiben:       { Icon: PenLine,    iconColor: '#8B5CF6', bgColor: 'rgba(139,92,246,0.15)' },
+  Sprechen:        { Icon: Mic,        iconColor: '#F97316', bgColor: 'rgba(249,115,22,0.15)' },
+};
+
+function getSectionCount(s: ExamBlueprintSection): string {
+  const q = s.questionsPerTeil?.reduce((a, b) => a + b, 0);
+  return q != null ? `${q} Q` : `${s.teils.length} tasks`;
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
 function formatRetestDate(dateStr: string): string {
   const d = new Date(dateStr);
   return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
+const LEVELS = ['A1', 'A2', 'B1'] as const;
+type Level = (typeof LEVELS)[number];
+
+// ─── Screen ───────────────────────────────────────────────────────────────────
+
 export default function MockScreen() {
   const { profile, user } = useAuth();
   const { access } = useAccess();
   const userId = user?.id ?? '';
-  const targetLevel = profile?.target_level ?? 'A1';
+  const targetLevel = (profile?.target_level ?? 'B1') as Level;
   const examType = profile?.exam_type ?? 'TELC';
-  const [showPaywall, setShowPaywall] = useState<boolean>(false);
   const mockEnabled = access.mock_tests_enabled;
+
+  const [showPaywall, setShowPaywall] = useState(false);
+  const [selectedLevel, setSelectedLevel] = useState<Level>(targetLevel);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
 
   const [setup, setSetup] = useState<SetupState>({
     visible: false,
-    info: null,
     isTimed: true,
     isLocked: false,
     retestDate: null,
@@ -65,16 +112,14 @@ export default function MockScreen() {
     isStarting: false,
   });
 
-  const infoQuery = useQuery({
-    queryKey: ['mock-test-info', targetLevel],
-    enabled: Boolean(targetLevel),
-    queryFn: () => fetchMockTestInfo(targetLevel),
-  });
+  const blueprint = getBlueprint(selectedLevel);
+  const totalQ = blueprint.reduce(
+    (sum, s) => sum + (s.questionsPerTeil?.reduce((a, b) => a + b, 0) ?? s.teils.length),
+    0,
+  );
+  const totalMin = getTotalMinutes(selectedLevel);
 
-  const info = infoQuery.data ?? null;
-  const timing = getMockTiming(targetLevel);
-
-  // Resumable V2 session query
+  // Resumable V2 session
   const resumeQuery = useQuery({
     queryKey: ['mock-v2-resumable', userId],
     enabled: Boolean(userId) && MOCK_V2_ENABLED,
@@ -83,41 +128,23 @@ export default function MockScreen() {
   });
   const resumable = resumeQuery.data ?? null;
 
-  // Inner setup opener — actual modal + retest check (used after any guards pass)
+  // Opens setup modal — checks retest lock
   const openSetupInner = useCallback(async () => {
-    if (!info) return;
-    setSetup({
-      visible: true,
-      info,
-      isTimed: true,
-      isLocked: false,
-      retestDate: null,
-      isLoadingRetest: true,
-      isStarting: false,
-    });
-
+    setSetup({ visible: true, isTimed: true, isLocked: false, retestDate: null, isLoadingRetest: true, isStarting: false });
     try {
-      const retest = await checkMockRetestAvailability(userId, targetLevel);
-      setSetup((prev) => ({
-        ...prev,
-        isLocked: retest.isLocked,
-        retestDate: retest.retestDate,
-        isLoadingRetest: false,
-      }));
+      const retest = await checkMockRetestAvailability(userId, selectedLevel);
+      setSetup((prev) => ({ ...prev, isLocked: retest.isLocked, retestDate: retest.retestDate, isLoadingRetest: false }));
     } catch {
       setSetup((prev) => ({ ...prev, isLoadingRetest: false }));
     }
-  }, [info, userId, targetLevel]);
+  }, [userId, selectedLevel]);
 
-  // Outer gate: paywall + active-session check before opening the setup modal.
+  // Outer gate: paywall + active-session check before opening setup modal
   const openSetup = useCallback(async () => {
-    if (!info) return;
     if (!mockEnabled) {
       setShowPaywall(true);
       return;
     }
-
-    // Active session check — prevent concurrent mocks.
     if (MOCK_V2_ENABLED) {
       try {
         const active = await fetchActiveMockV2(userId);
@@ -149,7 +176,7 @@ export default function MockScreen() {
                   });
                 },
               },
-            ]
+            ],
           );
           return;
         }
@@ -157,9 +184,8 @@ export default function MockScreen() {
         console.log('[Mock] fetchActiveMockV2 failed, proceeding to normal setup', err);
       }
     }
-
     await openSetupInner();
-  }, [info, userId, mockEnabled, openSetupInner, resumeQuery]);
+  }, [mockEnabled, userId, openSetupInner, resumeQuery]);
 
   const closeSetup = useCallback(() => {
     setSetup((prev) => ({ ...prev, visible: false }));
@@ -173,30 +199,26 @@ export default function MockScreen() {
     if (setup.isStarting || setup.isLocked) return;
     setSetup((prev) => ({ ...prev, isStarting: true }));
 
-    // ── V2 flow: route to /mock-test-v2 ─────────────────────────────────
     if (MOCK_V2_ENABLED) {
       setSetup((prev) => ({ ...prev, visible: false, isStarting: false }));
       router.push({
         pathname: '/mock-test-v2' as any,
-        params: { level: targetLevel },
+        params: { level: selectedLevel },
       });
       return;
     }
 
-    // ── V1 flow (original): fetch Hören/Lesen/Sprachbausteine ───────────
     try {
-      const questions = await fetchMockQuestions(targetLevel);
+      const questions = await fetchMockQuestions(selectedLevel);
       if (questions.horen.length === 0 && questions.lesen.length === 0) {
         setSetup((prev) => ({ ...prev, isStarting: false, visible: false }));
         return;
       }
-
       setSetup((prev) => ({ ...prev, visible: false, isStarting: false }));
-
       router.push({
         pathname: '/mock-test',
         params: {
-          level: targetLevel,
+          level: selectedLevel,
           examType,
           isTimed: setup.isTimed ? '1' : '0',
           horenQuestions: JSON.stringify(questions.horen),
@@ -206,12 +228,11 @@ export default function MockScreen() {
         },
       });
     } catch (err) {
-      console.log('MockScreen handleStart error', err);
+      console.log('[Mock] handleStart error', err);
       setSetup((prev) => ({ ...prev, isStarting: false }));
     }
-  }, [setup.isStarting, setup.isLocked, setup.isTimed, targetLevel, examType]);
+  }, [setup.isStarting, setup.isLocked, setup.isTimed, selectedLevel, examType]);
 
-  // Handle resume tap from the resume banner
   const handleResume = useCallback(() => {
     if (!resumable) return;
     router.push({
@@ -224,159 +245,157 @@ export default function MockScreen() {
     });
   }, [resumable]);
 
-  // Handle start fresh (abandon existing resumable)
-  const handleStartFresh = useCallback(async () => {
-    if (resumable) {
-      await abandonMockV2(resumable.id);
-      await resumeQuery.refetch();
-    }
-  }, [resumable, resumeQuery]);
-
-  const allLevels = ['A1', 'A2', 'B1'] as const;
-
   return (
     <SafeAreaView style={styles.safeArea}>
-      <View style={styles.headerWrap}>
-        <Text style={styles.headerTitle}>Full Mock Test</Text>
-        <View style={styles.levelChip}>
-          <Text style={styles.levelChipText}>{targetLevel}</Text>
+      {/* ── Header ────────────────────────────────────────────────────────── */}
+      <View style={styles.headerRow}>
+        <View style={styles.headerText}>
+          <Text style={styles.pageTitle}>Complete Test</Text>
+          <Text style={styles.pageSub}>Complete exam simulation</Text>
+        </View>
+
+        {/* Level pill + dropdown */}
+        <View style={styles.levelWrap}>
+          <Pressable
+            style={styles.levelPill}
+            onPress={() => setDropdownOpen((v) => !v)}
+            hitSlop={8}
+            accessibilityLabel={`Selected level: ${selectedLevel}. Tap to change.`}
+          >
+            <Text style={styles.levelPillText}>{selectedLevel}</Text>
+            <ChevronDown size={14} color={Colors.primary} />
+          </Pressable>
+
+          {dropdownOpen && (
+            <View style={styles.levelDropdown}>
+              {LEVELS.map((level, i) => (
+                <Pressable
+                  key={level}
+                  style={[styles.levelOption, i > 0 && styles.levelOptionBorder, level === selectedLevel && styles.levelOptionActive]}
+                  onPress={() => { setSelectedLevel(level); setDropdownOpen(false); }}
+                  accessibilityLabel={`${level}${level === selectedLevel ? ', selected' : ''}`}
+                >
+                  <Text style={[styles.levelOptionText, level === selectedLevel && styles.levelOptionTextActive]}>
+                    {level}
+                  </Text>
+                  {level === selectedLevel && <Check size={16} color={Colors.primary} />}
+                </Pressable>
+              ))}
+            </View>
+          )}
         </View>
       </View>
-      <Text style={styles.headerSub}>Complete exam simulation — Hören + Lesen</Text>
 
-      {infoQuery.isLoading ? (
-        <View style={styles.loadingWrap}>
-          <ActivityIndicator color={Colors.primary} size="large" />
-          <Text style={styles.loadingText}>Loading mock test info...</Text>
-        </View>
-      ) : (
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-          {/* Resume banner — shows if a V2 session is pending */}
-          {MOCK_V2_ENABLED && resumable ? (
-            <View style={styles.resumeBanner}>
-              <View style={styles.resumeBannerLeft}>
-                <Trophy color={Colors.accent} size={22} />
-                <View style={styles.resumeBannerText}>
-                  <Text style={styles.resumeBannerTitle}>Mock Test in progress</Text>
-                  <Text style={styles.resumeBannerSub}>
-                    {resumable.level} · Saved {new Date(resumable.savedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
-                  </Text>
-                </View>
-              </View>
-              <View style={styles.resumeBannerActions}>
-                <Pressable style={styles.resumeBtn} onPress={handleResume} testID="mock-resume-btn">
-                  <Text style={styles.resumeBtnText}>Resume</Text>
-                </Pressable>
-                <Pressable onPress={handleStartFresh} testID="mock-discard-btn" hitSlop={8}>
-                  <X color={Colors.textMuted} size={18} />
-                </Pressable>
-              </View>
-            </View>
-          ) : null}
-
-          {allLevels.map((level) => {
-            const isTarget = level === targetLevel;
-            const levelInfo = isTarget ? info : null;
-
-            return (
-              <Pressable
-                key={level}
-                accessibilityLabel={`${level} mock test`}
-                onPress={isTarget ? openSetup : undefined}
-                style={[styles.mockCard, !isTarget ? styles.mockCardLocked : null, isTarget && !mockEnabled ? styles.mockCardGated : null]}
-                testID={`mock-card-${level}`}
-                disabled={!isTarget}
-              >
-                <View style={styles.mockCardHeader}>
-                  <View style={[styles.levelBadge, isTarget ? styles.levelBadgeActive : null]}>
-                    <Text style={[styles.levelBadgeText, isTarget ? styles.levelBadgeTextActive : null]}>{level}</Text>
-                  </View>
-
-                  {!isTarget ? (
-                    <View style={styles.lockBadge}>
-                      <Lock color={Colors.textMuted} size={14} />
-                    </View>
-                  ) : null}
-                </View>
-
-                <View style={styles.sectionsList}>
-                  <View style={styles.sectionRow}>
-                    <View style={styles.sectionIconHoren}>
-                      <Headphones color="#fff" size={14} />
-                    </View>
-                    <Text style={[styles.sectionLabel, !isTarget ? styles.textLocked : null]}>
-                      Hören
-                    </Text>
-                    {levelInfo ? (
-                      <Text style={styles.sectionCount}>{levelInfo.horenCount} Q</Text>
-                    ) : null}
-                  </View>
-                  <View style={styles.sectionRow}>
-                    <View style={styles.sectionIconLesen}>
-                      <BookOpen color="#fff" size={14} />
-                    </View>
-                    <Text style={[styles.sectionLabel, !isTarget ? styles.textLocked : null]}>
-                      Lesen
-                    </Text>
-                    {levelInfo ? (
-                      <Text style={styles.sectionCount}>{levelInfo.lesenCount} Q</Text>
-                    ) : null}
-                  </View>
-                  <View style={styles.sectionRow}>
-                    <Lock color={Colors.textMuted} size={14} />
-                    <Text style={styles.sectionLabelLocked}>Schreiben</Text>
-                    <View style={styles.comingSoonPillInline}><Text style={styles.comingSoonTextInline}>Coming Soon</Text></View>
-                  </View>
-                  <View style={styles.sectionRow}>
-                    <Lock color={Colors.textMuted} size={14} />
-                    <Text style={styles.sectionLabelLocked}>Sprechen</Text>
-                    <View style={styles.comingSoonPillInline}><Text style={styles.comingSoonTextInline}>Coming Soon</Text></View>
-                  </View>
-                </View>
-
-                <View style={styles.mockCardFooter}>
-                  {levelInfo ? (
-                    <>
-                      <View style={styles.footerStat}>
-                        <Text style={styles.footerStatValue}>{levelInfo.totalCount}</Text>
-                        <Text style={styles.footerStatLabel}>Questions</Text>
-                      </View>
-                      <View style={styles.footerDivider} />
-                      <View style={styles.footerStat}>
-                        <Text style={styles.footerStatValue}>~{levelInfo.estimatedMinutes}</Text>
-                        <Text style={styles.footerStatLabel}>Minutes</Text>
-                      </View>
-                      <View style={styles.footerDivider} />
-                      <View style={styles.footerStat}>
-                        <Text style={styles.footerStatValue}>60%</Text>
-                        <Text style={styles.footerStatLabel}>Pass mark</Text>
-                      </View>
-                    </>
-                  ) : (
-                    <Text style={styles.lockedLabel}>Set as target level to unlock</Text>
-                  )}
-                </View>
-
-                {isTarget ? (
-                  <View style={styles.startHint}>
-                    <Shield color={Colors.accent} size={16} />
-                    <Text style={styles.startHintText}>Tap to start your mock exam</Text>
-                  </View>
-                ) : null}
-              </Pressable>
-            );
-          })}
-
-          {info && info.totalCount === 0 ? (
-            <EmptyState
-              title="No questions available yet"
-              description={`We're adding ${targetLevel} content soon. Check back later!`}
-              testID="mock-empty-state"
-            />
-          ) : null}
-        </ScrollView>
+      {/* Overlay to dismiss dropdown on outside tap */}
+      {dropdownOpen && (
+        <Pressable
+          style={[StyleSheet.absoluteFillObject, styles.dropdownOverlay]}
+          onPress={() => setDropdownOpen(false)}
+        />
       )}
 
+      {/* ── Scroll content ────────────────────────────────────────────────── */}
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Upgrade nudge */}
+        {!mockEnabled && (
+          <Pressable style={styles.nudge} onPress={() => setShowPaywall(true)}>
+            <Sparkles size={22} color="#F0C808" />
+            <View style={styles.nudgeTextWrap}>
+              <Text style={styles.nudgeTitle}>Unlock all sections & levels</Text>
+              <Text style={styles.nudgeSub}>Upgrade to access the full mock test</Text>
+            </View>
+            <ChevronDown
+              size={18}
+              color={Colors.textMuted}
+              style={styles.nudgeArrow}
+            />
+          </Pressable>
+        )}
+
+        {/* ── Hero card ──────────────────────────────────────────────────── */}
+        <View style={styles.heroCard}>
+          {/* Section list */}
+          <View style={styles.sectionList}>
+            {blueprint.map((section, i) => {
+              const cfg = SECTION_ICON_CONFIG[section.section];
+              if (!cfg) return null;
+              const { Icon, iconColor, bgColor } = cfg;
+              return (
+                <View
+                  key={section.section}
+                  style={[styles.sectionRow, i > 0 && styles.sectionRowBorder]}
+                >
+                  <View style={[styles.sectionIcon, { backgroundColor: bgColor }]}>
+                    <Icon size={18} color={iconColor} />
+                  </View>
+                  <Text style={styles.sectionName}>{section.section}</Text>
+                  <View style={styles.sectionMeta}>
+                    <Text style={styles.metaCount}>{getSectionCount(section)}</Text>
+                    <Text style={styles.metaDot}>·</Text>
+                    <Text style={styles.metaTime}>{section.timeMinutes} min</Text>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+
+          {/* Divider */}
+          <View style={styles.divider} />
+
+          {/* Summary stats */}
+          <View style={styles.statsRow}>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{totalQ}</Text>
+              <Text style={styles.statLabel}>Questions</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>~{totalMin}</Text>
+              <Text style={styles.statLabel}>Minutes</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>60%</Text>
+              <Text style={styles.statLabel}>Pass mark</Text>
+            </View>
+          </View>
+
+          {/* Start CTA */}
+          <Pressable
+            style={styles.startBtn}
+            onPress={openSetup}
+            testID="mock-open-setup-btn"
+            accessibilityLabel="Start mock test"
+          >
+            <Play size={20} color="#fff" fill="#fff" />
+            <Text style={styles.startBtnText}>Start Mock Test</Text>
+          </Pressable>
+
+          {/* Resume — shown below Start when a V2 session is resumable */}
+          {MOCK_V2_ENABLED && resumable && (
+            <Pressable
+              style={styles.resumeBtn}
+              onPress={handleResume}
+              testID="mock-resume-btn"
+            >
+              <Trophy size={18} color={Colors.accent} />
+              <View style={styles.resumeBtnContent}>
+                <Text style={styles.resumeBtnTitle}>Mock Test in Progress — Resume</Text>
+                <Text style={styles.resumeBtnSub}>
+                  {resumable.level} · Saved{' '}
+                  {new Date(resumable.savedAt).toLocaleTimeString([], {
+                    hour: 'numeric',
+                    minute: '2-digit',
+                  })}
+                </Text>
+              </View>
+            </Pressable>
+          )}
+        </View>
+      </ScrollView>
+
+      {/* ── Confirmation modal ────────────────────────────────────────────── */}
       <Modal
         animationType="slide"
         transparent
@@ -386,165 +405,105 @@ export default function MockScreen() {
         <Pressable style={styles.modalOverlay} onPress={closeSetup}>
           <Pressable style={styles.modalSheet} onPress={() => {}}>
             <View style={styles.modalHandle} />
-            <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
 
+            {/* Modal header */}
             <View style={styles.modalHeader}>
-              <View style={styles.modalIconWrap}>
-                <Trophy color={Colors.accent} size={26} />
-              </View>
-              <View style={styles.modalHeaderText}>
-                <Text style={styles.modalTitle}>Mock Exam — {targetLevel}</Text>
-                <Text style={styles.modalSubtitle}>Complete exam simulation</Text>
+              <View style={styles.modalHeaderLeft}>
+                <View style={styles.modalIconWrap}>
+                  <Trophy size={24} color={Colors.primary} />
+                </View>
+                <View style={styles.modalHeaderText}>
+                  <Text style={styles.modalTitle}>Mock Exam · {selectedLevel}</Text>
+                  <Text style={styles.modalSubtitle}>Complete exam simulation</Text>
+                </View>
               </View>
               <Pressable
-                accessibilityLabel="Cancel"
                 onPress={closeSetup}
                 hitSlop={8}
                 style={styles.modalClose}
                 testID="cancel-mock-button"
+                accessibilityLabel="Cancel"
               >
-                <X color={Colors.textMuted} size={18} />
+                <X size={24} color={Colors.textMuted} />
               </Pressable>
             </View>
 
-            {/* Section grid: Row 1 Hören + Lesen, Row 2 Schreiben + Sprechen, Row 3 Sprachbausteine (B1 only) */}
-            <View style={styles.sectionGrid}>
-              <View style={[styles.sectionCell, styles.sectionCellActive]}>
-                <Headphones color="#2B70EF" size={22} />
-                <Text style={styles.sectionCellName}>Hören</Text>
-                <View style={styles.sectionCellMeta}>
-                  {info ? <Text style={styles.sectionCellQ}>{info.horenCount} Q</Text> : null}
-                  {info ? <View style={styles.sectionCellDot} /> : null}
-                  <Text style={styles.sectionCellTime}>{timing.horenMinutes} min</Text>
-                </View>
+            {/* Summary stats pill */}
+            <View style={styles.bsSummary}>
+              <View style={styles.bsStat}>
+                <Text style={styles.bsStatNum}>{totalQ} Q</Text>
+                <Text style={styles.bsStatLabel}>Questions</Text>
               </View>
-              <View style={[styles.sectionCell, styles.sectionCellActive]}>
-                <BookOpen color="#22C55E" size={22} />
-                <Text style={styles.sectionCellName}>Lesen</Text>
-                <View style={styles.sectionCellMeta}>
-                  {info ? <Text style={styles.sectionCellQ}>{info.lesenCount} Q</Text> : null}
-                  {info ? <View style={styles.sectionCellDot} /> : null}
-                  <Text style={styles.sectionCellTime}>{timing.lesenMinutes} min</Text>
-                </View>
+              <View style={styles.bsStat}>
+                <Text style={styles.bsStatNum}>~{totalMin} min</Text>
+                <Text style={styles.bsStatLabel}>Total time</Text>
               </View>
-              {MOCK_V2_ENABLED ? (
-                <>
-                  <View style={[styles.sectionCell, styles.sectionCellActive]}>
-                    <PenLine color="#8B5CF6" size={22} />
-                    <Text style={styles.sectionCellName}>Schreiben</Text>
-                    <View style={styles.sectionCellMeta}>
-                      <Text style={styles.sectionCellQ}>
-                        {getBlueprint(targetLevel).find((s) => s.section === 'Schreiben')?.teils.length ?? 0} tasks
-                      </Text>
-                      <View style={styles.sectionCellDot} />
-                      <Text style={styles.sectionCellTime}>
-                        {getBlueprint(targetLevel).find((s) => s.section === 'Schreiben')?.timeMinutes ?? 0} min
-                      </Text>
-                    </View>
-                  </View>
-                  <View style={[styles.sectionCell, styles.sectionCellActive]}>
-                    <Mic color="#F97316" size={22} />
-                    <Text style={styles.sectionCellName}>Sprechen</Text>
-                    <View style={styles.sectionCellMeta}>
-                      <Text style={styles.sectionCellQ}>
-                        {getBlueprint(targetLevel).find((s) => s.section === 'Sprechen')?.teils.length ?? 0} tasks
-                      </Text>
-                      <View style={styles.sectionCellDot} />
-                      <Text style={styles.sectionCellTime}>
-                        {getBlueprint(targetLevel).find((s) => s.section === 'Sprechen')?.timeMinutes ?? 0} min
-                      </Text>
-                    </View>
-                  </View>
-                </>
-              ) : (
-                <>
-                  <View style={[styles.sectionCell, styles.sectionCellLocked]}>
-                    <PenLine color={Colors.textMuted} size={22} />
-                    <Text style={[styles.sectionCellName, styles.sectionCellNameMuted]}>Schreiben</Text>
-                  </View>
-                  <View style={[styles.sectionCell, styles.sectionCellLocked]}>
-                    <Mic color={Colors.textMuted} size={22} />
-                    <Text style={[styles.sectionCellName, styles.sectionCellNameMuted]}>Sprechen</Text>
-                  </View>
-                </>
-              )}
-              {targetLevel === 'B1' ? (
-                <View style={[styles.sectionCell, styles.sectionCellActive, styles.sectionCellFullWidth]}>
-                  <Puzzle color="#A37A00" size={22} />
-                  <Text style={styles.sectionCellName}>Sprachbausteine</Text>
-                  <View style={styles.sectionCellMeta}>
-                    <Text style={styles.sectionCellQ}>20 Q</Text>
-                    <View style={styles.sectionCellDot} />
-                    <Text style={styles.sectionCellTime}>15 min</Text>
-                  </View>
-                </View>
-              ) : null}
+              <View style={styles.bsStat}>
+                <Text style={styles.bsStatNum}>60%</Text>
+                <Text style={styles.bsStatLabel}>Pass mark</Text>
+              </View>
             </View>
 
+            {/* Timed mode toggle */}
             <Pressable
-              accessibilityLabel="Toggle timed mode"
               onPress={toggleTimed}
               style={styles.timedRow}
               testID="mock-timed-toggle"
+              accessibilityLabel="Toggle timed mode"
             >
               <View style={styles.timedInfo}>
-                <Clock color={Colors.primary} size={18} />
+                <Clock size={24} color={Colors.primary} />
                 <View>
                   <Text style={styles.timedLabel}>Timed Mode</Text>
                   <Text style={styles.timedSub}>Simulates real exam conditions</Text>
                 </View>
               </View>
               <View style={[styles.toggleTrack, setup.isTimed ? styles.toggleTrackOn : null]}>
-                <Animated.View style={[styles.toggleThumb, setup.isTimed ? styles.toggleThumbOn : null]} />
+                <Animated.View
+                  style={[styles.toggleThumb, setup.isTimed ? styles.toggleThumbOn : null]}
+                />
               </View>
             </Pressable>
+            <Text style={styles.toggleHint}>Turn off for untimed practice mode.</Text>
 
+            {/* Warning */}
             <View style={styles.warningCard}>
-              <Text style={styles.warningText}>
-                You cannot go back between sections once you move forward.
-              </Text>
+              <AlertCircle size={16} color="#92400E" />
+              <Text style={styles.warningText}>You can't go back between sections.</Text>
             </View>
 
+            {/* Retest lock */}
             {setup.isLoadingRetest ? (
               <ActivityIndicator color={Colors.primary} style={styles.retestLoader} />
             ) : setup.isLocked && setup.retestDate ? (
               <View style={styles.lockedBanner}>
-                <Lock color={Colors.warning} size={16} />
+                <Lock size={16} color={Colors.warning} />
                 <Text style={styles.lockedText}>
                   Retest available {formatRetestDate(setup.retestDate)}
                 </Text>
               </View>
             ) : null}
 
-            <View style={styles.modalActions}>
-              <Pressable
-                accessibilityLabel="Start mock test"
-                disabled={setup.isLocked || setup.isStarting}
-                onPress={handleStart}
-                style={[styles.startButton, setup.isLocked ? styles.buttonDisabled : null]}
-                testID="start-mock-button"
-              >
-                {setup.isStarting ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <>
-                    <Play color="#fff" size={18} />
-                    <Text style={styles.startButtonText}>Start Mock Test</Text>
-                  </>
-                )}
-              </Pressable>
-              <View style={styles.desktopButtonWrap}>
-                <View style={styles.floatingPill}>
-                  <Text style={styles.floatingPillText}>Coming Soon</Text>
-                  <Sparkles color="#374151" size={10} />
-                </View>
-                <View style={[styles.desktopButton, { opacity: 0.55 }]}>
-                  <Monitor color={Colors.textMuted} size={16} />
-                  <Text style={[styles.desktopButtonText, { color: Colors.textMuted }]}>Continue on Computer</Text>
-                </View>
-              </View>
-            </View>
-            </ScrollView>
+            {/* Motivation */}
+            <Text style={styles.motivation}>This is your moment. Go get it.</Text>
+
+            {/* Start button */}
+            <Pressable
+              style={[styles.startButton, (setup.isLocked || setup.isStarting) && styles.buttonDisabled]}
+              disabled={setup.isLocked || setup.isStarting}
+              onPress={handleStart}
+              testID="start-mock-button"
+              accessibilityLabel="Start mock test"
+            >
+              {setup.isStarting ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <>
+                  <Play size={18} color="#fff" fill="#fff" />
+                  <Text style={styles.startButtonText}>Start Mock Test</Text>
+                </>
+              )}
+            </Pressable>
           </Pressable>
         </Pressable>
       </Modal>
@@ -559,227 +518,297 @@ export default function MockScreen() {
   );
 }
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: Colors.background,
   },
-  headerWrap: {
+
+  // Header
+  headerRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: 16,
+    paddingHorizontal: 24,
+    paddingTop: 24,
+    paddingBottom: 16,
+    zIndex: 20,
   },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: '800' as const,
-    color: Colors.primary,
-  },
-  headerSub: {
-    fontSize: 14,
-    color: Colors.textMuted,
-    fontWeight: '500' as const,
-    paddingHorizontal: 20,
-    paddingTop: 4,
-    paddingBottom: 12,
-  },
-  levelChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 99,
-    backgroundColor: Colors.accent,
-  },
-  levelChipText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '800' as const,
-  },
-  loadingWrap: {
+  headerText: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
+    minWidth: 0,
   },
-  loadingText: {
-    color: Colors.textMuted,
+  pageTitle: {
+    fontFamily: 'Outfit_800ExtraBold',
+    fontSize: 32,
+    color: Colors.textBody,
+    letterSpacing: -0.8,
+    lineHeight: 38,
+  },
+  pageSub: {
+    fontFamily: 'NunitoSans_400Regular',
     fontSize: 15,
-    fontWeight: '600' as const,
-  },
-  resumeBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#FFFBEB',
-    borderColor: '#FDE68A',
-    borderWidth: 1,
-    borderRadius: 16,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    marginBottom: 16,
-    gap: 12,
-  },
-  resumeBannerLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
-  resumeBannerText: { flex: 1 },
-  resumeBannerTitle: { fontSize: 14, fontWeight: '800' as const, color: '#92400E' },
-  resumeBannerSub: { fontSize: 12, fontWeight: '500' as const, color: '#B45309', marginTop: 2 },
-  resumeBannerActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  resumeBtn: { backgroundColor: Colors.primary, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8 },
-  resumeBtnText: { color: '#fff', fontSize: 13, fontWeight: '800' as const },
-  scrollContent: {
-    padding: 20,
-    paddingTop: 8,
-    gap: 16,
-    paddingBottom: 40,
-  },
-  mockCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: 24,
-    borderWidth: 1.5,
-    borderColor: Colors.border,
-    padding: 20,
-    gap: 16,
-  },
-  mockCardLocked: {
-    opacity: 0.5,
-  },
-  mockCardGated: {
-    opacity: 0.6,
-  },
-  mockCardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  levelBadge: {
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 12,
-    backgroundColor: Colors.surfaceMuted,
-  },
-  levelBadgeActive: {
-    backgroundColor: Colors.primary,
-  },
-  levelBadgeText: {
-    fontSize: 18,
-    fontWeight: '800' as const,
     color: Colors.textMuted,
-  },
-  levelBadgeTextActive: {
-    color: '#fff',
+    marginTop: 4,
+    lineHeight: 22,
   },
 
-  lockBadge: {
-    marginLeft: 'auto',
+  // Level pill + dropdown
+  levelWrap: {
+    position: 'relative',
+    flexShrink: 0,
+    marginTop: 2,
+    zIndex: 30,
   },
-  sectionsList: {
-    gap: 8,
+  levelPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    paddingLeft: 16,
+    paddingRight: 14,
+    borderRadius: 999,
+    backgroundColor: '#ECF2FE',
+  },
+  levelPillText: {
+    fontFamily: 'Outfit_800ExtraBold',
+    fontSize: 18,
+    color: Colors.primary,
+    lineHeight: 22,
+  },
+  levelDropdown: {
+    position: 'absolute',
+    top: 48,
+    right: 0,
+    width: 112,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    shadowColor: '#374151',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 20,
+    elevation: 10,
+    overflow: 'hidden',
+    zIndex: 40,
+  },
+  levelOption: {
+    minHeight: 48,
+    paddingHorizontal: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF',
+  },
+  levelOptionBorder: {
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+  },
+  levelOptionActive: {
+    backgroundColor: 'rgba(43,112,239,0.04)',
+  },
+  levelOptionText: {
+    fontFamily: 'NunitoSans_600SemiBold',
+    fontSize: 15,
+    color: '#374151',
+  },
+  levelOptionTextActive: {
+    color: Colors.primary,
+  },
+  dropdownOverlay: {
+    zIndex: 10,
+  },
+
+  // Scroll
+  scrollContent: {
+    paddingHorizontal: 24,
+    paddingBottom: 40,
+    gap: 16,
+  },
+
+  // Upgrade nudge
+  nudge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    shadowColor: '#374151',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 1,
+  },
+  nudgeTextWrap: {
+    flex: 1,
+  },
+  nudgeTitle: {
+    fontFamily: 'NunitoSans_600SemiBold',
+    fontSize: 15,
+    color: '#374151',
+  },
+  nudgeSub: {
+    fontFamily: 'NunitoSans_400Regular',
+    fontSize: 13,
+    color: Colors.textMuted,
+    marginTop: 2,
+  },
+  nudgeArrow: {
+    transform: [{ rotate: '-90deg' }],
+  },
+
+  // Hero card
+  heroCard: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 24,
+    shadowColor: '#374151',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 20,
+    elevation: 2,
+    gap: 0,
+  },
+
+  // Section list
+  sectionList: {
+    marginBottom: 24,
   },
   sectionRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    minHeight: 32,
+    gap: 12,
+    paddingVertical: 14,
   },
-  sectionIconHoren: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
-    backgroundColor: '#1565C0',
+  sectionRowBorder: {
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+  },
+  sectionIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
-  sectionIconLesen: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
-    backgroundColor: '#6A1B9A',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sectionLabel: {
+  sectionName: {
+    fontFamily: 'NunitoSans_600SemiBold',
+    fontSize: 16,
+    color: '#374151',
     flex: 1,
-    fontSize: 15,
-    fontWeight: '700' as const,
+  },
+  sectionMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  metaCount: {
+    fontFamily: 'NunitoSans_600SemiBold',
+    fontSize: 14,
     color: Colors.primary,
   },
-  sectionLabelLocked: {
-    flex: 1,
-    fontSize: 15,
-    fontWeight: '600' as const,
+  metaDot: {
+    fontFamily: 'NunitoSans_400Regular',
+    fontSize: 14,
     color: Colors.textMuted,
   },
-  sectionCount: {
+  metaTime: {
+    fontFamily: 'NunitoSans_400Regular',
+    fontSize: 14,
+    color: Colors.textMuted,
+  },
+
+  // Divider
+  divider: {
+    height: 1,
+    backgroundColor: '#E2E8F0',
+    marginBottom: 24,
+  },
+
+  // Stats row
+  statsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    marginBottom: 32,
+  },
+  statItem: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 6,
+  },
+  statValue: {
+    fontFamily: 'Outfit_800ExtraBold',
+    fontSize: 26,
+    color: Colors.primary,
+    lineHeight: 30,
+    letterSpacing: -0.5,
+  },
+  statLabel: {
+    fontFamily: 'NunitoSans_400Regular',
     fontSize: 13,
-    fontWeight: '700' as const,
-    color: Colors.accent,
-  },
-  comingSoon: {
-    fontSize: 12,
-    fontWeight: '600' as const,
-    color: Colors.textMuted,
-    fontStyle: 'italic' as const,
-  },
-  comingSoonPillInline: {
-    backgroundColor: '#FEF3C7',
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-  },
-  comingSoonTextInline: {
-    color: '#92400E',
-    fontSize: 11,
-    fontWeight: '700' as const,
-  },
-  textLocked: {
     color: Colors.textMuted,
   },
-  mockCardFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.surfaceMuted,
-    borderRadius: 16,
-    padding: 14,
-  },
-  footerStat: {
-    flex: 1,
-    alignItems: 'center',
-    gap: 2,
-  },
-  footerStatValue: {
-    fontSize: 20,
-    fontWeight: '800' as const,
-    color: Colors.primary,
-  },
-  footerStatLabel: {
-    fontSize: 11,
-    fontWeight: '600' as const,
-    color: Colors.textMuted,
-  },
-  footerDivider: {
-    width: 1,
-    height: 28,
-    backgroundColor: Colors.border,
-  },
-  lockedLabel: {
-    flex: 1,
-    textAlign: 'center' as const,
-    color: Colors.textMuted,
-    fontWeight: '600' as const,
-    fontSize: 14,
-  },
-  startHint: {
+
+  // Start CTA
+  startBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 6,
+    gap: 12,
+    height: 60,
+    borderRadius: 16,
+    backgroundColor: Colors.primary,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 14,
+    elevation: 4,
   },
-  startHintText: {
-    color: Colors.accent,
+  startBtnText: {
+    fontFamily: 'Outfit_800ExtraBold',
+    fontSize: 18,
+    color: '#FFFFFF',
+  },
+
+  // Resume button
+  resumeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginTop: 12,
+    backgroundColor: '#FFFBEB',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  resumeBtnContent: {
+    flex: 1,
+  },
+  resumeBtnTitle: {
+    fontFamily: 'NunitoSans_600SemiBold',
     fontSize: 14,
-    fontWeight: '700' as const,
+    color: '#92400E',
   },
+  resumeBtnSub: {
+    fontFamily: 'NunitoSans_400Regular',
+    fontSize: 12,
+    color: '#B45309',
+    marginTop: 2,
+  },
+
+  // Modal
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.45)',
@@ -791,9 +820,8 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 28,
     paddingHorizontal: 24,
     paddingTop: 24,
-    paddingBottom: 32,
+    paddingBottom: 40,
     gap: 16,
-    maxHeight: '88%',
   },
   modalHandle: {
     width: 40,
@@ -801,191 +829,120 @@ const styles = StyleSheet.create({
     borderRadius: 3,
     backgroundColor: Colors.border,
     alignSelf: 'center',
+    marginBottom: 4,
   },
   modalHeader: {
     flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+  },
+  modalHeaderLeft: {
+    flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
-  },
-  modalHeaderText: {
+    gap: 16,
     flex: 1,
-    gap: 2,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: '800' as const,
-    color: Colors.primary,
-  },
-  modalSubtitle: {
-    fontSize: 14,
-    fontWeight: '500' as const,
-    color: Colors.textMuted,
+    minWidth: 0,
   },
   modalIconWrap: {
     width: 48,
     height: 48,
     borderRadius: 14,
-    backgroundColor: 'rgba(0,229,182,0.12)',
+    backgroundColor: '#ECF2FE',
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
+  },
+  modalHeaderText: {
+    flex: 1,
+    minWidth: 0,
+  },
+  modalTitle: {
+    fontFamily: 'Outfit_800ExtraBold',
+    fontSize: 22,
+    color: Colors.textBody,
+    lineHeight: 26,
+  },
+  modalSubtitle: {
+    fontFamily: 'NunitoSans_400Regular',
+    fontSize: 14,
+    color: Colors.textMuted,
+    marginTop: 4,
   },
   modalClose: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#F1F5F9',
+    width: 32,
+    height: 32,
     alignItems: 'center',
     justifyContent: 'center',
+    marginTop: 4,
+    flexShrink: 0,
   },
 
-  // ─── Section grid ─────────────────────────────────────────────────────────
-  sectionGrid: {
+  // Summary stats pill
+  bsSummary: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  sectionCell: {
-    width: '48.5%',
-    minHeight: 92,
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    backgroundColor: '#ECF2FE',
     borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    paddingVertical: 16,
-    paddingHorizontal: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    position: 'relative',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    gap: 8,
+    marginBottom: 20,
   },
-  sectionCellActive: {
-    backgroundColor: '#FFFFFF',
-  },
-  sectionCellLocked: {
-    backgroundColor: '#FAFAFA',
-    borderColor: '#F1F5F9',
-    opacity: 0.5,
-  },
-  sectionCellFullWidth: {
-    width: '100%',
-  },
-  sectionCellName: {
-    fontSize: 13,
-    fontWeight: '700' as const,
-    color: '#374151',
-    textAlign: 'center',
-  },
-  sectionCellNameMuted: {
-    color: Colors.textMuted,
-  },
-  sectionCellMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  sectionCellQ: {
-    fontSize: 12,
-    fontWeight: '700' as const,
-    color: Colors.primary,
-  },
-  sectionCellTime: {
-    fontSize: 11,
-    fontWeight: '600' as const,
-    color: Colors.textMuted,
-  },
-  sectionCellDot: {
-    width: 3,
-    height: 3,
-    borderRadius: 2,
-    backgroundColor: '#CBD5E1',
-  },
-
-  // ─── Floating pill (for "Continue on Computer") ──────────────────────────
-  desktopButtonWrap: {
-    position: 'relative',
-  },
-  floatingPill: {
-    position: 'absolute',
-    top: -11,
-    right: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#F0C808',
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    zIndex: 2,
-    shadowColor: '#F0C808',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.4,
-    shadowRadius: 10,
-    elevation: 4,
-  },
-  floatingPillText: {
-    fontSize: 10,
-    fontWeight: '800' as const,
-    color: '#374151',
-    letterSpacing: 0.2,
-  },
-  timingCard: {
-    backgroundColor: Colors.surfaceMuted,
-    borderRadius: 18,
-    padding: 16,
-    gap: 12,
-  },
-  timingTitle: {
-    fontSize: 13,
-    fontWeight: '700' as const,
-    color: Colors.textMuted,
-    textTransform: 'uppercase' as const,
-    letterSpacing: 0.4,
-  },
-  timingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  timingItem: {
+  bsStat: {
     flex: 1,
     alignItems: 'center',
     gap: 4,
+    minWidth: 0,
   },
-  timingLabel: {
-    fontSize: 13,
-    fontWeight: '600' as const,
-    color: Colors.textMuted,
-  },
-  timingValue: {
-    fontSize: 18,
-    fontWeight: '800' as const,
+  bsStatNum: {
+    fontFamily: 'Outfit_800ExtraBold',
+    fontSize: 20,
     color: Colors.primary,
+    lineHeight: 24,
   },
-  timingDivider: {
-    width: 1,
-    height: 32,
-    backgroundColor: Colors.border,
+  bsStatLabel: {
+    fontFamily: 'NunitoSans_400Regular',
+    fontSize: 12,
+    color: Colors.textMuted,
+    textAlign: 'center',
   },
+
+  // Timed toggle
   timedRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: Colors.surfaceMuted,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: Colors.border,
     borderRadius: 16,
     padding: 14,
   },
   timedInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 14,
   },
   timedLabel: {
-    fontSize: 15,
-    fontWeight: '700' as const,
-    color: Colors.primary,
+    fontFamily: 'NunitoSans_600SemiBold',
+    fontSize: 16,
+    color: Colors.textBody,
   },
   timedSub: {
-    fontSize: 12,
-    fontWeight: '500' as const,
+    fontFamily: 'NunitoSans_400Regular',
+    fontSize: 13,
     color: Colors.textMuted,
+    marginTop: 3,
+  },
+  toggleHint: {
+    fontFamily: 'NunitoSans_400Regular',
+    fontSize: 13,
+    color: Colors.textMuted,
+    marginTop: 10,
+    marginBottom: 18,
+    marginLeft: 4,
   },
   toggleTrack: {
     width: 48,
@@ -1005,19 +962,39 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   toggleThumbOn: {
-    alignSelf: 'flex-end' as const,
+    alignSelf: 'flex-end',
   },
+
+  // Warning
   warningCard: {
-    backgroundColor: '#FFF8E1',
-    borderRadius: 14,
-    padding: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#FEF9C3',
+    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    marginBottom: 16,
   },
   warningText: {
-    color: '#F57F17',
+    fontFamily: 'NunitoSans_400Regular',
     fontSize: 13,
-    fontWeight: '600' as const,
-    textAlign: 'center' as const,
+    color: '#92400E',
+    flex: 1,
+    lineHeight: 18,
   },
+
+  // Motivation
+  motivation: {
+    fontFamily: 'Outfit_800ExtraBold',
+    fontSize: 17,
+    color: Colors.textBody,
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 18,
+  },
+
+  // Retest lock
   retestLoader: {
     paddingVertical: 8,
   },
@@ -1030,17 +1007,15 @@ const styles = StyleSheet.create({
     padding: 14,
   },
   lockedText: {
-    color: '#F57F17',
+    fontFamily: 'NunitoSans_600SemiBold',
     fontSize: 14,
-    fontWeight: '700' as const,
+    color: '#F57F17',
   },
-  modalActions: {
-    gap: 14,
-    paddingTop: 4,
-  },
+
+  // Modal start button
   startButton: {
     minHeight: 54,
-    borderRadius: 27,
+    borderRadius: 16,
     backgroundColor: Colors.primary,
     flexDirection: 'row',
     alignItems: 'center',
@@ -1048,49 +1023,11 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   startButtonText: {
-    color: '#fff',
+    fontFamily: 'Outfit_800ExtraBold',
     fontSize: 16,
-    fontWeight: '800' as const,
+    color: '#fff',
   },
   buttonDisabled: {
     opacity: 0.4,
-  },
-  cancelButton: {
-    minHeight: 48,
-    borderRadius: 24,
-    backgroundColor: Colors.surfaceMuted,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cancelButtonText: {
-    color: Colors.primary,
-    fontSize: 15,
-    fontWeight: '700' as const,
-  },
-  desktopButton: {
-    minHeight: 52,
-    borderRadius: 999,
-    backgroundColor: '#F1F5F9',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    paddingHorizontal: 20,
-  },
-  desktopButtonText: {
-    color: Colors.primary,
-    fontSize: 15,
-    fontWeight: '700' as const,
-  },
-  comingSoonPill: {
-    backgroundColor: '#FEF3C7',
-    borderRadius: 10,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  comingSoonText: {
-    color: '#92400E',
-    fontSize: 11,
-    fontWeight: '700' as const,
   },
 });
