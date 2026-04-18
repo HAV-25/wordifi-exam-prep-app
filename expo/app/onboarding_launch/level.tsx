@@ -3,13 +3,15 @@
  * Source: Banani flow FtXTL2Xb5WF4 / screen _ATEWWmSBUV9
  * Step 2 of 10
  */
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { ArrowLeft, Lock } from 'lucide-react-native';
 import { onboardingStore } from './_store';
 import { ScreenLayout } from '@/components/ScreenLayout';
+import { ConvictionAnswerCard } from '@/components/onboarding/ConvictionAnswerCard';
+import { LEVEL_CONVICTIONS } from '@/components/onboarding/convictionLookup';
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 
@@ -30,8 +32,14 @@ const LOCKED = [
 
 export default function LevelScreen() {
   const [selected, setSelected] = useState<LevelId | null>(null);
+  const [continueActive, setContinueActive] = useState(false);
+  // Holds the cancel handle from the flipped card — called before navigating to
+  // abort any pending flip-back timer if Continue is tapped during the hold.
+  const cancelFlipBackRef = useRef<(() => void) | null>(null);
 
   function handleContinue() {
+    cancelFlipBackRef.current?.();
+    cancelFlipBackRef.current = null;
     if (!selected) return;
     onboardingStore.level = selected;
     router.push('/onboarding_launch/empathy');
@@ -40,16 +48,16 @@ export default function LevelScreen() {
   const ctaFooter = (
     <Pressable
       onPress={handleContinue}
-      disabled={!selected}
+      disabled={!continueActive}
       style={({ pressed }) => [
         styles.ctaButton,
-        !selected && styles.ctaDisabled,
-        pressed && selected && styles.ctaPressed,
+        !continueActive && styles.ctaDisabled,
+        pressed && continueActive && styles.ctaPressed,
       ]}
       accessibilityRole="button"
       accessibilityLabel="Continue"
     >
-      <Text style={[styles.ctaText, !selected && styles.ctaTextDisabled]}>Continue →</Text>
+      <Text style={[styles.ctaText, !continueActive && styles.ctaTextDisabled]}>Continue →</Text>
     </Pressable>
   );
 
@@ -74,19 +82,20 @@ export default function LevelScreen() {
           {/* Headline */}
           <Text style={styles.headline}>What level are you targeting?</Text>
 
-          {/* Selectable cards */}
+          {/* Selectable conviction cards */}
           <View style={styles.cardList}>
             {LEVELS.map((lvl) => (
-              <Pressable
+              <ConvictionAnswerCard
                 key={lvl.id}
+                conviction={LEVEL_CONVICTIONS[lvl.id]}
+                isSelected={selected === lvl.id}
                 onPress={() => setSelected(lvl.id)}
-                style={({ pressed }) => [
-                  styles.card,
-                  selected === lvl.id && styles.cardSelected,
-                  pressed && styles.cardPressed,
-                ]}
-                accessibilityRole="radio"
-                accessibilityState={{ selected: selected === lvl.id }}
+                onFlipComplete={(cancelFn) => {
+                  setContinueActive(true);
+                  cancelFlipBackRef.current = cancelFn;
+                }}
+                cardStyle={[styles.card, selected === lvl.id && styles.cardSelected]}
+                cardBorderRadius={16}
                 accessibilityLabel={lvl.title}
               >
                 <Text style={styles.emoji}>{lvl.emoji}</Text>
@@ -103,10 +112,10 @@ export default function LevelScreen() {
                   </View>
                   <Text style={styles.cardSubtitle}>{lvl.subtitle}</Text>
                 </View>
-              </Pressable>
+              </ConvictionAnswerCard>
             ))}
 
-            {/* Locked cards */}
+            {/* Locked cards — B2 and C1/C2, not selectable, no conviction card */}
             {LOCKED.map((lvl) => (
               <View key={lvl.title} style={[styles.card, styles.cardLocked]}>
                 <Text style={styles.emoji}>{lvl.emoji}</Text>
@@ -207,7 +216,7 @@ const styles = StyleSheet.create({
   },
   cardSelected: {
     borderColor: '#2B70EF',
-    backgroundColor: '#F0F5FF',
+    backgroundColor: '#ECF2FE', // brief §step-6: soft Primary Blue tint
   },
   cardLocked: {
     opacity: 0.6,
