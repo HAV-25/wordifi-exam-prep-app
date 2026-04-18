@@ -65,6 +65,10 @@ export type SprachbausteineSectionResult = {
   questionsTotal: number;
   t1Answers: BlankAnswers;
   t2Answers: BlankAnswers;
+  /** Full T1 question object (with correct_answer JSON map) — needed for per-blank review at end of mock. */
+  t1Question: AppQuestion | null;
+  /** Full T2 question object — same purpose. */
+  t2Question: AppQuestion | null;
   timeTakenSeconds: number;
 };
 
@@ -128,6 +132,8 @@ export function SectionPlayerSprachbausteine({
       questionsTotal,
       t1Answers,
       t2Answers,
+      t1Question,
+      t2Question,
       timeTakenSeconds,
     });
   }, [t1Question, t2Question, t1Answers, t2Answers, onComplete]);

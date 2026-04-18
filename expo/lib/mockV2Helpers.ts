@@ -14,13 +14,18 @@ export type SavedSectionResult = {
   questions?: unknown[];
   /** Selected answers keyed by question_id (lowercase option.key). */
   answers?: Record<string, string>;
-  /** Schreiben/Sprechen: per-teil AI assessments. */
+  /** Schreiben/Sprechen: per-teil AI assessments.
+   *  Sprachbausteine: per-teil full question + blank-by-blank answers (for review). */
   teilAssessments?: Array<{
     teil: number;
     userText?: string;
     assessment?: unknown;
     transcript?: string;
     scores?: { fluency?: number; grammar?: number; vocabulary?: number; overall?: number };
+    /** Sprachbausteine — full question with correct_answer JSON map. */
+    question?: unknown;
+    /** Sprachbausteine — user's per-blank answers for this teil. */
+    blankAnswers?: Record<string, string>;
   }>;
 };
 

@@ -67,12 +67,17 @@ type SectionResult = {
   questions?: unknown[];
   /** Selected answers keyed by question_id. */
   answers?: Record<string, string>;
-  /** Schreiben: per-teil user text + AI assessment. Sprechen: per-teil scores. */
+  /** Schreiben: per-teil user text + AI assessment. Sprechen: per-teil scores.
+   *  Sprachbausteine: per-teil full question + blank-by-blank answers (for review). */
   teilAssessments?: Array<{
     teil: number;
     userText?: string;
     assessment?: unknown;
     scores?: { overall?: number; fluency?: number; grammar?: number; vocabulary?: number };
+    /** Sprachbausteine only — the full question (with correct_answer JSON map). */
+    question?: unknown;
+    /** Sprachbausteine only — user's per-blank answers for this teil. */
+    blankAnswers?: Record<string, string>;
   }>;
 };
 
@@ -460,8 +465,13 @@ function SectionRouter({
           questionsCorrect: r.questionsCorrect,
           questionsTotal: r.questionsTotal,
           timeTakenSeconds: r.timeTakenSeconds,
-          // Sprachbausteine captures per-blank answers on both teils.
-          // Store a compact payload for final review.
+          // Per-teil payload: each teil carries its own question + blank answers
+          // so the final results screen can render per-blank correctness.
+          teilAssessments: [
+            { teil: 1, question: r.t1Question, blankAnswers: r.t1Answers },
+            { teil: 2, question: r.t2Question, blankAnswers: r.t2Answers },
+          ],
+          // Keep flat answers map for backwards-compat with existing review code paths.
           answers: { ...r.t1Answers, ...r.t2Answers } as Record<string, string>,
         })}
       />

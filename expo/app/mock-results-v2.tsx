@@ -65,6 +65,9 @@ type TeilAssessment = {
     task_completion_feedback?: string;
   };
   scores?: { overall?: number; fluency?: number; grammar?: number; vocabulary?: number };
+  // Sprachbausteine — full question with correct_answer JSON map + user blank answers
+  question?: AppQuestionLoose & { correct_answer?: string | Record<string, string>; stimulus_text?: string | null };
+  blankAnswers?: Record<string, string>;
 };
 
 // ─── Main screen ───────────────────────────────────────────────────────────────
@@ -216,6 +219,8 @@ function SectionDrilldown({ section }: { section: SavedSectionResult }) {
             <SchreibenReview teilAssessments={(section.teilAssessments ?? []) as TeilAssessment[]} />
           ) : section.section === 'Sprechen' ? (
             <SprechenReview teilAssessments={(section.teilAssessments ?? []) as TeilAssessment[]} />
+          ) : section.section === 'Sprachbausteine' ? (
+            <SprachbausteineReview teilAssessments={(section.teilAssessments ?? []) as TeilAssessment[]} />
           ) : (
             <MCQReview
               questions={(section.questions ?? []) as AppQuestionLoose[]}
@@ -241,25 +246,6 @@ function MCQReview({
 }) {
   if (questions.length === 0 && Object.keys(answers).length === 0) {
     return <Text style={styles.drillEmpty}>Detailed review not available.</Text>;
-  }
-
-  // Sprachbausteine stores per-blank answers in a flat map — render a simple list.
-  if (sectionName === 'Sprachbausteine') {
-    const blankKeys = Object.keys(answers).sort();
-    return (
-      <View style={styles.drillList}>
-        <Text style={styles.drillHeader}>Blanks filled: {blankKeys.length}</Text>
-        {blankKeys.map((k) => (
-          <View key={k} style={styles.blankRow}>
-            <Text style={styles.blankLabel}>Gap ({k})</Text>
-            <Text style={styles.blankValue}>{answers[k]}</Text>
-          </View>
-        ))}
-        <Text style={styles.drillNote}>
-          Per-blank correctness shown after you complete this mock again — we're adding detailed Sprachbausteine review in the next update.
-        </Text>
-      </View>
-    );
   }
 
   return (
@@ -377,6 +363,102 @@ function SchreibenReview({ teilAssessments }: { teilAssessments: TeilAssessment[
           </View>
         );
       })}
+    </View>
+  );
+}
+
+// ─── Sprachbausteine review — per-blank correctness ──────────────────────────
+function SprachbausteineReview({ teilAssessments }: { teilAssessments: TeilAssessment[] }) {
+  if (teilAssessments.length === 0) {
+    return <Text style={styles.drillEmpty}>No Sprachbausteine submissions recorded.</Text>;
+  }
+
+  return (
+    <View style={styles.drillList}>
+      {teilAssessments.map((t) => (
+        <SprachbausteineTeilReview key={t.teil} teil={t} />
+      ))}
+    </View>
+  );
+}
+
+function SprachbausteineTeilReview({ teil }: { teil: TeilAssessment }) {
+  const question = teil.question ?? null;
+  const userAnswers = teil.blankAnswers ?? {};
+
+  // Parse correct_answer JSON map (e.g. { "1": "wir", "2": "habe", ... })
+  const correctMap = useMemo<Record<string, string>>(() => {
+    const raw = question?.correct_answer;
+    if (typeof raw === 'string') {
+      try { return JSON.parse(raw) as Record<string, string>; }
+      catch { return {}; }
+    }
+    if (raw && typeof raw === 'object') return raw as Record<string, string>;
+    return {};
+  }, [question]);
+
+  if (!question || Object.keys(correctMap).length === 0) {
+    return (
+      <View style={styles.schreibenTeil}>
+        <Text style={styles.schreibenTeilTitle}>Teil {teil.teil}</Text>
+        <Text style={styles.drillEmpty}>Detailed review not available for this teil.</Text>
+      </View>
+    );
+  }
+
+  // Compute per-blank correctness
+  const blankKeys = Object.keys(correctMap).sort((a, b) => Number(a) - Number(b));
+  const correctCount = blankKeys.filter((k) => userAnswers[k] === correctMap[k]).length;
+  const totalCount = blankKeys.length;
+  const pct = totalCount > 0 ? Math.round((correctCount / totalCount) * 100) : 0;
+  const teilLabel = teil.teil === 1 ? 'Teil 1 — Word Bank' : 'Teil 2 — Multiple Choice';
+  const passed = pct >= 60;
+
+  return (
+    <View style={styles.schreibenTeil}>
+      <View style={styles.schreibenTeilHeader}>
+        <Text style={styles.schreibenTeilTitle}>{teilLabel}</Text>
+        <View style={[styles.setVerdict, passed ? styles.setVerdictPass : styles.setVerdictFail]}>
+          <Text style={[styles.setVerdictText, { color: passed ? '#22C55E' : '#F59E0B' }]}>
+            {correctCount}/{totalCount} · {pct}%
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.blankGrid}>
+        {blankKeys.map((k) => {
+          const userAns = userAnswers[k] ?? '';
+          const correctAns = correctMap[k] ?? '';
+          const isCorrect = userAns === correctAns;
+          const answered = userAns.length > 0;
+          return (
+            <View key={k} style={[styles.blankCard, isCorrect ? styles.blankCardCorrect : answered ? styles.blankCardWrong : styles.blankCardSkipped]}>
+              <View style={styles.blankCardHeader}>
+                <Text style={styles.blankCardNum}>Gap {k}</Text>
+                {isCorrect ? (
+                  <CheckCircle2 color="#22C55E" size={14} />
+                ) : answered ? (
+                  <XIcon color="#EF4444" size={14} />
+                ) : (
+                  <XIcon color={B.muted} size={14} />
+                )}
+              </View>
+              <View style={styles.blankCardRow}>
+                <Text style={styles.blankCardLabel}>Your:</Text>
+                <Text style={[styles.blankCardValue, { color: isCorrect ? '#22C55E' : answered ? '#EF4444' : B.muted }]}>
+                  {answered ? userAns : '—'}
+                </Text>
+              </View>
+              {!isCorrect ? (
+                <View style={styles.blankCardRow}>
+                  <Text style={styles.blankCardLabel}>Correct:</Text>
+                  <Text style={[styles.blankCardValue, { color: '#22C55E' }]}>{correctAns}</Text>
+                </View>
+              ) : null}
+            </View>
+          );
+        })}
+      </View>
     </View>
   );
 }
@@ -500,6 +582,22 @@ const styles = StyleSheet.create({
   blankRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 4 },
   blankLabel: { fontSize: 12, fontWeight: '800' as const, color: '#A37A00', minWidth: 56 },
   blankValue: { fontSize: 13, fontWeight: '600' as const, color: B.foreground, flex: 1 },
+
+  // Sprachbausteine per-blank correctness grid
+  blankGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  blankCard: {
+    width: '48%',
+    backgroundColor: B.card, borderRadius: 10, padding: 10,
+    borderWidth: 1, gap: 4,
+  },
+  blankCardCorrect: { borderColor: 'rgba(34,197,94,0.4)', backgroundColor: 'rgba(34,197,94,0.06)' },
+  blankCardWrong:   { borderColor: 'rgba(239,68,68,0.4)',  backgroundColor: 'rgba(239,68,68,0.06)' },
+  blankCardSkipped: { borderColor: B.border, backgroundColor: '#F8FAFC' },
+  blankCardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  blankCardNum: { fontSize: 10, fontWeight: '800' as const, color: B.muted, letterSpacing: 0.3, textTransform: 'uppercase' as const },
+  blankCardRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  blankCardLabel: { fontSize: 11, fontWeight: '700' as const, color: B.muted, minWidth: 48 },
+  blankCardValue: { fontSize: 13, fontWeight: '700' as const, flex: 1 },
 
   schreibenTeil: { backgroundColor: B.card, borderRadius: 12, padding: 12, borderWidth: 1, borderColor: B.border, gap: 8 },
   schreibenTeilHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
