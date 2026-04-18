@@ -3,7 +3,7 @@
  * Source: Banani flow FtXTL2Xb5WF4 / screen P_H6YuOeWqZi
  * Step 4 of 10
  */
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -11,6 +11,8 @@ import { ArrowLeft } from 'lucide-react-native';
 import { onboardingStore, TimelineId } from './_store';
 import { ScreenLayout } from '@/components/ScreenLayout';
 import { GlowOrb } from '@/components/GlowOrb';
+import { ConvictionAnswerCard } from '@/components/onboarding/ConvictionAnswerCard';
+import { TIMELINE_CONVICTIONS } from '@/components/onboarding/convictionLookup';
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 
@@ -26,8 +28,14 @@ const OPTIONS: { id: TimelineId; emoji: string; title: string; subtitle: string 
 
 export default function TimelineScreen() {
   const [selected, setSelected] = useState<TimelineId | null>(null);
+  const [continueActive, setContinueActive] = useState(false);
+  // Holds the cancel handle from the flipped card — called before navigating to
+  // abort any pending flip-back timer if Continue is tapped during the hold.
+  const cancelFlipBackRef = useRef<(() => void) | null>(null);
 
   function handleContinue() {
+    cancelFlipBackRef.current?.();
+    cancelFlipBackRef.current = null;
     if (!selected) return;
     onboardingStore.timeline = selected;
     router.push('/onboarding_launch/readiness');
@@ -36,16 +44,16 @@ export default function TimelineScreen() {
   const ctaFooter = (
     <Pressable
       onPress={handleContinue}
-      disabled={!selected}
+      disabled={!continueActive}
       style={({ pressed }) => [
         styles.ctaButton,
-        !selected && styles.ctaDisabled,
-        pressed && selected && styles.ctaPressed,
+        !continueActive && styles.ctaDisabled,
+        pressed && continueActive && styles.ctaPressed,
       ]}
       accessibilityRole="button"
       accessibilityLabel="Continue"
     >
-      <Text style={[styles.ctaText, !selected && styles.ctaTextDisabled]}>Continue →</Text>
+      <Text style={[styles.ctaText, !continueActive && styles.ctaTextDisabled]}>Continue →</Text>
     </Pressable>
   );
 
@@ -70,21 +78,23 @@ export default function TimelineScreen() {
         <ScreenLayout footer={ctaFooter} contentContainerStyle={styles.scroll} backgroundColor="transparent">
           {/* Headline */}
           <Text style={styles.headline}>How long until your exam date?</Text>
+          {/* Sub-copy preserved — screen-specific motivational line */}
           <Text style={styles.subCopy}>Every window is the right window. What matters is starting today.</Text>
 
           {/* Cards */}
           <View style={styles.cardList}>
             {OPTIONS.map((opt) => (
-              <Pressable
+              <ConvictionAnswerCard
                 key={opt.id}
+                conviction={TIMELINE_CONVICTIONS[opt.id]}
+                isSelected={selected === opt.id}
                 onPress={() => setSelected(opt.id)}
-                style={({ pressed }) => [
-                  styles.card,
-                  selected === opt.id && styles.cardSelected,
-                  pressed && styles.cardPressed,
-                ]}
-                accessibilityRole="radio"
-                accessibilityState={{ selected: selected === opt.id }}
+                onFlipComplete={(cancelFn) => {
+                  setContinueActive(true);
+                  cancelFlipBackRef.current = cancelFn;
+                }}
+                cardStyle={[styles.card, selected === opt.id && styles.cardSelected]}
+                cardBorderRadius={16}
                 accessibilityLabel={opt.title}
               >
                 <Text style={styles.emoji}>{opt.emoji}</Text>
@@ -94,7 +104,7 @@ export default function TimelineScreen() {
                   </Text>
                   <Text style={styles.cardSubtitle}>{opt.subtitle}</Text>
                 </View>
-              </Pressable>
+              </ConvictionAnswerCard>
             ))}
           </View>
         </ScreenLayout>
@@ -138,7 +148,7 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 2,
   },
-  cardSelected: { borderColor: '#2B70EF', backgroundColor: '#F0F5FF' },
+  cardSelected: { borderColor: '#2B70EF', backgroundColor: '#ECF2FE' }, // brief §step-6 (was #F0F5FF)
   cardPressed: { transform: [{ scale: 0.98 }] },
   emoji: { fontSize: 28, lineHeight: 32 },
   cardContent: { flex: 1, gap: 4 },
