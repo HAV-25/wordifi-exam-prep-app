@@ -6,6 +6,7 @@ import * as Linking from 'expo-linking';
 import * as Sentry from '@sentry/react-native';
 
 import { adapty } from 'react-native-adapty';
+import { identifyDevice } from 'vexo-analytics';
 
 import { signOutUser, updateTcAccepted } from '@/lib/authHelpers';
 import { syncSubscriptionOnLaunch } from '@/lib/adaptyPaywall';
@@ -46,6 +47,9 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
         adapty.identify(nextSession.user.id).catch((err) =>
           console.warn('[Adapty] identify failed:', err)
         );
+        if (nextSession.user.email) {
+          identifyDevice(nextSession.user.email);
+        }
       } else {
         Sentry.setUser(null);
         adapty.logout().catch(() => {});

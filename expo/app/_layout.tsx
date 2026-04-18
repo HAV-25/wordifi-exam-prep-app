@@ -23,6 +23,7 @@ import { AuthProvider, useAuth } from '@/providers/AuthProvider';
 import { QuestionTypeMetaProvider, useQuestionTypeMetaContext } from '@/lib/useQuestionTypeMeta';
 import * as Sentry from '@sentry/react-native';
 import { adapty } from 'react-native-adapty';
+import { vexo } from 'vexo-analytics';
 
 Sentry.init({
   dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
@@ -40,6 +41,8 @@ Sentry.init({
 void SplashScreen.preventAutoHideAsync();
 
 adapty.activate('public_live_PsXzPNln.zSOwZEDaKjadnp341RBT');
+
+vexo('5373b786-6793-463c-847f-24e1e280ee7a');
 
 const queryClient = new QueryClient();
 
