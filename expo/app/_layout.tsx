@@ -43,6 +43,7 @@ void SplashScreen.preventAutoHideAsync();
 adapty.activate('public_live_PsXzPNln.zSOwZEDaKjadnp341RBT');
 
 vexo('5373b786-6793-463c-847f-24e1e280ee7a');
+console.log('[Vexo] initialized');
 
 const queryClient = new QueryClient();
 
