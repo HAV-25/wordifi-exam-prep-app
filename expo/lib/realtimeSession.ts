@@ -141,7 +141,30 @@ export async function scoreSprechenConversation(params: {
   }
 
   const data = await res.json();
-  return data.scores;
+
+  // The score-sprechen edge function returns scores at the TOP LEVEL using DB
+  // column names (overall_score, fluency_score, ...) on a 0–5 rubric scale,
+  // matching public.sprechen_responses. Older callers expected `data.scores`
+  // with no suffix. Normalize both shapes here, scaling rubric→0-100%.
+  const rubricToPct = (raw: unknown): number => {
+    const n = typeof raw === 'number' ? raw : Number(raw);
+    if (!Number.isFinite(n)) return 0;
+    // Heuristic: edge function uses 0–5 rubric. Anything ≤5 we treat as rubric
+    // and scale ×20. Anything >5 we assume is already a percentage.
+    return n <= 5 ? Math.round(n * 20) : Math.round(n);
+  };
+
+  const flat = (data.scores ?? data) as Record<string, unknown>;
+
+  return {
+    overall:    rubricToPct(flat.overall    ?? flat.overall_score),
+    fluency:    rubricToPct(flat.fluency    ?? flat.fluency_score),
+    grammar:    rubricToPct(flat.grammar    ?? flat.grammar_score),
+    vocabulary: rubricToPct(flat.vocabulary ?? flat.vocabulary_score),
+    encouragement_note: String(flat.encouragement_note ?? ''),
+    improvement_tip:    String(flat.improvement_tip    ?? ''),
+    task_completion:    flat.task_completion === true || flat.task_completion === 'true',
+  };
 }
 
 function base64ToBytes(base64: string): Uint8Array {

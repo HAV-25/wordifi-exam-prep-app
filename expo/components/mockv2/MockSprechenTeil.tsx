@@ -184,7 +184,9 @@ export function MockSprechenTeil({
           question_id: question.id,
           level: question.level,
           teil: question.teil,
-          topic: question.question_text,
+          // For monologues the actual topic lives in stimulus_text; the AI
+          // prompt needs the real topic, not just "give a presentation."
+          topic: question.stimulus_text || question.question_text,
           task_subtype: taskSubtype,
           turn1_text: partnerPrompts[0]?.audio_script ?? '',
           partner_prompts: partnerPrompts,
@@ -327,7 +329,18 @@ export function MockSprechenTeil({
             <Mic color="#F97316" size={36} />
           </View>
           <Text style={styles.readyTitle}>{teilIndexLabel}</Text>
-          <Text style={styles.readyTopic} numberOfLines={3}>{question.question_text}</Text>
+          {/* Show the instruction (question_text) as a small label */}
+          <Text style={styles.readyTopic} numberOfLines={2}>{question.question_text}</Text>
+          {/* For monologues + structured tasks, the actual TOPIC lives in
+              stimulus_text (e.g. "Soziale Medien — Fluch oder Segen?
+              Sprechen Sie über: Vorteile · Nachteile · ..."). Show it
+              prominently or the user has nothing to talk about. */}
+          {question.stimulus_text ? (
+            <View style={styles.readyTopicCard}>
+              <Text style={styles.readyTopicCardLabel}>Your topic</Text>
+              <Text style={styles.readyTopicCardText}>{question.stimulus_text}</Text>
+            </View>
+          ) : null}
           <View style={styles.readyDivider} />
           <Text style={styles.readyHint}>
             Find a quiet space. You'll have a short conversation with the AI partner — speak naturally in German.
@@ -447,11 +460,14 @@ export function MockSprechenTeil({
         </View>
       </View>
 
-      {/* Topic + transcript */}
+      {/* Topic + transcript. Prefer stimulus_text (the actual topic) when present. */}
       <ScrollView style={styles.transcriptScroll} contentContainerStyle={styles.transcriptContent}>
         <View style={styles.topicCard}>
           <Text style={styles.topicLabel}>Topic</Text>
-          <Text style={styles.topicText}>{question.question_text}</Text>
+          <Text style={styles.topicText}>{question.stimulus_text || question.question_text}</Text>
+          {question.stimulus_text ? (
+            <Text style={styles.topicInstruction} numberOfLines={2}>{question.question_text}</Text>
+          ) : null}
         </View>
         {transcriptEntries.map((entry, i) => (
           <View key={i} style={[styles.bubble, entry.role === 'assistant' ? styles.bubbleAi : styles.bubbleUser]}>
@@ -528,6 +544,29 @@ const styles = StyleSheet.create({
   },
   readyTitle: { fontSize: 20, fontWeight: '800' as const, color: B.questionColor, textAlign: 'center' },
   readyTopic: { fontSize: 14, fontWeight: '600' as const, color: B.foreground, textAlign: 'center', lineHeight: 20, paddingHorizontal: 8 },
+  readyTopicCard: {
+    width: '100%',
+    backgroundColor: 'rgba(249,115,22,0.06)',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(249,115,22,0.25)',
+    padding: 14,
+    gap: 6,
+    marginTop: 4,
+  },
+  readyTopicCardLabel: {
+    fontSize: 11,
+    fontWeight: '800' as const,
+    color: '#F97316',
+    letterSpacing: 0.4,
+    textTransform: 'uppercase' as const,
+  },
+  readyTopicCardText: {
+    fontSize: 15,
+    fontWeight: '700' as const,
+    color: B.questionColor,
+    lineHeight: 22,
+  },
   readyDivider: { width: '60%', height: 1, backgroundColor: B.border, marginVertical: 6 },
   readyHint: { fontSize: 13, color: B.muted, textAlign: 'center', lineHeight: 18, paddingHorizontal: 8 },
   readyMicNote: { fontSize: 12, color: B.muted, fontWeight: '600' as const },
@@ -563,6 +602,7 @@ const styles = StyleSheet.create({
   topicCard: { backgroundColor: B.card, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: B.border, gap: 4 },
   topicLabel: { fontSize: 11, fontWeight: '800' as const, color: B.muted, letterSpacing: 0.4, textTransform: 'uppercase' as const },
   topicText: { fontSize: 14, fontWeight: '600' as const, color: B.questionColor, lineHeight: 20 },
+  topicInstruction: { fontSize: 12, fontWeight: '500' as const, color: B.muted, fontStyle: 'italic' as const, marginTop: 2 },
   bubble: { borderRadius: 14, padding: 12, maxWidth: '88%' },
   bubbleAi: { backgroundColor: B.card, borderWidth: 1, borderColor: B.border, alignSelf: 'flex-start', borderBottomLeftRadius: 4 },
   bubbleUser: { backgroundColor: B.primary, alignSelf: 'flex-end', borderBottomRightRadius: 4 },
