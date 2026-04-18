@@ -75,7 +75,12 @@ type Props = { active: boolean };
 
 export function ConfettiParticles({ active }: Props) {
   return (
-    <View style={styles.container} pointerEvents="none">
+    <View
+      style={styles.container}
+      pointerEvents="none"
+      accessibilityElementsHidden={true}
+      importantForAccessibility="no-hide-descendants"
+    >
       {PARTICLE_CONFIGS.map((config, i) => (
         <Particle key={i} config={config} active={active} />
       ))}

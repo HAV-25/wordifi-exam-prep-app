@@ -1,66 +1,44 @@
-# OB-03 — ConfettiParticles Sub-component
+# OB-03 — Accessibility: reduce-motion + screen reader labels
 
-**Status:** [ ]  
-**Brief sections:** §4.4
+## Read first (in this order)
+1. /docs/onboarding-conviction/AGENT_CONTEXT.md
+2. /docs/onboarding-conviction/OB-00-discovery.md
+3. Your OB-01 and OB-02 implementations (ConvictionAnswerCard.tsx
+   and ConfettiParticles.tsx)
+4. Wordifi_Conviction_Card_Implementation_Brief.docx — section 5.5 ONLY
 
----
+## Goal
+Add two accessibility behaviours per brief 5.5:
+1. If Reduce Motion is enabled, skip the flip animation — instant colour
+   change with no rotation. Press scale, haptic, Continue activation, and
+   particles still fire.
+2. Conviction card copy readable via screen reader. Only the visible face
+   is announced. Particles are not announced.
 
-## Objective
-Build `expo/components/onboarding/ConfettiParticles.tsx` and wire it into the yellow face of `ConvictionCard`.
+## Reduce-motion
+- Detect via AccessibilityInfo.isReduceMotionEnabled() on mount + listener
+  on 'reduceMotionChanged'. Cleanup on unmount.
+- When ON: set flipProgress.value = 1/0 directly (no withTiming).
+  onFlipComplete and setParticlesActive still fire.
+- When OFF: existing OB-01 behaviour unchanged.
+- Read reduce-motion via ref (not state) so the flip useEffect
+  dependency array stays [isSelected] only.
 
----
+## Screen reader
+- Pressable accessibilityLabel: dynamic — answer label when front face
+  showing, conviction copy when back face showing.
+- Front face Animated.View: accessibilityElementsHidden +
+  importantForAccessibility hidden when back face visible (isSelected true).
+- Back face Animated.View: same, hidden when front face visible.
+- ConfettiParticles container: always hidden from screen reader.
 
-## Spec from brief §4.4
+## IMPORTANT: separate-commits rule
+Commit message must be exactly:
+  "OB-03: accessibility (reduce-motion + screen reader)"
 
-```
-5 particles, absolutely positioned within the card
-Each floats upward and fades out over the hold duration
-
-count: 5
-size: 3–6px (random per particle)
-colors: ['rgba(255,255,255,0.4)', 'rgba(201,168,0,0.6)']
-floatDistance: 7px upward (translateY 0 → -7)
-duration: 2500ms (matches hold duration)
-staggerDelay: 0–400ms random per particle
-positions:
-  { top: '15%', left: '8%' }
-  { top: '20%', right: '10%' }
-  { bottom: '25%', left: '15%' }
-  { bottom: '20%', right: '8%' }
-  { top: '50%', right: '5%' }
-
-opacity: 0.8 → 0
-```
-
----
-
-## Component API
-
-```ts
-type ConfettiParticlesProps = {
-  // When true, starts the animation. When false, resets all particles.
-  active: boolean;
-};
-```
-
-Parent (`ConvictionCard`) passes `active={isShowingYellowFace}`. When `active` flips to false (flip-back triggers), all particles reset to their initial positions instantly.
-
----
-
-## Implementation notes
-
-- One `useSharedValue` per particle for both `translateY` and `opacity`
-- Use `withDelay(staggerDelay, withTiming(...))` from Reanimated
-- On `active = false`: reset shared values to initial immediately (no animation)
-- Wrap in `position: absolute, top: 0, left: 0, right: 0, bottom: 0, pointerEvents: 'none'`
-- Each particle is a `View` with fixed width/height, `borderRadius: size/2`
-
----
-
-## Acceptance criteria
-- [ ] 5 particles, correct positions, correct size range
-- [ ] Float upward 7px and fade to 0 over 2500ms
-- [ ] Staggered starts (random 0–400ms delay)
-- [ ] Reset instantly when `active` goes false
-- [ ] `pointerEvents: 'none'` — never blocks taps
-- [ ] No crash when card re-selected (animation restarts cleanly)
+## Do not touch
+- Everything in AGENT_CONTEXT.md "do not touch"
+- Flip animation timing/easing, particles, haptics, press scale (OB-01/02)
+- Other 7 question screens, all value screens
+- onboarding_launch_v1_2026-04-05/
+- Onboarding store, empathy bug, Supabase
