@@ -19,13 +19,14 @@ type ParticleConfig = {
 };
 
 // Values fixed at module load — no per-render randomisation jitter.
-// Sizes satisfy brief spec (3–6px), delays satisfy brief spec (0–400ms).
+// Sizes: 4–7px (raised +1px floor and ceiling from brief's 3–6px for visibility — OB-06b).
+// Delays satisfy brief spec (0–400ms).
 const PARTICLE_CONFIGS: ParticleConfig[] = [
-  { pos: { top: '15%', left: '8%' },    color: 'rgba(255,255,255,0.4)', size: 4, delay: 60  },
-  { pos: { top: '20%', right: '10%' },  color: 'rgba(201,168,0,0.6)',   size: 5, delay: 210 },
-  { pos: { bottom: '25%', left: '15%' }, color: 'rgba(255,255,255,0.4)', size: 3, delay: 340 },
-  { pos: { bottom: '20%', right: '8%' }, color: 'rgba(201,168,0,0.6)',   size: 6, delay: 95  },
-  { pos: { top: '50%', right: '5%' },   color: 'rgba(255,255,255,0.4)', size: 4, delay: 280 },
+  { pos: { top: '15%', left: '8%' },    color: 'rgba(255,255,255,0.4)', size: 5, delay: 60  },
+  { pos: { top: '20%', right: '10%' },  color: 'rgba(201,168,0,0.6)',   size: 6, delay: 210 },
+  { pos: { bottom: '25%', left: '15%' }, color: 'rgba(255,255,255,0.4)', size: 4, delay: 340 },
+  { pos: { bottom: '20%', right: '8%' }, color: 'rgba(201,168,0,0.6)',   size: 7, delay: 95  },
+  { pos: { top: '50%', right: '5%' },   color: 'rgba(255,255,255,0.4)', size: 5, delay: 280 },
 ];
 
 // ─── Single particle ──────────────────────────────────────────────────────────
@@ -49,7 +50,7 @@ function Particle({ config, active }: ParticleProps) {
   }, [active]);
 
   const animStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(progress.value, [0, 1], [0.8, 0]),
+    opacity: interpolate(progress.value, [0, 1], [1.0, 0]),
     transform: [{ translateY: interpolate(progress.value, [0, 1], [0, -7]) }],
   }));
 
