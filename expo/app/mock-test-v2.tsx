@@ -514,6 +514,7 @@ function SectionRouter({
           teilAssessments: r.teilScores.map((s) => ({
             teil: s.teil,
             scores: { overall: s.overall, fluency: s.fluency, grammar: s.grammar, vocabulary: s.vocabulary },
+            transcript: s.transcript ?? '',
           })),
         })}
       />

@@ -65,6 +65,8 @@ type TeilAssessment = {
     task_completion_feedback?: string;
   };
   scores?: { overall?: number; fluency?: number; grammar?: number; vocabulary?: number };
+  // Sprechen — full conversation transcript ("Partner: ...\nSie: ...")
+  transcript?: string;
   // Sprachbausteine — full question with correct_answer JSON map + user blank answers
   question?: AppQuestionLoose & { correct_answer?: string | Record<string, string>; stimulus_text?: string | null };
   blankAnswers?: Record<string, string>;
@@ -472,15 +474,31 @@ function SprechenReview({ teilAssessments }: { teilAssessments: TeilAssessment[]
     <View style={styles.drillList}>
       {teilAssessments.map((t) => {
         const s = t.scores ?? {};
+        const wasSkipped = (s.overall ?? 0) === 0 && !t.transcript;
         return (
           <View key={t.teil} style={styles.schreibenTeil}>
-            <Text style={styles.schreibenTeilTitle}>Teil {t.teil}</Text>
-            <View style={styles.rubricGrid}>
-              <RubricRow label="Overall" value={s.overall} />
-              <RubricRow label="Fluency" value={s.fluency} />
-              <RubricRow label="Grammar" value={s.grammar} />
-              <RubricRow label="Vocabulary" value={s.vocabulary} />
+            <View style={styles.schreibenTeilHeader}>
+              <Text style={styles.schreibenTeilTitle}>Teil {t.teil}</Text>
+              {wasSkipped ? (
+                <View style={[styles.setVerdict, styles.setVerdictFail]}>
+                  <Text style={[styles.setVerdictText, { color: '#F59E0B' }]}>Skipped</Text>
+                </View>
+              ) : null}
             </View>
+            {!wasSkipped ? (
+              <View style={styles.rubricGrid}>
+                <RubricRow label="Overall" value={s.overall} />
+                <RubricRow label="Fluency" value={s.fluency} />
+                <RubricRow label="Grammar" value={s.grammar} />
+                <RubricRow label="Vocabulary" value={s.vocabulary} />
+              </View>
+            ) : null}
+            {t.transcript ? (
+              <View style={styles.userTextBox}>
+                <Text style={styles.userTextLabel}>Conversation transcript</Text>
+                <Text style={styles.userTextValue}>{t.transcript}</Text>
+              </View>
+            ) : null}
           </View>
         );
       })}

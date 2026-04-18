@@ -1,35 +1,50 @@
 /**
  * SectionPlayerSprechen — Mock V2 oral section.
  *
- * V1 approach: for each teil, navigate OUT to /sprechen-realtime with a mock
- * context flag, collect the scored result on return via onComplete.
+ * Iterates Sprechen teils sequentially. For each teil:
+ *   1. Fetches one Sprechen question for that teil
+ *   2. Mounts <MockSprechenTeil /> which runs the real OpenAI Realtime
+ *      conversation (A2: Ready card → conversation → score)
+ *   3. On completion, stashes the score silently and shows a "Saved"
+ *      transition card before advancing to the next teil
+ *   4. After last teil, calls onComplete with aggregate
  *
- * For the compressed V1 build, we show a simplified one-screen-per-teil flow
- * that guides the user to start the conversation via the existing realtime flow.
+ * If user denies mic permission (B2), that teil records 0% and the
+ * section continues to the next teil — user can retry mic later.
  *
- * NOTE: Full inline realtime integration is a polish item. For V1 scope,
- * this wrapper shows a "Start Sprechen Teil X" card per teil and launches
- * the existing realtime flow. Results are simulated/captured via AsyncStorage
- * bridge since full inline is a 2-day job.
- *
- * Simple V1: show each teil as a "Ready to speak?" card → user taps Start →
- * conversation runs in the existing sprechen-realtime screen → on return,
- * we consume the score and advance to next teil.
+ * Silent UX: NO per-teil score is shown to the user during the mock.
+ * All scoring revealed only at the final results screen.
  */
-import { Mic, Play } from 'lucide-react-native';
-import React, { useCallback, useRef, useState } from 'react';
+import { Check, Mic } from 'lucide-react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 
+import { fetchSprechenQuestions } from '@/lib/sprechenHelpers';
 import { B } from '@/theme/banani';
+import { useAuth } from '@/providers/AuthProvider';
+import type { AppQuestion } from '@/types/database';
+import { MockSprechenTeil, type MockSprechenTeilResult } from './MockSprechenTeil';
+
+export type SprechenTeilScore = {
+  teil: number;
+  overall: number;
+  fluency: number;
+  grammar: number;
+  vocabulary: number;
+  /** Final transcript for review at the end of the mock. */
+  transcript?: string;
+  /** True if user skipped (mic denied or chose to skip). */
+  skipped?: boolean;
+};
 
 export type SprechenSectionResult = {
-  teilScores: Array<{ teil: number; overall: number; fluency: number; grammar: number; vocabulary: number }>;
+  teilScores: SprechenTeilScore[];
   overallScorePct: number;
   timeTakenSeconds: number;
 };
@@ -42,115 +57,235 @@ type Props = {
   totalSections: number;
 };
 
-/**
- * Placeholder V1: collects per-teil scores but the actual speaking happens
- * via the existing /sprechen-realtime route. For the compressed implementation,
- * we offer "Skip with demo score" so the mock flow end-to-end can be tested.
- * The proper integration (launch realtime → return with score) is a
- * follow-up when we wire up deep-linking between mock orchestrator and realtime.
- */
-export function SectionPlayerSprechen({ level, teils, onComplete, sectionIndex, totalSections }: Props) {
+type Phase =
+  | 'loading'   // fetching question for current teil
+  | 'teil'      // <MockSprechenTeil> active
+  | 'saved'     // brief "Teil saved" confirmation between teils
+  | 'finalizing'; // computing aggregate, calling onComplete
+
+export function SectionPlayerSprechen({
+  level,
+  teils,
+  onComplete,
+  sectionIndex,
+  totalSections,
+}: Props) {
+  const { session } = useAuth();
+  const accessToken = session?.access_token ?? '';
+
   const [currentTeilIndex, setCurrentTeilIndex] = useState(0);
-  const [teilScores, setTeilScores] = useState<SprechenSectionResult['teilScores']>([]);
+  const [currentQuestion, setCurrentQuestion] = useState<AppQuestion | null>(null);
+  const [phase, setPhase] = useState<Phase>('loading');
+  const [teilScores, setTeilScores] = useState<SprechenTeilScore[]>([]);
   const sessionStart = useRef(Date.now());
+  const isMountedRef = useRef(true);
 
   const currentTeil = teils[currentTeilIndex]!;
   const isLastTeil = currentTeilIndex === teils.length - 1;
+  const teilLabel = `Sprechen Teil ${currentTeil}`;
+  const teilCount = `Teil ${currentTeilIndex + 1} of ${teils.length}`;
 
-  const handleTeilDone = useCallback((score: { overall: number; fluency: number; grammar: number; vocabulary: number }) => {
-    const next = [...teilScores, { teil: currentTeil, ...score }];
-    setTeilScores(next);
-    if (isLastTeil) {
-      const avg = next.reduce((a, s) => a + s.overall, 0) / next.length;
-      onComplete({
-        teilScores: next,
-        overallScorePct: Math.round(avg),
-        timeTakenSeconds: Math.round((Date.now() - sessionStart.current) / 1000),
-      });
-    } else {
-      setCurrentTeilIndex((i) => i + 1);
-    }
-  }, [teilScores, currentTeil, isLastTeil, onComplete]);
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => { isMountedRef.current = false; };
+  }, []);
 
-  return (
-    <View style={styles.wrap}>
-      <View style={styles.header}>
-        <View style={styles.metaRow}>
-          <Text style={styles.teilCount}>Teil {currentTeilIndex + 1} of {teils.length}</Text>
+  // ── Fetch question for current teil ─────────────────────────────────────
+  useEffect(() => {
+    let cancelled = false;
+    setPhase('loading');
+    setCurrentQuestion(null);
+    (async () => {
+      try {
+        const fetched = await fetchSprechenQuestions(level, currentTeil, 1);
+        if (cancelled) return;
+        if (fetched.length === 0) {
+          // No question in DB for this teil — skip with 0%
+          finalizeTeil({ teil: currentTeil, overall: 0, fluency: 0, grammar: 0, vocabulary: 0, skipped: true });
+          return;
+        }
+        setCurrentQuestion(fetched[0]!);
+        setPhase('teil');
+      } catch (err) {
+        console.log('[MockV2 Sprechen] fetch error', err);
+        finalizeTeil({ teil: currentTeil, overall: 0, fluency: 0, grammar: 0, vocabulary: 0, skipped: true });
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentTeilIndex, level]);
+
+  // ── Finalize current teil (advance to next or finish section) ──────────
+  const finalizeTeil = useCallback((score: SprechenTeilScore) => {
+    setTeilScores((prev) => {
+      const next = [...prev, score];
+      // If last teil, finalize section
+      if (isLastTeil) {
+        const total = next.length;
+        const avg = total > 0 ? next.reduce((s, t) => s + t.overall, 0) / total : 0;
+        const timeTakenSeconds = Math.round((Date.now() - sessionStart.current) / 1000);
+        // Use a microtask so state updates settle first
+        setTimeout(() => {
+          onComplete({
+            teilScores: next,
+            overallScorePct: Math.round(avg),
+            timeTakenSeconds,
+          });
+        }, 0);
+        setPhase('finalizing');
+      } else {
+        setPhase('saved');
+      }
+      return next;
+    });
+  }, [isLastTeil, onComplete]);
+
+  // ── Handlers passed to MockSprechenTeil ─────────────────────────────────
+  const handleTeilCompleted = useCallback((result: MockSprechenTeilResult) => {
+    finalizeTeil({
+      teil: currentTeil,
+      overall: result.scores.overall,
+      fluency: result.scores.fluency,
+      grammar: result.scores.grammar,
+      vocabulary: result.scores.vocabulary,
+      transcript: result.transcript,
+    });
+  }, [currentTeil, finalizeTeil]);
+
+  const handleTeilSkipped = useCallback((_reason: 'mic_denied' | 'user_skip') => {
+    finalizeTeil({
+      teil: currentTeil,
+      overall: 0,
+      fluency: 0,
+      grammar: 0,
+      vocabulary: 0,
+      skipped: true,
+    });
+  }, [currentTeil, finalizeTeil]);
+
+  const handleContinueToNext = useCallback(() => {
+    setCurrentTeilIndex((i) => i + 1);
+  }, []);
+
+  // ── Render ───────────────────────────────────────────────────────────────
+
+  // PHASE: loading (fetching the next teil's question)
+  if (phase === 'loading') {
+    return (
+      <View style={styles.wrap}>
+        <View style={styles.header}>
+          <Text style={styles.teilCount}>{teilCount}</Text>
           <View style={styles.sectionPill}>
             <Mic color="#F97316" size={14} />
             <Text style={styles.sectionPillText}>Sprechen</Text>
           </View>
           <Text style={styles.levelText}>{level} · Section {sectionIndex + 1}/{totalSections}</Text>
         </View>
-      </View>
-
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
-        <View style={styles.teilCard}>
-          <View style={styles.teilIconWrap}>
-            <Mic color="#F97316" size={36} />
-          </View>
-          <Text style={styles.teilTitle}>Sprechen Teil {currentTeil}</Text>
-          <Text style={styles.teilHint}>
-            You'll have a short conversation with the AI partner. Speak naturally in German.
-          </Text>
-
-          <View style={styles.divider} />
-
-          <Text style={styles.instruction}>
-            Your response will be recorded and saved. Full feedback is revealed at the end of the mock.
-          </Text>
-
-          <Pressable
-            style={styles.startBtn}
-            onPress={() => handleTeilDone({ overall: 72, fluency: 70, grammar: 75, vocabulary: 70 })}
-            testID={`mockv2-sprechen-teil-${currentTeil}`}
-          >
-            <Play color="#fff" size={18} />
-            <Text style={styles.startBtnText}>
-              {isLastTeil ? 'Finish Sprechen' : `Continue to Teil ${currentTeil + 1}`}
-            </Text>
-          </Pressable>
+        <View style={styles.center}>
+          <ActivityIndicator color={B.primary} size="large" />
+          <Text style={styles.loadingText}>Loading {teilLabel}…</Text>
         </View>
-      </ScrollView>
+      </View>
+    );
+  }
+
+  // PHASE: teil — render the real conversation
+  if (phase === 'teil' && currentQuestion) {
+    return (
+      <View style={styles.wrap}>
+        <View style={styles.header}>
+          <Text style={styles.teilCount}>{teilCount}</Text>
+          <View style={styles.sectionPill}>
+            <Mic color="#F97316" size={14} />
+            <Text style={styles.sectionPillText}>Sprechen</Text>
+          </View>
+          <Text style={styles.levelText}>{level} · Section {sectionIndex + 1}/{totalSections}</Text>
+        </View>
+        <MockSprechenTeil
+          question={currentQuestion}
+          accessToken={accessToken}
+          teilIndexLabel={teilLabel}
+          onComplete={handleTeilCompleted}
+          onSkipped={handleTeilSkipped}
+        />
+      </View>
+    );
+  }
+
+  // PHASE: saved — neutral confirmation between teils
+  if (phase === 'saved') {
+    return (
+      <View style={styles.wrap}>
+        <View style={styles.header}>
+          <Text style={styles.teilCount}>{teilCount}</Text>
+          <View style={styles.sectionPill}>
+            <Mic color="#F97316" size={14} />
+            <Text style={styles.sectionPillText}>Sprechen</Text>
+          </View>
+          <Text style={styles.levelText}>{level} · Section {sectionIndex + 1}/{totalSections}</Text>
+        </View>
+        <View style={styles.center}>
+          <View style={styles.savedCard}>
+            <View style={styles.savedIconWrap}>
+              <Check color="#22C55E" size={36} strokeWidth={3} />
+            </View>
+            <Text style={styles.savedTitle}>{teilLabel} saved</Text>
+            <Text style={styles.savedSub}>
+              Your response has been recorded. Full feedback shown at the end of the mock.
+            </Text>
+            <Pressable style={styles.continueBtn} onPress={handleContinueToNext} testID="mock-sprechen-continue-next">
+              <Text style={styles.continueBtnText}>Continue to Teil {currentTeil + 1} →</Text>
+            </Pressable>
+          </View>
+        </View>
+      </View>
+    );
+  }
+
+  // PHASE: finalizing — brief loading while we hand off to orchestrator
+  return (
+    <View style={styles.wrap}>
+      <View style={styles.center}>
+        <ActivityIndicator color={B.primary} size="large" />
+        <Text style={styles.loadingText}>Wrapping up Sprechen…</Text>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: B.background },
-  header: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 12, backgroundColor: B.card, borderBottomWidth: 1, borderBottomColor: B.border },
-  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20, gap: 14 },
+  loadingText: { fontSize: 14, color: B.muted, fontWeight: '600' as const },
+
+  header: {
+    paddingHorizontal: 20, paddingTop: 12, paddingBottom: 12,
+    backgroundColor: B.card, borderBottomWidth: 1, borderBottomColor: B.border,
+    flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap',
+  },
   teilCount: { fontSize: 13, fontWeight: '800' as const, color: B.primary },
   sectionPill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, backgroundColor: 'rgba(249,115,22,0.12)' },
   sectionPillText: { fontSize: 11, fontWeight: '700' as const, color: '#F97316' },
   levelText: { fontSize: 11, fontWeight: '600' as const, color: B.muted, flex: 1 },
 
-  scroll: { flex: 1 },
-  scrollContent: { padding: 20, gap: 16, paddingBottom: 24 },
-
-  teilCard: {
-    backgroundColor: B.card, borderRadius: 20, padding: 24,
-    alignItems: 'center', gap: 12,
+  // Saved confirmation card
+  savedCard: {
+    backgroundColor: B.card, borderRadius: 20, padding: 28,
+    alignItems: 'center', gap: 12, width: '100%', maxWidth: 400,
     borderWidth: 1, borderColor: B.border,
   },
-  teilIconWrap: {
-    width: 88, height: 88, borderRadius: 44,
-    backgroundColor: 'rgba(249,115,22,0.12)',
+  savedIconWrap: {
+    width: 72, height: 72, borderRadius: 36,
+    backgroundColor: 'rgba(34,197,94,0.12)',
     alignItems: 'center', justifyContent: 'center',
   },
-  teilTitle: { fontSize: 22, fontWeight: '800' as const, color: B.questionColor, textAlign: 'center' },
-  teilHint: { fontSize: 14, fontWeight: '500' as const, color: B.muted, textAlign: 'center', lineHeight: 20 },
-  divider: { width: '60%', height: 1, backgroundColor: B.border, marginVertical: 12 },
-  instruction: { fontSize: 13, color: B.muted, textAlign: 'center', lineHeight: 18, paddingHorizontal: 8 },
-
-  startBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
+  savedTitle: { fontSize: 20, fontWeight: '800' as const, color: B.questionColor, marginTop: 4 },
+  savedSub: { fontSize: 14, fontWeight: '500' as const, color: B.muted, textAlign: 'center', lineHeight: 20, paddingHorizontal: 16 },
+  continueBtn: {
+    marginTop: 12,
     backgroundColor: B.primary, borderRadius: 999,
-    paddingVertical: 16, paddingHorizontal: 28,
-    marginTop: 12, minWidth: 220,
-    shadowColor: B.primary, shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.2, shadowRadius: 12, elevation: 3,
+    paddingVertical: 14, paddingHorizontal: 24, minWidth: 220,
+    alignItems: 'center',
   },
-  startBtnText: { color: '#fff', fontSize: 15, fontWeight: '800' as const },
+  continueBtnText: { color: '#fff', fontSize: 15, fontWeight: '800' as const },
 });
