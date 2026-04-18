@@ -3,7 +3,7 @@
  * Source: Banani flow FtXTL2Xb5WF4 / screen XVaFB_BiIsRy
  * Step 3 of 10
  */
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -11,6 +11,8 @@ import { ArrowLeft } from 'lucide-react-native';
 import { onboardingStore } from './_store';
 import { ScreenLayout } from '@/components/ScreenLayout';
 import { GlowOrb } from '@/components/GlowOrb';
+import { ConvictionAnswerCard } from '@/components/onboarding/ConvictionAnswerCard';
+import { EMPATHY_CONVICTIONS } from '@/components/onboarding/convictionLookup';
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 
@@ -29,9 +31,18 @@ const REASONS: { id: ReasonId; emoji: string; title: string; subtitle: string }[
 
 export default function EmpathyScreen() {
   const [selected, setSelected] = useState<ReasonId | null>(null);
+  const [continueActive, setContinueActive] = useState(false);
+  // Holds the cancel handle from the flipped card — called before navigating to
+  // abort any pending flip-back timer if Continue is tapped during the hold.
+  const cancelFlipBackRef = useRef<(() => void) | null>(null);
 
   function handleContinue() {
+    cancelFlipBackRef.current?.();
+    cancelFlipBackRef.current = null;
     if (!selected) return;
+    // KNOWN BUG (deferred post-launch): writes to wrong field.
+    // The selected empathy answer is not persisted anywhere by design
+    // until product decides what consumes it. See OB-00b plan doc.
     onboardingStore.readiness = null;
     router.push('/onboarding_launch/timeline');
   }
@@ -39,16 +50,16 @@ export default function EmpathyScreen() {
   const ctaFooter = (
     <Pressable
       onPress={handleContinue}
-      disabled={!selected}
+      disabled={!continueActive}
       style={({ pressed }) => [
         styles.ctaButton,
-        !selected && styles.ctaDisabled,
-        pressed && selected && styles.ctaPressed,
+        !continueActive && styles.ctaDisabled,
+        pressed && continueActive && styles.ctaPressed,
       ]}
       accessibilityRole="button"
       accessibilityLabel="Continue"
     >
-      <Text style={[styles.ctaText, !selected && styles.ctaTextDisabled]}>Continue →</Text>
+      <Text style={[styles.ctaText, !continueActive && styles.ctaTextDisabled]}>Continue →</Text>
     </Pressable>
   );
 
@@ -77,16 +88,17 @@ export default function EmpathyScreen() {
           {/* Cards */}
           <View style={styles.cardList}>
             {REASONS.map((reason) => (
-              <Pressable
+              <ConvictionAnswerCard
                 key={reason.id}
+                conviction={EMPATHY_CONVICTIONS[reason.id]}
+                isSelected={selected === reason.id}
                 onPress={() => setSelected(reason.id)}
-                style={({ pressed }) => [
-                  styles.card,
-                  selected === reason.id && styles.cardSelected,
-                  pressed && styles.cardPressed,
-                ]}
-                accessibilityRole="radio"
-                accessibilityState={{ selected: selected === reason.id }}
+                onFlipComplete={(cancelFn) => {
+                  setContinueActive(true);
+                  cancelFlipBackRef.current = cancelFn;
+                }}
+                cardStyle={[styles.card, selected === reason.id && styles.cardSelected]}
+                cardBorderRadius={16}
                 accessibilityLabel={reason.title}
               >
                 <Text style={styles.emoji}>{reason.emoji}</Text>
@@ -96,7 +108,7 @@ export default function EmpathyScreen() {
                   </Text>
                   <Text style={styles.cardSubtitle}>{reason.subtitle}</Text>
                 </View>
-              </Pressable>
+              </ConvictionAnswerCard>
             ))}
           </View>
         </ScreenLayout>
@@ -185,7 +197,7 @@ const styles = StyleSheet.create({
   },
   cardSelected: {
     borderColor: '#2B70EF',
-    backgroundColor: '#F0F5FF',
+    backgroundColor: '#ECF2FE', // brief §step-6: soft Primary Blue tint (was #F0F5FF)
   },
   cardPressed: {
     transform: [{ scale: 0.98 }],
