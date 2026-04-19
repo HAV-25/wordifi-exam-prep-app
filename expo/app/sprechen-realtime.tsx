@@ -118,13 +118,13 @@ export default function SprechenRealtimeScreen() {
           setScreenState('instruction');
           console.log('[SprechenRealtime] Question loaded:', fetched[0]!.id);
         } else if (!cancelled) {
-          setErrorMsg('Keine Sprechen-Fragen verfügbar');
+          setErrorMsg('No speaking questions available');
           setScreenState('error');
         }
       } catch (err) {
         console.log('[SprechenRealtime] Load error:', err);
         if (!cancelled) {
-          setErrorMsg('Fragen konnten nicht geladen werden');
+          setErrorMsg('Questions could not be loaded');
           setScreenState('error');
         }
       }
@@ -178,7 +178,7 @@ export default function SprechenRealtimeScreen() {
       if (Platform.OS !== 'web') {
         const { status } = await Audio.requestPermissionsAsync();
         if (status !== 'granted') {
-          setErrorMsg('Mikrofon-Berechtigung erforderlich');
+          setErrorMsg('Microphone permission required');
           setScreenState('error');
           return;
         }
@@ -209,7 +209,7 @@ export default function SprechenRealtimeScreen() {
       if (!sessionRes.ok) {
         const errText = await sessionRes.text().catch(() => '');
         console.log('[SprechenRealtime] Create session error:', sessionRes.status, errText);
-        throw new Error(`Sitzung konnte nicht erstellt werden (${sessionRes.status})`);
+        throw new Error(`Session could not be created (${sessionRes.status})`);
       }
 
       const sessionData = await sessionRes.json() as Record<string, unknown>;
@@ -274,7 +274,7 @@ export default function SprechenRealtimeScreen() {
       }
     } catch (err) {
       console.log('[SprechenRealtime] Start error:', err);
-      setErrorMsg(err instanceof Error ? err.message : 'Verbindung fehlgeschlagen');
+      setErrorMsg(err instanceof Error ? err.message : 'Connection failed');
       setScreenState('error');
     }
   }, [question, accessToken, partnerPromptsMemo, rubricCard, startTimer, taskSubtype, isMonologue, recordingTimeLimitSec]);
@@ -319,7 +319,7 @@ export default function SprechenRealtimeScreen() {
         fluency: 0,
         grammar: 0,
         vocabulary: 0,
-        encouragement_note: 'Bewertung konnte nicht geladen werden.',
+        encouragement_note: 'Assessment could not be loaded.',
         improvement_tip: '',
         task_completion: false,
       });
@@ -429,10 +429,10 @@ export default function SprechenRealtimeScreen() {
 
   const getStatusLabel = (): string => {
     switch (convState) {
-      case 'connecting': return 'Verbinde...';
-      case 'connected': return 'Verbunden';
-      case 'ai_speaking': return 'Partner spricht...';
-      case 'listening': return isMonologue ? 'Ihre Aufnahme läuft...' : 'Zuhören...';
+      case 'connecting': return 'Connecting...';
+      case 'connected': return 'Connected';
+      case 'ai_speaking': return 'Partner speaking...';
+      case 'listening': return isMonologue ? 'Recording in progress...' : 'Listening...';
       default: return '';
     }
   };
@@ -509,7 +509,7 @@ export default function SprechenRealtimeScreen() {
         <Stack.Screen options={{ title: 'Sprechen', headerShown: true }} />
         <View style={styles.center}>
           <ActivityIndicator color={colors.blue} size="large" />
-          <Text style={styles.loadingText}>Fragen werden geladen...</Text>
+          <Text style={styles.loadingText}>Loading questions...</Text>
         </View>
       </View>
     );
