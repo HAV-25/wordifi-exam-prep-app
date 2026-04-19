@@ -193,7 +193,11 @@ export function ConvictionAnswerCard({
         accessibilityRole="radio"
         accessibilityState={{ selected: isSelected }}
         accessibilityLabel={
-          isSelected
+          // Yellow face is showing → read conviction copy.
+          // Default or selected-state front face → read the answer label.
+          // accessibilityState.selected handles the "selected" announcement
+          // natively on both iOS (VoiceOver) and Android (TalkBack).
+          particlesActive
             ? `${conviction.emoji} ${conviction.copy}`
             : accessibilityLabel
         }
