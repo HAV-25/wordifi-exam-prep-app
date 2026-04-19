@@ -85,9 +85,9 @@ export default function PlanBuilderScreen() {
     Animated.timing(ctaOpacity, { toValue: 1, duration: 400, delay: CTA_DELAY, useNativeDriver: true }).start(() => setDone(true));
     // Bar fill uses width (non-native) — must run separately
     Animated.timing(progressWidth, { toValue: 1, duration: PROG_DUR, delay: PROG_DELAY + 300, useNativeDriver: false }).start(() => {
-      // Fire confetti from center of the screen when bar completes
+      // Fire confetti from top-center so pieces fall visibly over the card
       const { width, height } = Dimensions.get('window');
-      confettiRef.current?.burst(width / 2, height * 0.45);
+      confettiRef.current?.burst(width / 2, height * 0.18);
     });
   }, []);
 
@@ -120,13 +120,16 @@ export default function PlanBuilderScreen() {
 
   return (
     <View style={styles.root}>
-      {/* Confetti burst — fires when progress bar completes */}
-      <ConfettiBurst ref={confettiRef} />
 
       {/* Decorative orbs */}
       <View style={[styles.orb, styles.orbOne]} />
       <View style={[styles.orb, styles.orbTwo]} />
       <View style={[styles.orb, styles.orbThree]} />
+
+      {/* Confetti — rendered above SafeAreaView so it clears the card elevation */}
+      <View style={styles.confettiLayer} pointerEvents="none">
+        <ConfettiBurst ref={confettiRef} />
+      </View>
 
       <SafeAreaView edges={['top']} style={styles.safe}>
         <ScreenLayout
@@ -134,15 +137,6 @@ export default function PlanBuilderScreen() {
           backgroundColor="transparent"
           footer={ctaFooter}
         >
-          {/* Spark dots — top right */}
-          <View style={styles.sparkRow}>
-            <View style={styles.sparks}>
-              <View style={[styles.spark, styles.sparkA]} />
-              <View style={[styles.spark, styles.sparkB]} />
-              <View style={[styles.spark, styles.sparkC]} />
-            </View>
-          </View>
-
           {/* Headline + sub-copy */}
           <Text style={styles.headline}>Your Wordifi plan is ready.</Text>
           <Text style={styles.subCopy}>Built around everything you just told us.</Text>
@@ -202,13 +196,8 @@ const styles = StyleSheet.create({
   orbTwo:   { width: 72,  height: 72,  backgroundColor: 'rgba(240,200,8,0.18)',   top: 350,   left: -20  },
   orbThree: { width: 88,  height: 88,  backgroundColor: 'rgba(255,255,255,0.08)', bottom: 118, right: -18 },
 
-  // ── Spark dots ──────────────────────────────────────────────────────────────
-  sparkRow: { flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 24 },
-  sparks:   { flexDirection: 'row', gap: 8, alignItems: 'center' },
-  spark:    { borderRadius: 999 },
-  sparkA:   { width: 6,  height: 6,  backgroundColor: 'rgba(255,255,255,0.9)'  },
-  sparkB:   { width: 10, height: 10, backgroundColor: 'rgba(240,200,8,0.95)'   },
-  sparkC:   { width: 5,  height: 5,  backgroundColor: 'rgba(255,255,255,0.7)'  },
+  // ── Confetti overlay ────────────────────────────────────────────────────────
+  confettiLayer: { ...StyleSheet.absoluteFillObject, zIndex: 20 },
 
   // ── Header ──────────────────────────────────────────────────────────────────
   headline: { fontFamily: 'Outfit_800ExtraBold', fontSize: 40, lineHeight: 42, color: '#FFFFFF', marginBottom: 12, letterSpacing: -1.2 },

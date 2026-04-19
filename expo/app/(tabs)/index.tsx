@@ -27,6 +27,7 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { GlowBorderCard } from '@/components/GlowBorderCard';
 import { PaywallModal } from '@/components/PaywallModal';
 import { ReadinessBottomSheet } from '@/components/ReadinessBottomSheet';
 import { ProgressRing } from '@/components/ProgressRing';
@@ -194,17 +195,19 @@ export default function HomeScreen() {
           </View>
         ) : (
           <View style={s.upgradeRow}>
-            <Pressable style={s.upgradeCard} onPress={() => router.push('/(tabs)/stream' as never)}>
-              <View style={[s.upgradeIcon, { backgroundColor: 'rgba(43,112,239,0.14)' }]}>
-                <Zap color={BANANI.primary} size={14} />
-              </View>
-              <Text style={s.upgradeCopy}>
-                {data.hasPracticedToday ? 'Continue your daily stream' : 'Start your daily stream'}
-              </Text>
-              <View style={s.upgradeArrow}>
-                <ArrowRight color={BANANI.muted} size={16} />
-              </View>
-            </Pressable>
+            <GlowBorderCard>
+              <Pressable style={s.upgradeCard} onPress={() => router.push('/(tabs)/stream' as never)}>
+                <View style={[s.upgradeIcon, { backgroundColor: 'rgba(43,112,239,0.14)' }]}>
+                  <Zap color={BANANI.primary} size={14} />
+                </View>
+                <Text style={s.upgradeCopy}>
+                  {data.hasPracticedToday ? 'Continue your daily stream' : 'Start your daily stream'}
+                </Text>
+                <View style={s.upgradeArrow}>
+                  <ArrowRight color={BANANI.muted} size={16} />
+                </View>
+              </Pressable>
+            </GlowBorderCard>
           </View>
         )}
 
@@ -384,10 +387,20 @@ export default function HomeScreen() {
 // ─── Mini leaderboard row ────────────────────────────────────────────────────
 function MiniLeaderboardRow({ neighbor }: { neighbor: LeaderboardNeighbor }) {
   const isYou = neighbor.is_current_user;
+  const { profile } = useAuth();
+
+  // For current user: player_name → first_name+exam_type → first_name+*****
+  const displayName = isYou
+    ? (profile?.player_name
+        ?? ((profile as any)?.first_name
+            ? `${(profile as any).first_name} ${profile?.exam_type ?? '*****'}`
+            : neighbor.display_name))
+    : neighbor.display_name;
+
   const avatarBg = isYou
     ? `rgba(43,112,239,0.18)`
     : neighbor.avatar_color ?? AVATAR_COLORS[neighbor.rank % AVATAR_COLORS.length];
-  const avatarText = isYou ? 'You' : neighbor.display_name.charAt(0).toUpperCase();
+  const avatarText = isYou ? 'You' : displayName.charAt(0).toUpperCase();
   const avatarTextColor = isYou ? BANANI.primary : '#7C2D12';
 
   return (
@@ -397,7 +410,7 @@ function MiniLeaderboardRow({ neighbor }: { neighbor: LeaderboardNeighbor }) {
         <Text style={[s.avatarSmallText, { color: avatarTextColor }]}>{avatarText}</Text>
       </View>
       <View style={s.person}>
-        <Text style={s.personName} numberOfLines={1}>{neighbor.display_name}</Text>
+        <Text style={s.personName} numberOfLines={1}>{displayName}</Text>
         <Text style={s.personMeta} numberOfLines={1}>
           {neighbor.exam_type} {neighbor.target_level} · {neighbor.streak > 0 ? `${neighbor.streak} day streak` : 'Day 1'}
         </Text>
@@ -483,15 +496,15 @@ const s = StyleSheet.create({
   },
   greetingText: {
     fontFamily: fontFamily.bodySemiBold,
-    fontSize: 12,
+    fontSize: 14,
     color: BANANI.muted,
-    lineHeight: 15,
+    lineHeight: 18,
   },
   quoteText: {
     fontFamily: fontFamily.bodyRegular,
-    fontSize: 12,
+    fontSize: 13,
     color: BANANI.muted,
-    lineHeight: 15,
+    lineHeight: 16,
     opacity: 0.8,
   },
 

@@ -10,6 +10,7 @@ import { router } from 'expo-router';
 import { onboardingStore } from './_store';
 import { ArrowLeft } from 'lucide-react-native';
 import { ScreenLayout } from '@/components/ScreenLayout';
+import { GlowOrb } from '@/components/GlowOrb';
 import { ConvictionAnswerCard } from '@/components/onboarding/ConvictionAnswerCard';
 import { CERT_CONVICTIONS } from '@/components/onboarding/convictionLookup';
 
@@ -59,6 +60,7 @@ export default function CertScreen() {
 
   return (
     <View style={styles.root}>
+      <GlowOrb top={-100} right={-100} />
       {/* Progress bar */}
       <View style={styles.progressTrack}>
         <View style={[styles.progressFill, { width: '10%' }]} />
@@ -74,7 +76,7 @@ export default function CertScreen() {
           <View style={styles.navSpacer} />
         </View>
 
-        <ScreenLayout footer={ctaFooter} contentContainerStyle={styles.scroll}>
+        <ScreenLayout footer={ctaFooter} contentContainerStyle={styles.scroll} backgroundColor="transparent">
           {/* Headline */}
           <Text style={styles.headline}>Which German certification are you going for?</Text>
 
@@ -116,6 +118,7 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: '#F8FAFF',
+    overflow: 'hidden',
   },
 
   // Progress

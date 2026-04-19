@@ -108,12 +108,7 @@ export default function GapAnalysisScreen() {
 
             {/* CERTIFIED card */}
             <View style={styles.certCard}>
-              <View style={styles.celebrationDots}>
-                <View style={[styles.dot, styles.dotYellow]} />
-                <View style={[styles.dot, styles.dotWhite]} />
-                <View style={[styles.dot, styles.dotBlue]} />
-              </View>
-              <View style={styles.labelCert}>
+                  <View style={styles.labelCert}>
                 <Text style={styles.labelCertText}>CERTIFIED</Text>
               </View>
               <View style={styles.rowList}>
@@ -196,12 +191,6 @@ const styles = StyleSheet.create({
     shadowRadius: 40,
     elevation: 10,
   },
-  celebrationDots: { position: 'absolute', top: 16, right: 16, flexDirection: 'row', alignItems: 'center', gap: 6 },
-  dot:             { borderRadius: 999 },
-  dotYellow:       { width: 10, height: 10, backgroundColor: '#F0C808' },
-  dotWhite:        { width: 8,  height: 8,  backgroundColor: 'rgba(255,255,255,0.72)' },
-  dotBlue:         { width: 8,  height: 8,  backgroundColor: 'rgba(255,255,255,0.42)' },
-
   labelCert: {
     alignSelf: 'flex-start',
     height: 32,

@@ -97,11 +97,7 @@ export default function LearnerStyleScreen() {
             })}
           </View>
 
-          {/* "Almost there" static card — preserved, not a selectable option */}
-          <View style={styles.almostCard}>
-            <Text style={styles.almostTitle}>Last question done.</Text>
-            <Text style={styles.almostSub}>Your plan is complete. Let's show you what's next.</Text>
-          </View>
+
         </ScreenLayout>
       </SafeAreaView>
     </View>
@@ -151,26 +147,6 @@ const styles = StyleSheet.create({
   cardTitle:         { fontFamily: 'NunitoSans_600SemiBold', fontSize: 16, color: '#374151' },
   cardTitleSelected: { color: colors.primary },
   cardSubtitle:      { fontFamily: 'NunitoSans_400Regular', fontSize: 14, lineHeight: 20, color: '#94A3B8' },
-
-  // "Almost there" card
-  almostCard: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 16,
-    paddingVertical: 20,
-    paddingHorizontal: 24,
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 24,
-    shadowColor: '#374151',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.04,
-    shadowRadius: 12,
-    elevation: 2,
-  },
-  almostTitle: { fontFamily: 'NunitoSans_600SemiBold', fontSize: 16, color: '#374151' },
-  almostSub:   { fontFamily: 'NunitoSans_400Regular', fontSize: 14, lineHeight: 20, color: '#94A3B8', textAlign: 'center' },
 
   // CTA
   cta:           { width: '100%', height: 64, backgroundColor: colors.primary, borderRadius: 100, alignItems: 'center', justifyContent: 'center', shadowColor: colors.primary, shadowOffset: { width: 0, height: 16 }, shadowOpacity: 0.5, shadowRadius: 32, elevation: 10 },

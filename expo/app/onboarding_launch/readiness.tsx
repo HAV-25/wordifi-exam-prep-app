@@ -6,6 +6,7 @@
 import React, { useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { ScreenLayout } from '@/components/ScreenLayout';
+import { GlowOrb } from '@/components/GlowOrb';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { ArrowLeft } from 'lucide-react-native';
@@ -58,6 +59,7 @@ export default function ReadinessScreen() {
 
   return (
     <View style={styles.root}>
+      <GlowOrb top={-100} right={-100} />
       {/* Progress bar */}
       <View style={styles.progressTrack}>
         <View style={[styles.progressFill, { width: '50%' }]} />
@@ -73,7 +75,7 @@ export default function ReadinessScreen() {
           <View style={styles.navSpacer} />
         </View>
 
-        <ScreenLayout footer={ctaFooter} contentContainerStyle={styles.scroll}>
+        <ScreenLayout footer={ctaFooter} contentContainerStyle={styles.scroll} backgroundColor="transparent">
           {/* Headline */}
           <Text style={styles.headline}>How ready are you for your exam today?</Text>
           {/* Sub-copy preserved */}
@@ -114,7 +116,7 @@ export default function ReadinessScreen() {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#F8FAFF' },
+  root: { flex: 1, backgroundColor: '#F8FAFF', overflow: 'hidden' },
 
   progressTrack: { height: 4, backgroundColor: '#EBF1FF', width: '100%' },
   progressFill: { height: '100%', backgroundColor: '#2B70EF', borderTopRightRadius: 4, borderBottomRightRadius: 4 },

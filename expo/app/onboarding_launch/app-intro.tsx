@@ -1,11 +1,10 @@
 /**
- * Onboarding Launch — Screen 01: App Intro (redesigned)
- * Animated wordmark splash → compact non-scrollable intro with yellow glow.
+ * Onboarding Launch — Screen 01: App Intro
+ * Brand intro with Goethe/TELC headline, feature pills, and "Start my plan" CTA.
+ * The animated wordmark splash was replaced by the video in index.tsx.
  */
-import React, { useEffect, useRef, useState } from 'react';
+import React from 'react';
 import {
-  Animated,
-  Easing,
   Image,
   Pressable,
   StyleSheet,
@@ -17,7 +16,6 @@ import { router } from 'expo-router';
 import { ArrowRight, ChartColumn, Layers3, Target } from 'lucide-react-native';
 
 import { GlowOrb } from '@/components/GlowOrb';
-import { GermanFlagBadge } from '@/components/GermanFlagBadge';
 
 const LOGO_URI =
   'https://firebasestorage.googleapis.com/v0/b/banani-prod.appspot.com/o/reference-images%2F1cf9115c-bc87-4683-bfd4-0670f0875c39?alt=media&token=c560f38f-1cf6-46fa-9a2e-f86edac2a035';
@@ -47,91 +45,9 @@ function FeatureRow({ icon, iconBg, title, desc }: FeatureRowProps) {
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
-export default function AppIntroPolished() {
-  const [splashDone, setSplashDone] = useState(false);
-
-  // ── Splash animation values ──────────────────────────────────────────────
-  const wScale        = useRef(new Animated.Value(0.3)).current;
-  const wOpacity      = useRef(new Animated.Value(0)).current;
-  const wTranslateX   = useRef(new Animated.Value(0)).current;
-  const ordifiOpacity    = useRef(new Animated.Value(0)).current;
-  const ordifiTranslateX = useRef(new Animated.Value(20)).current;
-  const taglineOpacity = useRef(new Animated.Value(0)).current;
-  const flagOpacity    = useRef(new Animated.Value(0)).current;
-  const splashFadeOut  = useRef(new Animated.Value(1)).current;
-
-  useEffect(() => {
-    // Phase 1: "w" grows in
-    Animated.parallel([
-      Animated.timing(wOpacity, { toValue: 1, duration: 300, useNativeDriver: true }),
-      Animated.spring(wScale, { toValue: 1, friction: 6, tension: 80, useNativeDriver: true }),
-    ]).start();
-
-    // Phase 2: "w" slides left, "ordifi" flows in
-    const phase2 = setTimeout(() => {
-      Animated.parallel([
-        Animated.timing(wTranslateX, { toValue: -72, duration: 500, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-        Animated.timing(ordifiOpacity, { toValue: 1, duration: 400, delay: 150, useNativeDriver: true }),
-        Animated.timing(ordifiTranslateX, { toValue: 0, duration: 500, delay: 150, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-      ]).start();
-    }, 600);
-
-    // Phase 3: tagline + flag
-    const phase3 = setTimeout(() => {
-      Animated.parallel([
-        Animated.timing(taglineOpacity, { toValue: 1, duration: 400, useNativeDriver: true }),
-        Animated.timing(flagOpacity, { toValue: 1, duration: 400, delay: 100, useNativeDriver: true }),
-      ]).start();
-    }, 1400);
-
-    // Phase 4: fade out splash
-    const phase4 = setTimeout(() => {
-      Animated.timing(splashFadeOut, { toValue: 0, duration: 400, useNativeDriver: true })
-        .start(() => setSplashDone(true));
-    }, 2800);
-
-    return () => {
-      clearTimeout(phase2);
-      clearTimeout(phase3);
-      clearTimeout(phase4);
-    };
-  }, []);
-
+export default function AppIntroScreen() {
   return (
     <View style={styles.root}>
-      {/* ── Splash overlay ────────────────────────────────────────────── */}
-      {!splashDone && (
-        <Animated.View style={[styles.splashOverlay, { opacity: splashFadeOut }]}>
-          <View style={styles.splashContent}>
-            <View style={styles.splashWordmarkRow}>
-              <Animated.Text
-                style={[
-                  styles.splashW,
-                  { opacity: wOpacity, transform: [{ scale: wScale }, { translateX: wTranslateX }] },
-                ]}
-              >
-                w
-              </Animated.Text>
-              <Animated.Text
-                style={[
-                  styles.splashOrdifi,
-                  { opacity: ordifiOpacity, transform: [{ translateX: ordifiTranslateX }] },
-                ]}
-              >
-                ordifi
-              </Animated.Text>
-            </View>
-            <Animated.View style={[styles.splashTaglineRow, { opacity: taglineOpacity }]}>
-              <Text style={styles.splashTagline}>Your exam, conquered.</Text>
-            </Animated.View>
-            <Animated.View style={{ opacity: flagOpacity }}>
-              <GermanFlagBadge width={28} height={18} />
-            </Animated.View>
-          </View>
-        </Animated.View>
-      )}
-
-      {/* ── Main intro ────────────────────────────────────────────────── */}
       <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
         <View style={styles.screen}>
           {/* Yellow glow — top-right, clipped by root overflow:hidden */}
@@ -215,40 +131,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
 
-  // ── Splash ────────────────────────────────────────────────────────────────
-  splashOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#F8FAFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 10,
-  },
-  splashContent: { alignItems: 'center', gap: 16 },
-  splashWordmarkRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'center',
-  },
-  splashW: {
-    fontFamily: 'Pacifico_400Regular',
-    fontSize: 52,
-    color: '#2B70EF',
-    letterSpacing: -1,
-  },
-  splashOrdifi: {
-    fontFamily: 'Pacifico_400Regular',
-    fontSize: 52,
-    color: '#2B70EF',
-    letterSpacing: -1,
-  },
-  splashTaglineRow: { marginTop: 4 },
-  splashTagline: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#94A3B8',
-  },
-
-  // ── Main screen ───────────────────────────────────────────────────────────
   safeArea: {
     flex: 1,
     backgroundColor: '#F8FAFF',
@@ -261,7 +143,6 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
 
-  // ── Logo ─────────────────────────────────────────────────────────────────
   logoWrap: {
     alignItems: 'center',
     marginBottom: 32,
@@ -272,7 +153,6 @@ const styles = StyleSheet.create({
     height: 36,
   },
 
-  // ── Headline block ────────────────────────────────────────────────────────
   headlineBlock: {
     zIndex: 1,
     gap: 16,
@@ -295,7 +175,6 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
   },
 
-  // ── Feature pills ─────────────────────────────────────────────────────────
   featurePills: {
     gap: 10,
     marginTop: 4,
@@ -331,7 +210,6 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
   },
 
-  // ── CTA ──────────────────────────────────────────────────────────────────
   ctaWrap: {
     marginTop: 24,
     gap: 16,

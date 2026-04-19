@@ -16,9 +16,8 @@ import { GlowOrb } from '@/components/GlowOrb';
 // ─── Types & data ─────────────────────────────────────────────────────────────
 
 type LbRow = {
-  rank: string;       // emoji medal or '—'
+  rank: string;
   name: string;
-  flag: string;
   level: string;
   score: number;
   days: string;
@@ -27,9 +26,9 @@ type LbRow = {
 };
 
 const BASE_ROWS: LbRow[] = [
-  { rank: '🥇', name: 'Maria', flag: '🇧🇷', level: 'B1', score: 91, days: '47 days', passed: true },
-  { rank: '🥈', name: 'Yusuf', flag: '🇹🇷', level: 'B1', score: 84, days: '31 days' },
-  { rank: '🥉', name: 'Priya', flag: '🇮🇳', level: 'A2', score: 79, days: '24 days' },
+  { rank: '🥇', name: 'Maria Wanderer',  level: 'B1', score: 91, days: '47 days', passed: true },
+  { rank: '🥈', name: 'Yusuf Berlin',    level: 'B1', score: 84, days: '54 days' },
+  { rank: '🥉', name: 'Priya Ambitious', level: 'A2', score: 79, days: '48 days' },
 ];
 
 // ─── Row component ────────────────────────────────────────────────────────────
@@ -42,7 +41,7 @@ function LeaderRow({ row }: { row: LbRow }) {
       <View style={styles.lbDetails}>
         <View style={styles.lbDetailsTop}>
           <Text style={[styles.lbName, isUser && styles.lbNameUser]}>
-            {row.name} {row.flag}
+            {row.name}
           </Text>
           {row.passed && (
             <View style={styles.passedBadge}>
@@ -70,7 +69,6 @@ export default function LeaderboardTeaserScreen() {
   const userRow: LbRow = {
     rank: '—',
     name: 'You',
-    flag: '🏳️',
     level: `[${level}]`,
     score: 22,
     days: 'Day 1',
@@ -80,18 +78,15 @@ export default function LeaderboardTeaserScreen() {
   const allRows = [...BASE_ROWS, userRow];
 
   const ctaFooter = (
-    <>
-      <Text style={styles.footerNote}>Thousands of learners worldwide</Text>
-      <Pressable
-        onPress={() => router.push('/onboarding_launch/plan-builder')}
-        style={({ pressed }) => [styles.cta, pressed && styles.ctaPressed]}
-        accessibilityRole="button"
-        accessibilityLabel="Show me how"
-      >
-        <Text style={styles.ctaText}>Show me how</Text>
-        <ArrowRight size={22} color="#FFFFFF" />
-      </Pressable>
-    </>
+    <Pressable
+      onPress={() => router.push('/onboarding_launch/plan-builder')}
+      style={({ pressed }) => [styles.cta, pressed && styles.ctaPressed]}
+      accessibilityRole="button"
+      accessibilityLabel="Show me how"
+    >
+      <Text style={styles.ctaText}>Show me how</Text>
+      <ArrowRight size={22} color="#FFFFFF" />
+    </Pressable>
   );
 
   return (
@@ -101,12 +96,14 @@ export default function LeaderboardTeaserScreen() {
       <SafeAreaView edges={['top']} style={styles.safe}>
         <ScreenLayout
           backgroundColor="transparent"
+          scrollable={false}
           footer={ctaFooter}
-          contentContainerStyle={styles.scroll}
+          contentContainerStyle={styles.content}
         >
           {/* Header */}
           <View style={styles.header}>
             <Text style={styles.headline}>You are not the only one on this journey.</Text>
+            <Text style={styles.yourName}>Your name belongs on this list.{'\n'}Let's put it there.</Text>
             <Text style={styles.subCopy}>These learners started exactly where you are today.</Text>
           </View>
 
@@ -135,12 +132,7 @@ export default function LeaderboardTeaserScreen() {
             <Text style={styles.storyQuote}>
               "Maria started at 19%. She sat her Goethe {level} six weeks later. She passed first time."
             </Text>
-            <Text style={styles.storyAuthor}>Maria Silva · Goethe {level} · 2024</Text>
-          </View>
-
-          {/* Close block */}
-          <View style={styles.closeBlock}>
-            <Text style={styles.closeLine}>Your name belongs on this list.{'\n'}Let's put it there.</Text>
+            <Text style={styles.storyAuthor}>Maria Wanderer · Goethe {level} · 2024</Text>
           </View>
         </ScreenLayout>
       </SafeAreaView>
@@ -155,9 +147,10 @@ const styles = StyleSheet.create({
 
   safe: { flex: 1 },
 
-  scroll:  { paddingHorizontal: 24, paddingTop: 28 },
+  content: { paddingHorizontal: 24, paddingTop: 28 },
   header:  { marginBottom: 24 },
-  headline: { fontFamily: 'Outfit_800ExtraBold', fontSize: 34, lineHeight: 37, color: '#374151', letterSpacing: -1, marginBottom: 12 },
+  headline: { fontFamily: 'Outfit_800ExtraBold', fontSize: 34, lineHeight: 37, color: '#374151', letterSpacing: -1, marginBottom: 10 },
+  yourName: { fontFamily: 'Outfit_800ExtraBold', fontSize: 20, lineHeight: 26, color: colors.primary, marginBottom: 10 },
   subCopy:  { fontFamily: 'NunitoSans_600SemiBold', fontSize: 15, lineHeight: 22, color: '#94A3B8' },
 
   // Leaderboard card
@@ -214,16 +207,9 @@ const styles = StyleSheet.create({
   lbScoreUser:{ color: colors.primary },
 
   // Story block
-  storyBlock: { alignItems: 'center', paddingHorizontal: 16, marginBottom: 28 },
+  storyBlock: { alignItems: 'center', paddingHorizontal: 16, marginBottom: 16 },
   storyQuote: { fontFamily: 'NunitoSans_400Regular', fontSize: 15, lineHeight: 22, color: '#374151', fontStyle: 'italic', textAlign: 'center', marginBottom: 8 },
   storyAuthor: { fontFamily: 'NunitoSans_600SemiBold', fontSize: 13, color: '#94A3B8', textAlign: 'center' },
-
-  // Close block
-  closeBlock: { alignItems: 'center', marginBottom: 20 },
-  closeLine:  { fontFamily: 'Outfit_800ExtraBold', fontSize: 24, lineHeight: 30, color: '#374151', textAlign: 'center', letterSpacing: -0.5 },
-
-  // Footer
-  footerNote: { fontFamily: 'Outfit_800ExtraBold', fontSize: 13, color: '#94A3B8', textAlign: 'center', marginBottom: 16 },
 
   cta: {
     width: '100%',

@@ -6,6 +6,7 @@
 import React, { useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { ScreenLayout } from '@/components/ScreenLayout';
+import { GlowOrb } from '@/components/GlowOrb';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { ArrowLeft } from 'lucide-react-native';
@@ -57,6 +58,7 @@ export default function HardestScreen() {
 
   return (
     <View style={styles.root}>
+      <GlowOrb top={-100} right={-100} />
       {/* Progress bar */}
       <View style={styles.progressTrack}>
         <View style={[styles.progressFill, { width: '60%' }]} />
@@ -72,11 +74,11 @@ export default function HardestScreen() {
           <View style={styles.navSpacer} />
         </View>
 
-        <ScreenLayout footer={ctaFooter} contentContainerStyle={styles.scroll}>
+        <ScreenLayout footer={ctaFooter} contentContainerStyle={styles.scroll} backgroundColor="transparent">
           {/* Headline */}
           <Text style={styles.headline}>Which part of the exam do you find hardest?</Text>
           {/* Sub-copy and choose label preserved */}
-          <Text style={styles.subCopy}>Pick your biggest challenge. This shapes your entire plan.</Text>
+          <Text style={styles.subCopy}>Pick your biggest challenge. Let's set the deadline.</Text>
           <Text style={styles.chooseLabel}>CHOOSE ONE</Text>
 
           {/* Cards — vertical list, 6 items, each flips independently */}
@@ -114,7 +116,7 @@ export default function HardestScreen() {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#F8FAFF' },
+  root: { flex: 1, backgroundColor: '#F8FAFF', overflow: 'hidden' },
 
   progressTrack: { height: 4, backgroundColor: '#EBF1FF', width: '100%' },
   progressFill: { height: '100%', backgroundColor: '#2B70EF', borderTopRightRadius: 4, borderBottomRightRadius: 4 },
