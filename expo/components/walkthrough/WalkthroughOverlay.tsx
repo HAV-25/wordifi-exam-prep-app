@@ -132,16 +132,23 @@ export function WalkthroughOverlay() {
     const isFinalStep = step === TOTAL_STEPS - 1;
 
     if (isFirstStep) {
-      // First step: measure and appear
-      getRectForStep(step).then((rect) => {
-        setSpotlightRect(rect);
-        tooltipOpacity.setValue(0);
-        Animated.timing(tooltipOpacity, {
-          toValue: 1,
-          duration: reduceMotion ? 0 : 200,
-          useNativeDriver: true,
-        }).start();
-      });
+      // First step: measure and appear. If the ref isn't laid out yet, retry once after 500ms.
+      const measureAndShow = (retrying = false) => {
+        getRectForStep(step).then((rect) => {
+          if (!rect && !retrying) {
+            setTimeout(() => measureAndShow(true), 500);
+            return;
+          }
+          setSpotlightRect(rect);
+          tooltipOpacity.setValue(0);
+          Animated.timing(tooltipOpacity, {
+            toValue: 1,
+            duration: reduceMotion ? 0 : 200,
+            useNativeDriver: true,
+          }).start();
+        });
+      };
+      measureAndShow();
       return;
     }
 
@@ -205,7 +212,7 @@ export function WalkthroughOverlay() {
 
   // Auto-position tooltip above or below the spotlight
   let tooltipPlacement: 'above' | 'below' = 'below';
-  let tooltipTopOffset = 0;
+  let tooltipTopOffset = SH * 0.25; // fallback: 25% from top when spotlightRect not yet available
 
   if (spotlightRect) {
     const TOOLTIP_EST_HEIGHT = 160;
@@ -250,7 +257,7 @@ export function WalkthroughOverlay() {
         ) : null}
 
         {/* ── Tooltip bubble (steps 0-5) ── */}
-        {showTooltip && spotlightRect ? (
+        {showTooltip ? (
           <TooltipBubble
             step={stepDef}
             stepIndex={step}

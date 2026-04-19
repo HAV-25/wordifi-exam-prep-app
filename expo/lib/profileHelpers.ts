@@ -356,7 +356,7 @@ export async function savePendingOnboarding(
  * saved less than 5 minutes ago it's almost certainly from this user's just-
  * completed onboarding, so we still tag it.
  */
-const FRESHNESS_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
+const FRESHNESS_WINDOW_MS = 30 * 60 * 1000; // 30 minutes — covers Google OAuth browser round-trips
 
 export async function tagPendingOnboardingForUser(
   userId: string,
