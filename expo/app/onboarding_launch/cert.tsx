@@ -93,7 +93,7 @@ export default function CertScreen() {
                   cancelFlipBackRef.current = cancelFn;
                 }}
                 cardStyle={[styles.card, selected === cert.id && styles.cardSelected]}
-                cardBorderRadius={12}
+                cardBorderRadius={12} /* intentional: cert screen uses 12px cards; all others 16px — original design, verified OB-10 */
                 accessibilityLabel={cert.title}
               >
                 <Text style={styles.emoji}>{cert.emoji}</Text>
