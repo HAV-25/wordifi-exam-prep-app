@@ -791,11 +791,11 @@ export default function SprechenRealtimeScreen() {
           </View>
 
           <View style={[styles.scoresCard, shadows.card]}>
-            <Text style={styles.scoresHeader}>Detailbewertung</Text>
+            <Text style={styles.scoresHeader}>Detailed Assessment</Text>
             {[
-              { label: 'Flüssigkeit', value: fluencyNum },
-              { label: 'Grammatik', value: grammarNum },
-              { label: 'Wortschatz', value: vocabularyNum },
+              { label: 'Fluency', value: fluencyNum },
+              { label: 'Grammar', value: grammarNum },
+              { label: 'Vocabulary', value: vocabularyNum },
             ].map(item => (
               <View key={item.label} style={styles.scoreRow}>
                 <Text style={styles.scoreLabel}>{item.label}</Text>
@@ -810,17 +810,17 @@ export default function SprechenRealtimeScreen() {
           {taskCompletion === 'full' ? (
             <View style={[styles.badgeCard, shadows.card, { borderColor: colors.green }]}>
               <Text style={styles.badgeEmoji}>✅</Text>
-              <Text style={[styles.badgeText, { color: colors.green }]}>Aufgabe erfüllt</Text>
+              <Text style={[styles.badgeText, { color: colors.green }]}>Task completed</Text>
             </View>
           ) : taskCompletion === 'partial' ? (
             <View style={[styles.badgeCard, shadows.card, { borderColor: colors.amber }]}>
               <Text style={styles.badgeEmoji}>⚠️</Text>
-              <Text style={[styles.badgeText, { color: colors.amber }]}>Teilweise erfüllt</Text>
+              <Text style={[styles.badgeText, { color: colors.amber }]}>Partially completed</Text>
             </View>
           ) : taskCompletion === 'minimal' ? (
             <View style={[styles.badgeCard, shadows.card, { borderColor: colors.red }]}>
               <Text style={styles.badgeEmoji}>❌</Text>
-              <Text style={[styles.badgeText, { color: colors.red }]}>Nicht erfüllt</Text>
+              <Text style={[styles.badgeText, { color: colors.red }]}>Not completed</Text>
             </View>
           ) : null}
 
@@ -833,19 +833,19 @@ export default function SprechenRealtimeScreen() {
 
           {scores.improvement_tip ? (
             <View style={[styles.tipCard, shadows.card]}>
-              <Text style={styles.tipLabel}>Verbesserungsvorschlag</Text>
+              <Text style={styles.tipLabel}>Improvement tip</Text>
               <Text style={styles.tipText}>{scores.improvement_tip}</Text>
             </View>
           ) : null}
 
           <Text style={styles.durationNote}>
-            Gesprächsdauer: {formatTime(elapsedSeconds)}
+            Conversation duration: {formatTime(elapsedSeconds)}
           </Text>
         </ScrollView>
 
         <View style={[styles.footer, { bottom: insets.bottom }]}>
           <CTAButton
-            label="Zur Übersicht"
+            label="Back to overview"
             onPress={() => router.replace('/(tabs)/tests')}
             testID="realtime-back-to-tests"
           />
