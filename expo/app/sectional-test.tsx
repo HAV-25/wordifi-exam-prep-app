@@ -219,14 +219,14 @@ export default function SectionalTestScreen() {
         <View style={styles.emptyWrap}>
           <View style={styles.emptyContent}>
             <Text style={styles.emptyEmoji}>📚</Text>
-            <Text style={styles.emptyTitle}>Noch keine Fragen verfügbar</Text>
-            <Text style={styles.emptyDesc}>Dieser Abschnitt wird bald freigeschaltet.</Text>
+            <Text style={styles.emptyTitle}>No questions available yet</Text>
+            <Text style={styles.emptyDesc}>This section will be unlocked soon.</Text>
             <Pressable
               onPress={() => router.back()}
               style={styles.emptyBackButton}
               testID="sectional-empty-back"
             >
-              <Text style={styles.emptyBackText}>Zurück</Text>
+              <Text style={styles.emptyBackText}>Back</Text>
             </Pressable>
           </View>
         </View>

@@ -206,7 +206,7 @@ export async function uploadRecording(
 
   if (error) {
     console.log('uploadRecording error', error);
-    throw new Error('Speicher nicht verfügbar. Bitte kontaktiere den Support.');
+    throw new Error('Storage unavailable. Please contact support.');
   }
 
   const { data: urlData } = supabase.storage

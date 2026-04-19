@@ -141,7 +141,7 @@ function FormFillVariant({ question, onSubmit, isSubmitted, isLoading }: Variant
           <LoadingIndicator />
         ) : (
           <CTAButton
-            label="Abschicken"
+            label="Submit"
             onPress={handleSubmit}
             disabled={!allFilled}
             style={styles.submitBtn}
@@ -197,7 +197,7 @@ function SMSVariant({ question, onSubmit, isSubmitted, isLoading }: VariantProps
       </View>
 
       {showWarning && wc < limits.warnBelow ? (
-        <Text style={styles.warningText}>Hinweis: Mindestens {limits.warnBelow} Wörter empfohlen.</Text>
+        <Text style={styles.warningText}>Note: At least {limits.warnBelow} words recommended.</Text>
       ) : null}
 
       {!isSubmitted ? (
@@ -205,7 +205,7 @@ function SMSVariant({ question, onSubmit, isSubmitted, isLoading }: VariantProps
           <LoadingIndicator />
         ) : (
           <CTAButton
-            label="Abschicken"
+            label="Submit"
             onPress={handleSubmit}
             disabled={text.trim().length === 0}
             style={styles.submitBtn}
@@ -296,7 +296,7 @@ function FormalEmailVariant({ question, onSubmit, isSubmitted, isLoading }: Vari
       </View>
 
       {showWarning && wc < limits.warnBelow ? (
-        <Text style={styles.warningText}>Hinweis: Mindestens {limits.warnBelow} Wörter empfohlen.</Text>
+        <Text style={styles.warningText}>Note: At least {limits.warnBelow} words recommended.</Text>
       ) : null}
 
       {!isSubmitted ? (
@@ -304,7 +304,7 @@ function FormalEmailVariant({ question, onSubmit, isSubmitted, isLoading }: Vari
           <LoadingIndicator />
         ) : (
           <CTAButton
-            label="Abschicken"
+            label="Submit"
             onPress={handleSubmit}
             disabled={body.trim().length === 0}
             style={styles.submitBtn}
@@ -392,7 +392,7 @@ function InformalLetterVariant({ question, onSubmit, isSubmitted, isLoading }: V
       </View>
 
       {showWarning && wc < limits.warnBelow ? (
-        <Text style={styles.warningText}>Hinweis: Mindestens {limits.warnBelow} Wörter empfohlen.</Text>
+        <Text style={styles.warningText}>Note: At least {limits.warnBelow} words recommended.</Text>
       ) : null}
 
       {!isSubmitted ? (
@@ -400,7 +400,7 @@ function InformalLetterVariant({ question, onSubmit, isSubmitted, isLoading }: V
           <LoadingIndicator />
         ) : (
           <CTAButton
-            label="Abschicken"
+            label="Submit"
             onPress={handleSubmit}
             disabled={body.trim().length === 0}
             style={styles.submitBtn}
@@ -457,7 +457,7 @@ function OpinionVariant({ question, onSubmit, isSubmitted, isLoading }: VariantP
       </View>
 
       {showWarning && wc < limits.warnBelow ? (
-        <Text style={styles.warningText}>Hinweis: Mindestens {limits.warnBelow} Wörter empfohlen.</Text>
+        <Text style={styles.warningText}>Note: At least {limits.warnBelow} words recommended.</Text>
       ) : null}
 
       {!isSubmitted ? (
@@ -465,7 +465,7 @@ function OpinionVariant({ question, onSubmit, isSubmitted, isLoading }: VariantP
           <LoadingIndicator />
         ) : (
           <CTAButton
-            label="Abschicken"
+            label="Submit"
             onPress={handleSubmit}
             disabled={text.trim().length === 0}
             style={styles.submitBtn}

@@ -233,7 +233,7 @@ export const StreamCard = React.memo(function StreamCard({
     if (explanationLang === 'de') {
       if (question.explanation_de) return question.explanation_de;
       if (question.explanation_en) return question.explanation_en;
-      return 'Erklärung kommt bald.';
+      return 'Explanation coming soon.';
     }
     if (question.explanation_en) return question.explanation_en;
     if (question.explanation_de) return question.explanation_de;

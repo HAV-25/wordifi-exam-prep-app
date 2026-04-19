@@ -44,7 +44,7 @@ export function SchreibenResult({ assessment, taskType, level, teil }: Schreiben
       ) : null}
 
       <View style={[styles.sectionCard, shadows.card]}>
-        <Text style={styles.sectionTitle}>AUFGABENPUNKTE</Text>
+        <Text style={styles.sectionTitle}>TASK POINTS</Text>
         {assessment.points_coverage.map((pt, idx) => (
           <View key={idx} style={styles.pointItem}>
             <View style={styles.pointHeader}>
@@ -153,7 +153,7 @@ function ScoreHeroCard({ scorePct, assessment }: { scorePct: number; assessment:
           <X color={colors.red} size={14} />
         )}
         <Text style={[styles.passText, assessment.passed ? styles.passTextGreen : styles.passTextRed]}>
-          {assessment.passed ? 'Bestanden' : 'Nicht bestanden'}
+          {assessment.passed ? 'Passed' : 'Not passed'}
         </Text>
       </View>
     </View>
@@ -234,7 +234,7 @@ function CorrectionsCard({ corrections }: { corrections: CorrectionItem[] }) {
         onPress={() => setExpanded((v) => !v)}
         testID="corrections-toggle"
       >
-        <Text style={styles.sectionTitle}>KORREKTUREN & HINWEISE</Text>
+        <Text style={styles.sectionTitle}>CORRECTIONS & NOTES</Text>
         {expanded ? (
           <ChevronUp color={colors.muted} size={18} />
         ) : (
@@ -307,7 +307,7 @@ function LanguageFeedbackCard({
         onPress={() => setExpanded((v) => !v)}
         testID="language-feedback-toggle"
       >
-        <Text style={styles.sectionTitle}>SPRACHLICHE RÜCKMELDUNG</Text>
+        <Text style={styles.sectionTitle}>LANGUAGE FEEDBACK</Text>
         {expanded ? (
           <ChevronUp color={colors.muted} size={18} />
         ) : (
@@ -317,13 +317,13 @@ function LanguageFeedbackCard({
 
       {expanded ? (
         <View style={styles.feedbackContent}>
-          <FeedbackRow label="Grammatik" value={feedback.grammar} />
+          <FeedbackRow label="Grammar" value={feedback.grammar} />
           <View style={styles.feedbackDivider} />
-          <FeedbackRow label="Rechtschreibung" value={feedback.spelling} />
+          <FeedbackRow label="Spelling" value={feedback.spelling} />
           <View style={styles.feedbackDivider} />
           <FeedbackRow label="Register" value={feedback.register} />
           <View style={styles.feedbackDivider} />
-          <FeedbackRow label="Satzbau" value={feedback.sentence_structure} />
+          <FeedbackRow label="Sentence structure" value={feedback.sentence_structure} />
         </View>
       ) : null}
     </View>
