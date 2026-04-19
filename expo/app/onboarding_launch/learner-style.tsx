@@ -3,7 +3,7 @@
  * Source: Banani flow FtXTL2Xb5WF4 / screen 6IQWGji6DIts
  * Step 8 of 10
  */
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -12,13 +12,19 @@ import { onboardingStore, LearnerStyleId, LEARNER_STYLE_DISPLAY } from './_store
 import { colors } from '@/theme';
 import { ScreenLayout } from '@/components/ScreenLayout';
 import { GlowOrb } from '@/components/GlowOrb';
+import { ConvictionAnswerCard } from '@/components/onboarding/ConvictionAnswerCard';
+import { LEARNER_STYLE_CONVICTIONS } from '@/components/onboarding/convictionLookup';
 
 const OPTIONS: LearnerStyleId[] = ['sprinter', 'builder', 'sniper', 'explorer'];
 
 export default function LearnerStyleScreen() {
   const [selected, setSelected] = useState<LearnerStyleId | null>(null);
+  const [continueActive, setContinueActive] = useState(false);
+  const cancelFlipBackRef = useRef<(() => void) | null>(null);
 
   function handleContinue() {
+    cancelFlipBackRef.current?.();
+    cancelFlipBackRef.current = null;
     if (!selected) return;
     onboardingStore.learnerStyle = selected;
     router.push('/onboarding_launch/leaderboard');
@@ -27,16 +33,16 @@ export default function LearnerStyleScreen() {
   const ctaFooter = (
     <Pressable
       onPress={handleContinue}
-      disabled={!selected}
+      disabled={!continueActive}
       style={({ pressed }) => [
         styles.cta,
-        !selected && styles.ctaDisabled,
-        pressed && selected && styles.ctaPressed,
+        !continueActive && styles.ctaDisabled,
+        pressed && continueActive && styles.ctaPressed,
       ]}
       accessibilityRole="button"
       accessibilityLabel="Continue"
     >
-      <Text style={[styles.ctaText, !selected && styles.ctaTextDisabled]}>Continue →</Text>
+      <Text style={[styles.ctaText, !continueActive && styles.ctaTextDisabled]}>Continue →</Text>
     </Pressable>
   );
 
@@ -68,16 +74,17 @@ export default function LearnerStyleScreen() {
               const { emoji, title, description } = LEARNER_STYLE_DISPLAY[id];
               const isSelected = selected === id;
               return (
-                <Pressable
+                <ConvictionAnswerCard
                   key={id}
+                  conviction={LEARNER_STYLE_CONVICTIONS[id]}
+                  isSelected={isSelected}
                   onPress={() => setSelected(id)}
-                  style={({ pressed }) => [
-                    styles.card,
-                    isSelected && styles.cardSelected,
-                    pressed && styles.cardPressed,
-                  ]}
-                  accessibilityRole="radio"
-                  accessibilityState={{ selected: isSelected }}
+                  onFlipComplete={(cancelFn) => {
+                    setContinueActive(true);
+                    cancelFlipBackRef.current = cancelFn;
+                  }}
+                  cardStyle={[styles.card, isSelected && styles.cardSelected]}
+                  cardBorderRadius={16}
                   accessibilityLabel={title}
                 >
                   <Text style={styles.cardIcon}>{emoji}</Text>
@@ -85,12 +92,12 @@ export default function LearnerStyleScreen() {
                     <Text style={[styles.cardTitle, isSelected && styles.cardTitleSelected]}>{title}</Text>
                     <Text style={styles.cardSubtitle}>{description}</Text>
                   </View>
-                </Pressable>
+                </ConvictionAnswerCard>
               );
             })}
           </View>
 
-          {/* "Almost there" card — always visible */}
+          {/* "Almost there" static card — preserved, not a selectable option */}
           <View style={styles.almostCard}>
             <Text style={styles.almostTitle}>Last question done.</Text>
             <Text style={styles.almostSub}>Your plan is complete. Let's show you what's next.</Text>
@@ -137,7 +144,7 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 1,
   },
-  cardSelected:      { borderColor: colors.primary, backgroundColor: '#F0F5FF' },
+  cardSelected:      { borderColor: colors.primary, backgroundColor: '#ECF2FE' }, // brief §step-6 (was #F0F5FF)
   cardPressed:       { transform: [{ scale: 0.98 }] },
   cardIcon:          { fontSize: 24, lineHeight: 29 },
   cardContent:       { flex: 1, gap: 4 },
