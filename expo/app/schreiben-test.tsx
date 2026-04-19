@@ -212,7 +212,7 @@ export default function SchreibenTestScreen() {
 
     setQuestionStates((prev) => ({
       ...prev,
-      [currentIndex]: { isSubmitted: true, isLoading: true, assessment: null, error: null, isLoadingCached: false },
+      [currentIndex]: { isSubmitted: false, isLoading: true, assessment: null, error: null, isLoadingCached: false },
     }));
 
     const timeoutId = setTimeout(() => {
@@ -223,6 +223,7 @@ export default function SchreibenTestScreen() {
             ...prev,
             [currentIndex]: {
               ...state,
+              isSubmitted: true,
               isLoading: false,
               error: 'Bewertung nicht verfügbar. Bitte versuche es später.',
             },
