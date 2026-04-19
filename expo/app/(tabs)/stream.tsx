@@ -461,7 +461,7 @@ export default function TestStreamScreen() {
         <View style={[s.footer, { paddingBottom: insets.bottom + 12 }]}>
           <Pressable onPress={handleNext} style={s.nextBtn} testID="stream-next-btn">
             <Text style={s.nextBtnText}>
-              {currentIndex + 1 >= totalQuestions ? 'Fertig' : 'Weiter →'}
+              {currentIndex + 1 >= totalQuestions ? 'Done' : 'Next →'}
             </Text>
           </Pressable>
         </View>
