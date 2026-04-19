@@ -1,31 +1,52 @@
 /**
  * Onboarding Launch — Screen 08: Time Commitment
  * Source: Banani flow FtXTL2Xb5WF4 / screen hie-W6TxJ9Qs
- * Step 7 of 10 — defaults to 15 min (recommended) pre-selected
+ * Step 7 of 10
+ *
+ * Note: original screen pre-selected 15 min on mount. Changed to null
+ * (no pre-selection) so the conviction card pattern applies correctly —
+ * Continue gates on flip completion per brief 5.4.
  */
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { ScreenLayout } from '@/components/ScreenLayout';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { ArrowLeft } from 'lucide-react-native';
 import { onboardingStore, DailyMinutes, DAILY_MINUTES_DISPLAY } from './_store';
+import { ConvictionAnswerCard } from '@/components/onboarding/ConvictionAnswerCard';
+import { DAILY_MINUTES_CONVICTIONS } from '@/components/onboarding/convictionLookup';
 
 const OPTIONS: DailyMinutes[] = [5, 15, 25, 30];
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function DailyCommitmentScreen() {
-  const [selected, setSelected] = useState<DailyMinutes>(15);
+  const [selected, setSelected] = useState<DailyMinutes | null>(null);
+  const [continueActive, setContinueActive] = useState(false);
+  const cancelFlipBackRef = useRef<(() => void) | null>(null);
+
+  function handleContinue() {
+    cancelFlipBackRef.current?.();
+    cancelFlipBackRef.current = null;
+    if (!selected) return;
+    onboardingStore.dailyMinutes = selected;
+    router.push('/onboarding_launch/learner-style');
+  }
 
   const ctaFooter = (
     <Pressable
-      onPress={() => { onboardingStore.dailyMinutes = selected; router.push('/onboarding_launch/learner-style'); }}
-      style={({ pressed }) => [styles.ctaButton, pressed && styles.ctaPressed]}
+      onPress={handleContinue}
+      disabled={!continueActive}
+      style={({ pressed }) => [
+        styles.ctaButton,
+        !continueActive && styles.ctaDisabled,
+        pressed && continueActive && styles.ctaPressed,
+      ]}
       accessibilityRole="button"
       accessibilityLabel="Continue"
     >
-      <Text style={styles.ctaText}>Continue →</Text>
+      <Text style={[styles.ctaText, !continueActive && styles.ctaTextDisabled]}>Continue →</Text>
     </Pressable>
   );
 
@@ -57,18 +78,20 @@ export default function DailyCommitmentScreen() {
               const { label, description, emoji, recommended } = DAILY_MINUTES_DISPLAY[id];
               const isSelected = selected === id;
               return (
-                <Pressable
+                <ConvictionAnswerCard
                   key={id}
+                  conviction={DAILY_MINUTES_CONVICTIONS[id]}
+                  isSelected={isSelected}
                   onPress={() => setSelected(id)}
-                  style={({ pressed }) => [
-                    styles.card,
-                    isSelected && styles.cardSelected,
-                    pressed && styles.cardPressed,
-                  ]}
-                  accessibilityRole="radio"
-                  accessibilityState={{ selected: isSelected }}
+                  onFlipComplete={(cancelFn) => {
+                    setContinueActive(true);
+                    cancelFlipBackRef.current = cancelFn;
+                  }}
+                  cardStyle={[styles.card, isSelected && styles.cardSelected]}
+                  cardBorderRadius={16}
                   accessibilityLabel={label}
                 >
+                  {/* Recommended badge — absolute top-right, part of front face children */}
                   {recommended && (
                     <View style={styles.recommendedBadge}>
                       <Text style={styles.recommendedText}>Recommended 🔥</Text>
@@ -81,13 +104,12 @@ export default function DailyCommitmentScreen() {
                     </Text>
                     <Text style={styles.cardSubtitle}>{description}</Text>
                   </View>
-                </Pressable>
+                </ConvictionAnswerCard>
               );
             })}
           </View>
         </ScreenLayout>
       </SafeAreaView>
-
     </View>
   );
 }
@@ -127,10 +149,10 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 2,
   },
-  cardSelected: { borderColor: '#2B70EF', backgroundColor: '#F0F5FF' },
+  cardSelected: { borderColor: '#2B70EF', backgroundColor: '#ECF2FE' }, // brief §step-6 (was #F0F5FF)
   cardPressed: { transform: [{ scale: 0.98 }] },
 
-  // Recommended badge — absolute top-right
+  // Recommended badge — absolute top-right, overflows card top edge intentionally
   recommendedBadge: {
     position: 'absolute',
     top: -12,
@@ -161,6 +183,8 @@ const styles = StyleSheet.create({
   cardSubtitle: { fontFamily: 'NunitoSans_400Regular', fontSize: 15, color: '#94A3B8', lineHeight: 21 },
 
   ctaButton: { width: '100%', height: 60, backgroundColor: '#2B70EF', borderRadius: 999, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, shadowColor: '#2B70EF', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.25, shadowRadius: 24, elevation: 8 },
+  ctaDisabled: { backgroundColor: '#E2E8F0', shadowOpacity: 0, elevation: 0 },
   ctaPressed: { opacity: 0.88 },
   ctaText: { fontFamily: 'Outfit_800ExtraBold', fontSize: 18, color: '#FFFFFF', letterSpacing: -0.3 },
+  ctaTextDisabled: { color: '#94A3B8' },
 });
