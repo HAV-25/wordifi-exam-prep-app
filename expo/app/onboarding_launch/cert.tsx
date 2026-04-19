@@ -33,8 +33,12 @@ export default function CertScreen() {
   // Holds the cancel handle passed by the currently-flipped card via onFlipComplete.
   // Called in handleContinue to abort any pending flip-back timer (brief 5.4 point 3).
   const cancelFlipBackRef = useRef<(() => void) | null>(null);
+  // Prevents double-navigation if Continue is tapped rapidly (F-05).
+  const isNavigatingRef = useRef(false);
 
   function handleContinue() {
+    if (isNavigatingRef.current) return;
+    isNavigatingRef.current = true;
     cancelFlipBackRef.current?.(); // abort flip-back if yellow face is still showing
     cancelFlipBackRef.current = null;
     if (!selected) return;

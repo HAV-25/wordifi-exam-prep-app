@@ -31,8 +31,12 @@ export default function HardestScreen() {
   const [selected, setSelected] = useState<HardestId | null>(null);
   const [continueActive, setContinueActive] = useState(false);
   const cancelFlipBackRef = useRef<(() => void) | null>(null);
+  // Prevents double-navigation if Continue is tapped rapidly (F-05).
+  const isNavigatingRef = useRef(false);
 
   function handleContinue() {
+    if (isNavigatingRef.current) return;
+    isNavigatingRef.current = true;
     cancelFlipBackRef.current?.();
     cancelFlipBackRef.current = null;
     if (!selected) return;

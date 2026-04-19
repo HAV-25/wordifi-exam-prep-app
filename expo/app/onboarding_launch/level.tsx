@@ -37,8 +37,12 @@ export default function LevelScreen() {
   // Holds the cancel handle from the flipped card — called before navigating to
   // abort any pending flip-back timer if Continue is tapped during the hold.
   const cancelFlipBackRef = useRef<(() => void) | null>(null);
+  // Prevents double-navigation if Continue is tapped rapidly (F-05).
+  const isNavigatingRef = useRef(false);
 
   function handleContinue() {
+    if (isNavigatingRef.current) return;
+    isNavigatingRef.current = true;
     cancelFlipBackRef.current?.();
     cancelFlipBackRef.current = null;
     if (!selected) return;
