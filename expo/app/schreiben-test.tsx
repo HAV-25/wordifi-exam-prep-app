@@ -225,7 +225,7 @@ export default function SchreibenTestScreen() {
               ...state,
               isSubmitted: true,
               isLoading: false,
-              error: 'Bewertung nicht verfügbar. Bitte versuche es später.',
+              error: 'Assessment unavailable. Please try again later.',
             },
           };
         }
@@ -345,9 +345,9 @@ export default function SchreibenTestScreen() {
   const handleBack = useCallback(() => {
     const hasAnswered = Object.keys(questionStates).length > 0;
     if (hasAnswered) {
-      Alert.alert('Diesen Test verlassen?', 'Dein Fortschritt geht verloren.', [
-        { text: 'Bleiben', style: 'cancel' },
-        { text: 'Verlassen', style: 'destructive', onPress: () => router.back() },
+      Alert.alert('Leave this test?', 'Your progress will be lost.', [
+        { text: 'Stay', style: 'cancel' },
+        { text: 'Leave', style: 'destructive', onPress: () => router.back() },
       ]);
       return;
     }
@@ -365,9 +365,9 @@ export default function SchreibenTestScreen() {
         <Stack.Screen options={{ title: 'Schreiben', headerShown: true }} />
         <View style={styles.emptyWrap}>
           <EmptyState
-            title="Keine Schreiben-Fragen verfügbar"
-            description="Wir fügen bald neue Inhalte hinzu."
-            actionLabel="Zurück"
+            title="No writing questions available"
+            description="We'll be adding new content soon."
+            actionLabel="Back"
             onActionPress={() => router.back()}
             testID="schreiben-empty-state"
           />
@@ -382,18 +382,18 @@ export default function SchreibenTestScreen() {
 
     return (
       <View style={styles.screen}>
-        <Stack.Screen options={{ title: 'Ergebnis', headerBackVisible: false }} />
+        <Stack.Screen options={{ title: 'Results', headerBackVisible: false }} />
         <ScrollView contentContainerStyle={[styles.summaryContent, { paddingBottom: insets.bottom + CTA_BUTTON_HEIGHT + BOTTOM_CONTENT_BUFFER }]} showsVerticalScrollIndicator={false}>
           <View style={[styles.summaryHero, shadows.card]}>
             <View style={styles.summaryIconWrap}>
               <PenLine color={colors.white} size={24} />
             </View>
-            <Text style={styles.summaryTitle}>Schreiben · Teil {teil}</Text>
+            <Text style={styles.summaryTitle}>Writing · Part {teil}</Text>
             <Text style={styles.summarySubtitle}>{level} · {taskLabel}</Text>
             <Text style={styles.summaryScore}>{totalScore} / {totalMaxScore}</Text>
             <Text style={styles.summaryPct}>{scorePct}%</Text>
             <Text style={styles.summaryPassed}>
-              {passedCount} von {questions.length} bestanden
+              {passedCount} of {questions.length} passed
             </Text>
           </View>
 
@@ -420,7 +420,7 @@ export default function SchreibenTestScreen() {
 
         <View style={[styles.footer, { bottom: insets.bottom }]}>
           <CTAButton
-            label="Zurück zu den Tests"
+            label="Back to tests"
             onPress={() => router.replace('/(tabs)/tests')}
             style={styles.footerBtn}
             testID="back-to-tests"
@@ -443,12 +443,12 @@ export default function SchreibenTestScreen() {
           title: '',
           headerLeft: () => (
             <Pressable
-              accessibilityLabel="Zurück"
+              accessibilityLabel="Back"
               onPress={handleBack}
               style={styles.headerBtn}
               testID="schreiben-back-button"
             >
-              <Text style={styles.headerBtnText}>Zurück</Text>
+              <Text style={styles.headerBtnText}>Back</Text>
             </Pressable>
           ),
         }}
@@ -460,7 +460,7 @@ export default function SchreibenTestScreen() {
         </View>
         <View style={styles.headerRow}>
           <Text style={styles.counter}>
-            Frage {Math.min(currentIndex + 1, questions.length)} von {questions.length}
+            Question {Math.min(currentIndex + 1, questions.length)} of {questions.length}
           </Text>
           <View style={styles.metaRow}>
             <View style={styles.sectionPill}>
@@ -500,7 +500,7 @@ export default function SchreibenTestScreen() {
             <View style={styles.errorWrap}>
               <Text style={styles.errorText}>{currentState.error}</Text>
               <Pressable onPress={handleRetry} style={styles.retryBtn} testID="schreiben-retry">
-                <Text style={styles.retryText}>Erneut versuchen</Text>
+                <Text style={styles.retryText}>Try again</Text>
               </Pressable>
             </View>
           ) : null}
@@ -512,7 +512,7 @@ export default function SchreibenTestScreen() {
           <Pressable
             onPress={async () => {
               const a = currentState.assessment!;
-              const passLabel = a.passed ? 'Bestanden' : 'Nicht bestanden';
+              const passLabel = a.passed ? 'Passed' : 'Not passed';
               const message = `wordifi — Schreiben ${level} Teil ${teil}\n${a.overall_score}/${a.max_score} — ${passLabel}\n\n${a.encouragement}\n\nwordifi.app`;
               try {
                 if (Platform.OS === 'web') {
@@ -528,10 +528,10 @@ export default function SchreibenTestScreen() {
             testID="schreiben-share"
           >
             <Share2 color={colors.blue} size={18} />
-            <Text style={styles.shareBtnText}>Ergebnis teilen</Text>
+            <Text style={styles.shareBtnText}>Share result</Text>
           </Pressable>
           <CTAButton
-            label={currentIndex === questions.length - 1 ? 'Test abschließen' : 'Nächste Frage →'}
+            label={currentIndex === questions.length - 1 ? 'Finish test' : 'Next question →'}
             onPress={handleNext}
             style={styles.footerBtn}
             testID="schreiben-next"
