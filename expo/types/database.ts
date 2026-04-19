@@ -36,6 +36,18 @@ export type AppQuestion = {
   grammar_rule_de: string | null;
 };
 
+export type UserNotification = {
+  id: string;
+  user_id: string;
+  type: string;
+  title: string;
+  body: string;
+  action_url: string | null;
+  metadata: Record<string, unknown> | null;
+  read_at: string | null;
+  created_at: string;
+};
+
 export type StudyPlanItem = {
   priority: number;
   section: string;
@@ -277,6 +289,22 @@ export type Database = {
           created_at?: string | null;
         };
         Update: Partial<SessionLink>;
+        Relationships: [];
+      };
+      user_notifications: {
+        Row: UserNotification;
+        Insert: {
+          id?: string;
+          user_id: string;
+          type: string;
+          title: string;
+          body: string;
+          action_url?: string | null;
+          metadata?: Record<string, unknown> | null;
+          read_at?: string | null;
+          created_at?: string;
+        };
+        Update: Partial<UserNotification>;
         Relationships: [];
       };
     };

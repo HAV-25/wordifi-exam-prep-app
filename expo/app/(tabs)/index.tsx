@@ -88,6 +88,16 @@ function statusColor(pct: number): string {
   return '#FCA5A5';
 }
 
+function sectionAccentColor(section: string): string {
+  const map: Record<string, string> = {
+    'Hören':     '#2B70EF',
+    'Lesen':     '#22C55E',
+    'Schreiben': '#8B5CF6',
+    'Sprechen':  '#F97316',
+  };
+  return map[section] ?? '#94A3B8';
+}
+
 // ─── Home screen ─────────────────────────────────────────────────────────────
 export default function HomeScreen() {
   const router = useRouter();
@@ -164,7 +174,11 @@ export default function HomeScreen() {
             </View>
             <View style={s.headerRight}>
               <View style={s.bellBtn}>
-                <Bell color={BANANI.foreground} size={20} />
+                <Bell
+                  color={data.hasUnreadNotification ? BANANI.warning : BANANI.foreground}
+                  size={20}
+                />
+                {data.hasUnreadNotification && <View style={s.notifDot} />}
               </View>
             </View>
           </View>
@@ -292,40 +306,55 @@ export default function HomeScreen() {
           </View>
 
           <View style={s.sectionsList}>
-            {data.sectionHistory.map((item) => {
-              const pct = Math.min(item.progressPct, 100);
-              const barColor = statusColor(pct);
-              const isLocked = (item.section === 'Schreiben' && !access.schreiben_enabled) ||
-                               (item.section === 'Sprechen' && !access.sprechen_enabled);
-              return (
-                <Pressable
-                  key={item.section}
-                  style={s.sectionRow}
-                  onPress={() => router.push('/(tabs)/tests' as never)}
-                >
-                  <View style={s.secLeft}>
-                    <View style={s.secIconWrap}>
-                      <SectionIcon section={item.section} />
-                    </View>
-                    <Text style={s.secName}>{item.section}</Text>
-                  </View>
-                  <View style={s.secMid}>
-                    <View style={s.microBarBg}>
-                      <View style={[s.microBarFill, { width: `${pct}%` as any, backgroundColor: barColor }]} />
-                    </View>
-                    <View style={[s.statusDot, { backgroundColor: barColor }]} />
-                  </View>
-                  <View style={s.secRight}>
-                    <Text style={s.questionCount}>{item.questionCount}q</Text>
-                    {isLocked ? (
-                      <View style={s.lockWrap}>
-                        <Lock color="rgba(255,255,255,0.62)" size={14} />
+            {(() => {
+              const maxQ = Math.max(...data.sectionHistory.map(s => s.questionCount), 1);
+              return data.sectionHistory.map((item) => {
+                const pct = Math.min(item.progressPct, 100);
+                const barColor = statusColor(pct);
+                const qPct = Math.round((item.questionCount / maxQ) * 100);
+                const isLocked = (item.section === 'Schreiben' && !access.schreiben_enabled) ||
+                                 (item.section === 'Sprechen' && !access.sprechen_enabled);
+                return (
+                  <Pressable
+                    key={item.section}
+                    style={s.sectionRow}
+                    onPress={() => router.push('/(tabs)/tests' as never)}
+                  >
+                    <View style={s.secLeft}>
+                      <View style={s.secIconWrap}>
+                        <SectionIcon section={item.section} />
                       </View>
-                    ) : null}
-                  </View>
-                </Pressable>
-              );
-            })}
+                      <Text style={s.secName}>{item.section}</Text>
+                    </View>
+                    <View style={s.secMid}>
+                      {/* Bar 1 — questions completed (normalized) */}
+                      <View style={s.microBarBg}>
+                        <View style={[s.microBarFill, {
+                          width: `${qPct}%` as any,
+                          backgroundColor: sectionAccentColor(item.section),
+                          opacity: 0.7,
+                        }]} />
+                      </View>
+                      {/* Bar 2 — accuracy % */}
+                      <View style={s.microBarBg}>
+                        <View style={[s.microBarFill, {
+                          width: `${pct}%` as any,
+                          backgroundColor: barColor,
+                        }]} />
+                      </View>
+                    </View>
+                    <View style={s.secRight}>
+                      <Text style={s.questionCount}>{item.questionCount}q</Text>
+                      {isLocked ? (
+                        <View style={s.lockWrap}>
+                          <Lock color="rgba(255,255,255,0.62)" size={14} />
+                        </View>
+                      ) : null}
+                    </View>
+                  </Pressable>
+                );
+              });
+            })()}
           </View>
         </Pressable>
 
@@ -486,6 +515,17 @@ const s = StyleSheet.create({
       ios: { shadowColor: '#0F1F3D', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.05, shadowRadius: 20 },
       android: { elevation: 3 },
     }),
+  },
+  notifDot: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: BANANI.warning,
+    borderWidth: 1.5,
+    borderColor: '#F8FAFC',
   },
 
   // ── Greeting ──
@@ -793,25 +833,20 @@ const s = StyleSheet.create({
   },
   secMid: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
+    flexDirection: 'column',
+    justifyContent: 'center',
+    gap: 4,
+    marginHorizontal: 10,
   },
   microBarBg: {
-    flex: 1,
-    height: 7,
+    height: 4,
     backgroundColor: 'rgba(255,255,255,0.16)',
-    borderRadius: 999,
+    borderRadius: 2,
     overflow: 'hidden',
   },
   microBarFill: {
     height: '100%',
-    borderRadius: 999,
-  },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    borderRadius: 2,
   },
   secRight: {
     flexDirection: 'row',

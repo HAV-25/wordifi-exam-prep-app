@@ -79,6 +79,7 @@ export type HomeData = {
   leaderboardNeighbors: LeaderboardNeighbor[];
   trendData: TrendDay[];
   trendPercentage: number | null;
+  hasUnreadNotification: boolean;
 };
 
 function calcDaysToExam(examDate: string | null): number | null {
@@ -304,6 +305,25 @@ export function useHomeData(): HomeData {
     staleTime: 60_000,
   });
 
+  // Unread notification count — drives the bell badge
+  const notificationsQuery = useQuery({
+    queryKey: ['home-notifications-unread', userId],
+    enabled: Boolean(userId),
+    staleTime: 60_000,
+    queryFn: async (): Promise<boolean> => {
+      try {
+        const { count } = await supabase
+          .from('user_notifications' as never)
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id' as never, userId)
+          .is('read_at' as never, null) as any;
+        return (count ?? 0) > 0;
+      } catch {
+        return false;
+      }
+    },
+  });
+
   // New: motivational quote (cached per session via staleTime)
   const streak = profile?.streak_count ?? 0;
   const readiness = profile?.readiness_score ?? 0;
@@ -422,5 +442,6 @@ export function useHomeData(): HomeData {
     leaderboardNeighbors: neighborsQuery.data ?? [],
     trendData,
     trendPercentage,
+    hasUnreadNotification: notificationsQuery.data ?? false,
   };
 }
