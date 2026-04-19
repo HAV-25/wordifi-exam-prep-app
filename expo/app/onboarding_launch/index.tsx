@@ -21,7 +21,7 @@ export default function VideoSplashScreen() {
   return (
     <View style={styles.root}>
       <Video
-        source={require('../../../assets/wordifi.mp4')}
+        source={require('../../assets/wordifi.mp4')}
         style={StyleSheet.absoluteFill}
         resizeMode={ResizeMode.COVER}
         shouldPlay
