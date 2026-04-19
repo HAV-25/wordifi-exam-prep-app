@@ -2,6 +2,7 @@ import { Check, X, ChevronDown, ChevronUp } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   Animated,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
