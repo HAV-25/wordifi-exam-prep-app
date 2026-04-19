@@ -524,7 +524,7 @@ export default function SprechenRealtimeScreen() {
             <AlertCircle color={colors.red} size={40} />
           </View>
           <Text style={styles.errorTitle}>Error</Text>
-          <Text style={styles.errorText}>{errorMsg ?? 'Unbekannter Fehler'}</Text>
+          <Text style={styles.errorText}>{errorMsg ?? 'Unknown error'}</Text>
           <View style={styles.errorActions}>
             <CTAButton label="Try again" onPress={handleRetry} testID="realtime-retry" />
             <Pressable onPress={() => router.back()} style={styles.backLink} testID="realtime-back">
@@ -600,7 +600,7 @@ export default function SprechenRealtimeScreen() {
         <Stack.Screen options={{ title: 'Verbinde...', headerShown: true }} />
         <View style={styles.center}>
           <ActivityIndicator color={colors.blue} size="large" />
-          <Text style={styles.loadingText}>KI-Partner wird verbunden...</Text>
+          <Text style={styles.loadingText}>Connecting AI partner...</Text>
         </View>
       </View>
     );
@@ -664,7 +664,7 @@ export default function SprechenRealtimeScreen() {
               ]}
             >
               <Text style={styles.bubbleRole}>
-                {entry.role === 'assistant' ? 'Partner' : 'Sie'}
+                {entry.role === 'assistant' ? 'Partner' : 'You'}
               </Text>
               <Text style={styles.bubbleText}>{entry.text}</Text>
             </View>
@@ -702,11 +702,11 @@ export default function SprechenRealtimeScreen() {
           <Pressable
             onPress={() => {
               Alert.alert(
-                isMonologue ? 'Aufnahme beenden?' : 'Gespräch beenden?',
-                'Das Gespräch wird bewertet.',
+                isMonologue ? 'End recording?' : 'End conversation?',
+                'The conversation will be evaluated.',
                 [
-                  { text: 'Weiter', style: 'cancel' },
-                  { text: 'Beenden', style: 'destructive', onPress: () => void handleEndConversation() },
+                  { text: 'Continue', style: 'cancel' },
+                  { text: 'End', style: 'destructive', onPress: () => void handleEndConversation() },
                 ]
               );
             }}
@@ -714,7 +714,7 @@ export default function SprechenRealtimeScreen() {
             testID="realtime-end"
           >
             <PhoneOff color={colors.red} size={16} />
-            <Text style={styles.endBtnText}>{isMonologue ? 'Aufnahme beenden' : 'Gespräch beenden'}</Text>
+            <Text style={styles.endBtnText}>{isMonologue ? 'End recording' : 'End conversation'}</Text>
           </Pressable>
         </View>
 
@@ -733,7 +733,7 @@ export default function SprechenRealtimeScreen() {
               <Text style={styles.finalCountdownNumber}>{finalCountdown}</Text>
             </Animated.View>
             <Animated.Text style={[styles.finalCountdownMessage, { opacity: finalCountdownOpacityAnim }]}>
-              Deine Sprechzeit endet gleich
+              Your speaking time is ending soon
             </Animated.Text>
             <Animated.Text style={[styles.finalCountdownMessageEn, { opacity: finalCountdownOpacityAnim }]}>
               Your speaking time is ending
@@ -747,10 +747,10 @@ export default function SprechenRealtimeScreen() {
   if (screenState === 'scoring') {
     return (
       <View style={styles.screen}>
-        <Stack.Screen options={{ title: 'Bewertung', headerShown: true, headerBackVisible: false }} />
+        <Stack.Screen options={{ title: 'Assessment', headerShown: true, headerBackVisible: false }} />
         <View style={styles.center}>
           <ActivityIndicator color={colors.blue} size="large" />
-          <Text style={styles.loadingText}>Ihre Antwort wird bewertet...</Text>
+          <Text style={styles.loadingText}>Your answer is being evaluated...</Text>
         </View>
       </View>
     );
