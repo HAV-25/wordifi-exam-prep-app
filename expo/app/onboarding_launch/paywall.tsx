@@ -11,6 +11,7 @@ import { router } from 'expo-router';
 
 import { presentAdaptyPaywall } from '@/lib/adaptyPaywall';
 import { savePendingOnboarding } from '@/lib/profileHelpers';
+import { track } from '@/lib/track';
 import { colors, fontFamily, fontSize } from '@/theme';
 import { onboardingStore, onboardingSessionNonce } from './_store';
 
@@ -22,9 +23,15 @@ export default function PaywallScreen() {
     if (presentedRef.current) return;
     presentedRef.current = true;
 
+    track('paywall_viewed', { source_screen: 'onboarding' });
+
     async function showPaywall() {
       try {
         const result = await presentAdaptyPaywall();
+
+        if (!result.purchased && !result.restored) {
+          track('paywall_dismissed', { source_screen: 'onboarding' });
+        }
 
         // Whether purchased, restored, or dismissed — save onboarding and continue to auth
         await savePendingOnboarding(onboardingStore, onboardingSessionNonce);

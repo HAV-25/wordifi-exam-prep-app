@@ -6,6 +6,7 @@
  */
 import { adapty, createPaywallView } from 'react-native-adapty';
 import type { EventHandlers } from 'react-native-adapty';
+import { track } from '@/lib/track';
 
 import { supabase } from '@/lib/supabaseClient';
 import { PAID_TIERS } from '@/theme/constants';
@@ -36,6 +37,7 @@ export async function presentAdaptyPaywall(
       onPurchaseCompleted: (purchaseResult) => {
         if (purchaseResult.type === 'success') {
           result.purchased = true;
+          track('subscription_started', { plan: 'adapty' });
           onPurchaseSuccess?.();
         }
         // Close paywall unless user cancelled
@@ -76,6 +78,7 @@ export async function syncSubscriptionAfterPurchase(userId: string): Promise<voi
           trial_active: false,
         } as never)
         .eq('id', userId);
+      track('subscription_started', { plan: 'pro' });
       console.log('[Adapty] Subscription synced to pro for user', userId);
     }
   } catch (err) {

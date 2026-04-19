@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabaseClient';
 import type { AppQuestion, UserProfile } from '@/types/database';
+import { track } from '@/lib/track';
 
 export type StreamFetchParams = {
   userId: string;
@@ -216,6 +217,9 @@ export async function createStreamSession(params: {
     return 'placeholder-session';
   }
 
+  track('session_started', { section: 'mixed', cefr_level: params.level });
+  track('section_completed', { section: 'mixed', cefr_level: params.level, score_pct: scorePct, duration_sec: params.timeTakenSeconds });
+
   return (data as unknown as SessionIdRow).id;
 }
 
@@ -251,7 +255,8 @@ export async function updateXpAndStreak(
   const today = new Date().toISOString().split('T')[0] ?? '';
   const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0] ?? '';
 
-  let newStreak = profile.streak_count;
+  const prevStreak = profile.streak_count;
+  let newStreak = prevStreak;
   if (profile.last_active_date === yesterday) {
     newStreak = profile.streak_count + 1;
   } else if (profile.last_active_date !== today) {
@@ -273,6 +278,12 @@ export async function updateXpAndStreak(
 
   if (error) {
     console.log('updateXpAndStreak error', error);
+  }
+
+  if (profile.last_active_date === yesterday) {
+    track('streak_extended', { streak_count: newStreak });
+  } else if (profile.last_active_date !== today && prevStreak > 1) {
+    track('streak_broken', { prev_streak: prevStreak });
   }
 
   return { newXp, newStreak };

@@ -2,6 +2,7 @@ import { supabase } from '@/lib/supabaseClient';
 import * as Sentry from '@sentry/react-native';
 import type { AppQuestion } from '@/types/database';
 import type { AssessmentResult } from '@/types/schreiben';
+import { track } from '@/lib/track';
 
 export const countWords = (text: string): number => {
   return text.trim().split(/\s+/).filter(w => w.length > 0).length;
@@ -130,6 +131,7 @@ export const assessSchreiben = async (
   }
 
   console.log('schreibenHelpers assessSchreiben result score:', assessment.overall_score);
+  track('section_completed', { section: 'Schreiben', cefr_level: question.level, score_pct: assessment.overall_score });
   return assessment;
 };
 

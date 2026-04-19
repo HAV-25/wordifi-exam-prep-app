@@ -51,7 +51,8 @@
           "iosDisplayInForeground": true
         }
       ],
-      "react-native-adapty"
+      "react-native-adapty",
+      "expo-localization"
     ],
     "experiments": {
       "typedRoutes": true

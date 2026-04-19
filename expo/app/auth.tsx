@@ -23,6 +23,7 @@ import { WordifiLogo } from '@/components/WordifiLogo';
 import { resetPassword, signInWithEmail, signInWithGoogle, signUpWithEmail, updateTcAccepted } from '@/lib/authHelpers';
 import { tagPendingOnboardingForUser } from '@/lib/profileHelpers';
 import { onboardingSessionNonce } from '@/app/onboarding_launch/_store';
+import { track } from '@/lib/track';
 import { useAppConfig } from '@/providers/AppConfigProvider';
 import { supabase } from '@/lib/supabaseClient';
 
@@ -84,6 +85,7 @@ export default function AuthScreen() {
         if (data?.user) {
           await updateTcAccepted(data.user.id, config.tc_version).catch(() => {});
         }
+        track('user_signed_in', { method: 'email' });
         // Pending onboarding reconciliation handled by AuthProvider after session established
         router.replace('/');
       } else {
@@ -92,6 +94,7 @@ export default function AuthScreen() {
           // Onboarding data already persisted to AsyncStorage in paywall.tsx.
           // Tag it with the new userId so reconciliation is scoped to this user only.
           await tagPendingOnboardingForUser(result.userId, onboardingSessionNonce);
+          track('user_signed_up', { signup_method: 'email' });
           // tc_accepted is handled by AuthProvider after session is established
           router.push({ pathname: '/check-email', params: { email: result.email } });
           return;
@@ -102,6 +105,7 @@ export default function AuthScreen() {
           await tagPendingOnboardingForUser(result.data.user.id, onboardingSessionNonce);
           await updateTcAccepted(result.data.user.id, config.tc_version).catch(() => {});
         }
+        track('user_signed_up', { signup_method: 'email' });
         router.replace('/');
       }
     } catch (error) {
@@ -126,6 +130,9 @@ export default function AuthScreen() {
         // Only tag pending onboarding for new signups — don't stamp stale data onto existing users
         if (mode === 'signUp') {
           await tagPendingOnboardingForUser(user.id, onboardingSessionNonce);
+          track('user_signed_up', { signup_method: 'google' });
+        } else {
+          track('user_signed_in', { method: 'google' });
         }
         await updateTcAccepted(user.id, config.tc_version).catch(() => {});
       }

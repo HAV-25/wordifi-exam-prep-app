@@ -3,6 +3,7 @@ import { Audio } from 'expo-av';
 import { File as FSFile, Paths } from 'expo-file-system/next';
 import { EncodingType } from 'expo-file-system';
 import * as Sentry from '@sentry/react-native';
+import { track } from '@/lib/track';
 
 // Load react-native-webrtc on native platforms. Falls back gracefully if unavailable.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -102,6 +103,8 @@ export async function createSprechenSession(params: {
     ? data.client_secret
     : data.client_secret?.value ?? '';
 
+  track('session_started', { section: 'Sprechen', cefr_level: params.level });
+
   return { client_secret: secret, session_id: data.session_id };
 }
 
@@ -156,7 +159,7 @@ export async function scoreSprechenConversation(params: {
 
   const flat = (data.scores ?? data) as Record<string, unknown>;
 
-  return {
+  const scores: SprechenScores = {
     overall:    rubricToPct(flat.overall    ?? flat.overall_score),
     fluency:    rubricToPct(flat.fluency    ?? flat.fluency_score),
     grammar:    rubricToPct(flat.grammar    ?? flat.grammar_score),
@@ -165,6 +168,10 @@ export async function scoreSprechenConversation(params: {
     improvement_tip:    String(flat.improvement_tip    ?? ''),
     task_completion:    flat.task_completion === true || flat.task_completion === 'true',
   };
+
+  track('section_completed', { section: 'Sprechen', cefr_level: params.level, score_pct: scores.overall, duration_sec: params.duration_seconds });
+
+  return scores;
 }
 
 function base64ToBytes(base64: string): Uint8Array {

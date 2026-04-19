@@ -23,8 +23,7 @@ import { AuthProvider, useAuth } from '@/providers/AuthProvider';
 import { QuestionTypeMetaProvider, useQuestionTypeMetaContext } from '@/lib/useQuestionTypeMeta';
 import * as Sentry from '@sentry/react-native';
 import { adapty } from 'react-native-adapty';
-import { vexo } from 'vexo-analytics';
-
+import { initPostHog } from '@/lib/posthog';
 Sentry.init({
   dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
   enabled: !!process.env.EXPO_PUBLIC_SENTRY_DSN,
@@ -41,9 +40,6 @@ Sentry.init({
 void SplashScreen.preventAutoHideAsync();
 
 adapty.activate('public_live_PsXzPNln.zSOwZEDaKjadnp341RBT');
-
-vexo('5373b786-6793-463c-847f-24e1e280ee7a');
-console.log('[Vexo] initialized');
 
 const queryClient = new QueryClient();
 
@@ -135,6 +131,14 @@ function SentryFallback() {
 }
 
 export default Sentry.wrap(function RootLayout() {
+  useEffect(() => {
+    try {
+      initPostHog();
+    } catch (e) {
+      console.warn('[PostHog] init failed', e);
+    }
+  }, []);
+
   const [fontsLoaded] = useFonts({
     Outfit_800ExtraBold,
     NunitoSans_400Regular,

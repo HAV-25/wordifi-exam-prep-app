@@ -11,6 +11,7 @@ import { View } from 'react-native';
 
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/providers/AuthProvider';
+import { track } from '@/lib/track';
 import { WalkthroughOverlay } from './WalkthroughOverlay';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -140,6 +141,7 @@ export function WalkthroughProvider({ children }: { children: React.ReactNode })
   );
 
   const completeWalkthrough = useCallback(async () => {
+    track('onboarding_completed');
     setIsActive(false);
     setCurrentStep(0);
     if (!user?.id) return;

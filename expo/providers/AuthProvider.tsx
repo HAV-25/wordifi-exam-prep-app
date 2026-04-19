@@ -6,7 +6,6 @@ import * as Linking from 'expo-linking';
 import * as Sentry from '@sentry/react-native';
 
 import { adapty } from 'react-native-adapty';
-import { identifyDevice } from 'vexo-analytics';
 
 import { signOutUser, updateTcAccepted } from '@/lib/authHelpers';
 import { syncSubscriptionOnLaunch } from '@/lib/adaptyPaywall';
@@ -14,6 +13,8 @@ import { ensureUserProfile, reconcilePendingOnboarding } from '@/lib/profileHelp
 import { supabase } from '@/lib/supabaseClient';
 import type { UserProfile } from '@/types/database';
 import { useAppConfig } from '@/providers/AppConfigProvider';
+import { identifyUser, resetUser } from '@/lib/identity';
+import { track } from '@/lib/track';
 
 export const [AuthProvider, useAuth] = createContextHook(() => {
   const queryClient = useQueryClient();
@@ -47,12 +48,14 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
         adapty.identify(nextSession.user.id).catch((err) =>
           console.warn('[Adapty] identify failed:', err)
         );
-        if (nextSession.user.email) {
-          identifyDevice(nextSession.user.email);
+        identifyUser(nextSession.user.id);
+        if (event === 'INITIAL_SESSION') {
+          track('user_signed_in', { method: 'session_restore' });
         }
       } else {
         Sentry.setUser(null);
         adapty.logout().catch(() => {});
+        resetUser();
       }
     });
 

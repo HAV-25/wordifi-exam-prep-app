@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabaseClient';
 import { fetchRecentlyAnsweredIds, partitionByDedup } from '@/lib/questionDedup';
+import { track } from '@/lib/track';
 import { MOCK_TEST_QUESTION_COUNTS, shuffleArray, XP_RATES } from '@/theme/constants';
 import type { AppQuestion, UserProfile } from '@/types/database';
 import * as Sentry from '@sentry/react-native';
@@ -347,6 +348,8 @@ export async function createSectionalSession(params: {
     throw error;
   }
 
+  track('session_started', { section: params.section, cefr_level: params.level });
+
   return (data as { id: string }).id;
 }
 
@@ -407,9 +410,10 @@ export async function completeSectionalSession(params: {
 
     const today = new Date().toISOString().split('T')[0] ?? '';
     const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0] ?? '';
-    let newStreak = profile?.streak_count ?? 0;
+    const prevStreak = profile?.streak_count ?? 0;
+    let newStreak = prevStreak;
     if (profile?.last_active_date === yesterday) {
-      newStreak = (profile?.streak_count ?? 0) + 1;
+      newStreak = prevStreak + 1;
     } else if (profile?.last_active_date !== today) {
       newStreak = 1;
     }
@@ -431,10 +435,18 @@ export async function completeSectionalSession(params: {
       console.error('completeSectionalSession profile update error', profileError);
       Sentry.captureException(profileError, { tags: { context: 'sectional' } });
     }
+
+    if (profile?.last_active_date === yesterday) {
+      track('streak_extended', { streak_count: newStreak });
+    } else if (profile?.last_active_date !== today && prevStreak > 1) {
+      track('streak_broken', { prev_streak: prevStreak });
+    }
   } catch (err) {
     console.log('completeSectionalSession unexpected error', err);
     Sentry.captureException(err, { tags: { context: 'sectional' } });
   }
+
+  track('section_completed', { section: params.questions[0]?.section ?? 'sectional', cefr_level: params.questions[0]?.level, score_pct: scorePct, duration_sec: params.timeTakenSeconds });
 
   return { correctCount, total, scorePct };
 }
@@ -566,9 +578,10 @@ export async function completeSprachbausteineSession(params: {
 
     const today = new Date().toISOString().split('T')[0] ?? '';
     const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0] ?? '';
-    let newStreak = profile?.streak_count ?? 0;
+    const prevStreak = profile?.streak_count ?? 0;
+    let newStreak = prevStreak;
     if (profile?.last_active_date === yesterday) {
-      newStreak = (profile?.streak_count ?? 0) + 1;
+      newStreak = prevStreak + 1;
     } else if (profile?.last_active_date !== today) {
       newStreak = 1;
     }
@@ -587,10 +600,18 @@ export async function completeSprachbausteineSession(params: {
       console.log('completeSprachbausteineSession profile update error', profileError);
       Sentry.captureException(profileError, { tags: { context: 'sectional' } });
     }
+
+    if (profile?.last_active_date === yesterday) {
+      track('streak_extended', { streak_count: newStreak });
+    } else if (profile?.last_active_date !== today && prevStreak > 1) {
+      track('streak_broken', { prev_streak: prevStreak });
+    }
   } catch (err) {
     console.log('completeSprachbausteineSession unexpected error', err);
     Sentry.captureException(err, { tags: { context: 'sectional' } });
   }
+
+  track('section_completed', { section: 'Sprachbausteine', cefr_level: t1Question.level, score_pct: scorePct, duration_sec: timeTakenSeconds });
 
   return { totalCorrect, totalBlanks, scorePct };
 }
