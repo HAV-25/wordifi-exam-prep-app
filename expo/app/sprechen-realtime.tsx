@@ -523,12 +523,12 @@ export default function SprechenRealtimeScreen() {
           <View style={styles.errorIcon}>
             <AlertCircle color={colors.red} size={40} />
           </View>
-          <Text style={styles.errorTitle}>Fehler</Text>
+          <Text style={styles.errorTitle}>Error</Text>
           <Text style={styles.errorText}>{errorMsg ?? 'Unbekannter Fehler'}</Text>
           <View style={styles.errorActions}>
-            <CTAButton label="Erneut versuchen" onPress={handleRetry} testID="realtime-retry" />
+            <CTAButton label="Try again" onPress={handleRetry} testID="realtime-retry" />
             <Pressable onPress={() => router.back()} style={styles.backLink} testID="realtime-back">
-              <Text style={styles.backLinkText}>Zurück</Text>
+              <Text style={styles.backLinkText}>Back</Text>
             </Pressable>
           </View>
         </View>
@@ -549,7 +549,7 @@ export default function SprechenRealtimeScreen() {
           <View style={styles.instructionHeader}>
             <View style={styles.sectionPill}>
               <Mic color={colors.white} size={12} />
-              <Text style={styles.sectionPillText}>Live-Gespräch</Text>
+              <Text style={styles.sectionPillText}>Live Conversation</Text>
             </View>
             <Text style={styles.instructionSubtitle}>{taskLabel}</Text>
           </View>
@@ -559,7 +559,7 @@ export default function SprechenRealtimeScreen() {
 
           {moderatorAudioUrl ? (
             <View style={styles.moderatorWrap}>
-              <Text style={styles.moderatorLabel}>Aufgabe anhören</Text>
+              <Text style={styles.moderatorLabel}>Listen to task</Text>
               <AudioPlayer audioUrl={moderatorAudioUrl} onPlaybackComplete={() => setModeratorFinished(true)} />
             </View>
           ) : null}
@@ -567,7 +567,7 @@ export default function SprechenRealtimeScreen() {
           {!isMonologue && !moderatorAudioUrl ? (
             <View style={styles.noModeratorNote}>
               <Text style={styles.noModeratorText}>
-                Drücken Sie unten, um das Live-Gespräch mit dem KI-Partner zu beginnen.
+                Press below to start the live conversation with the AI partner.
               </Text>
             </View>
           ) : null}
@@ -575,7 +575,7 @@ export default function SprechenRealtimeScreen() {
           {isMonologue && countdownValue !== null ? (
             <View style={styles.countdownWrap}>
               <Text style={styles.countdownText}>{countdownValue}</Text>
-              <Text style={styles.countdownLabel}>Aufnahme startet...</Text>
+              <Text style={styles.countdownLabel}>Recording starting...</Text>
             </View>
           ) : null}
         </ScrollView>
@@ -583,7 +583,7 @@ export default function SprechenRealtimeScreen() {
         {!isMonologue ? (
           <View style={[styles.footer, { bottom: insets.bottom }]}>
             <CTAButton
-              label="Gespräch beginnen"
+              label="Start conversation"
               onPress={handleStartConversation}
               disabled={moderatorAudioUrl != null && !moderatorFinished}
               testID="realtime-start"
