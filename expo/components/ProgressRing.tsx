@@ -1,7 +1,19 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
+import Animated, {
+  useSharedValue,
+  useAnimatedProps,
+  withTiming,
+  Easing,
+} from 'react-native-reanimated';
 import { fontFamily } from '@/theme';
+import { duration, easing } from '@/theme/motion';
+
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+
+const SUCCESS_GREEN = '#22C55E';
+const RING_BG = 'rgba(255,255,255,0.12)';
 
 type Props = {
   /** 0–100 readiness percentage */
@@ -12,14 +24,43 @@ type Props = {
   strokeWidth?: number;
 };
 
-const SUCCESS_GREEN = '#22C55E';
-const RING_BG = 'rgba(255,255,255,0.12)';
-
 export function ProgressRing({ score, size = 214, strokeWidth = 10 }: Props) {
   const r = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * r;
   const pct = Math.min(Math.max(score, 0), 100);
-  const offset = circumference - (pct / 100) * circumference;
+
+  // ── Ring fill (UI thread via Reanimated) ──────────────────────────────────
+  const progress = useSharedValue(0);
+
+  useEffect(() => {
+    progress.value = withTiming(pct, {
+      duration: duration.scoreRing,
+      easing: Easing.bezier(...easing.decelerate),
+    });
+  }, [pct]);
+
+  const animatedProps = useAnimatedProps(() => ({
+    strokeDashoffset: circumference - (progress.value / 100) * circumference,
+  }));
+
+  // ── Score count-up (JS thread, RAF-based) ─────────────────────────────────
+  const [displayInt, setDisplayInt] = useState(0);
+  const rafRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (rafRef.current) clearTimeout(rafRef.current);
+    const startTime = Date.now();
+    const dur = duration.scoreRing;
+
+    function tick() {
+      const t = Math.min((Date.now() - startTime) / dur, 1);
+      const eased = 1 - Math.pow(1 - t, 3); // cubic ease-out
+      setDisplayInt(Math.round(eased * pct));
+      if (t < 1) rafRef.current = setTimeout(tick, 16);
+    }
+    tick();
+    return () => { if (rafRef.current) clearTimeout(rafRef.current); };
+  }, [pct]);
 
   return (
     <View style={[styles.container, { width: size, height: size }]}>
@@ -32,7 +73,8 @@ export function ProgressRing({ score, size = 214, strokeWidth = 10 }: Props) {
           stroke={RING_BG}
           strokeWidth={strokeWidth}
         />
-        <Circle
+        <AnimatedCircle
+          animatedProps={animatedProps}
           cx={size / 2}
           cy={size / 2}
           r={r}
@@ -41,14 +83,13 @@ export function ProgressRing({ score, size = 214, strokeWidth = 10 }: Props) {
           strokeWidth={strokeWidth}
           strokeLinecap="round"
           strokeDasharray={`${circumference}`}
-          strokeDashoffset={offset}
           rotation={-90}
           origin={`${size / 2}, ${size / 2}`}
         />
       </Svg>
       <View style={styles.scoreCore}>
         <View style={styles.scoreRow}>
-          <Text style={styles.scoreNumber}>{Math.round(pct)}</Text>
+          <Text style={styles.scoreNumber}>{displayInt}</Text>
           <Text style={styles.scorePercent}>%</Text>
         </View>
       </View>
