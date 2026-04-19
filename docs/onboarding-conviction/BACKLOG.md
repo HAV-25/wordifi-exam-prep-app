@@ -13,5 +13,5 @@ Execute top to bottom. One task at a time. Stop after each and wait for PO revie
 | [OB-06](tasks/OB-06-screens-02-03.md) | Screen 02 refactor (inline → lookup) + Screen 03 wiring | [x] |
 | [OB-07](tasks/OB-07-screens-04-05.md) | Screens 04 + 05 wiring — empathy + timeline | [x] |
 | [OB-08](tasks/OB-08-screens-06-07-11-13.md) | Screens 06, 07, 11, 13 wiring — readiness + hardest + minutes + learner-style | [x] |
-| [OB-09](tasks/OB-09-regression.md) | Regression pass — TC-011/012/013 + edge cases + all 8 screens | [ ] |
+| [OB-09](tasks/OB-09-regression.md) | Regression pass — TC-011/012/013 + edge cases + all 8 screens | [x] |
 | [OB-10](tasks/OB-10-visual-qa.md) | Visual QA against brief — dimensions, timing, colours on every screen | [ ] |
