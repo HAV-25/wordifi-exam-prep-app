@@ -45,6 +45,7 @@ function CustomTabBar({ state, navigation }: any) {
   const tabBarWidthRef = useRef(0);
 
   useEffect(() => {
+    if (activeIndex >= TAB_COUNT) return;
     Animated.timing(slideAnim, {
       toValue: activeIndex,
       duration: ANIM_DURATION,
@@ -110,19 +111,21 @@ function CustomTabBar({ state, navigation }: any) {
       style={[styles.tabBar, { paddingBottom: Math.max(insets.bottom, 8) }]}
       onLayout={handleTabBarLayout}
     >
-      {/* Sliding active indicator */}
-      <Animated.View
-        style={[
-          styles.activeIndicator,
-          {
-            width: `${100 / TAB_COUNT}%`,
-            transform: [{ translateX: indicatorTranslateX }],
-          },
-        ]}
-        pointerEvents="none"
-      >
-        <View style={styles.activeIndicatorPill} />
-      </Animated.View>
+      {/* Sliding active indicator — hidden when profile (non-tab) screen is active */}
+      {activeIndex < TAB_COUNT && (
+        <Animated.View
+          style={[
+            styles.activeIndicator,
+            {
+              width: `${100 / TAB_COUNT}%`,
+              transform: [{ translateX: indicatorTranslateX }],
+            },
+          ]}
+          pointerEvents="none"
+        >
+          <View style={styles.activeIndicatorPill} />
+        </Animated.View>
+      )}
 
       {/* Tab items */}
       {TAB_CONFIG.map((tab, index) => {

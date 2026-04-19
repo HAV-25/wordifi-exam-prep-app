@@ -67,6 +67,7 @@ export function GlowBorderCard({ children }: Props) {
         setDims({ w: width, h: height });
       }}
     >
+      {children}
       {dims !== null && (() => {
         const { w, h } = dims;
         const perim =
@@ -81,14 +82,7 @@ export function GlowBorderCard({ children }: Props) {
             style={{ position: 'absolute', top: 0, left: 0 }}
             pointerEvents="none"
           >
-            {/* faint always-on track */}
-            <Path
-              d={path}
-              fill="none"
-              stroke={TRACK_COLOR}
-              strokeWidth={1.5}
-            />
-            {/* travelling dot */}
+            <Path d={path} fill="none" stroke={TRACK_COLOR} strokeWidth={1.5} />
             <AnimatedPath
               animatedProps={animatedProps}
               d={path}
@@ -101,7 +95,7 @@ export function GlowBorderCard({ children }: Props) {
           </Svg>
         );
       })()}
-      {children}
+
     </View>
   );
 }

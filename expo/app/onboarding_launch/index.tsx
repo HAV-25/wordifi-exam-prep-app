@@ -3,9 +3,11 @@
  * Plays wordifi.mp4 full-screen, then auto-navigates to app-intro.
  */
 import React, { useRef } from 'react';
-import { StyleSheet, View } from 'react-native';
-import { router } from 'expo-router';
+import { Dimensions, StyleSheet, View } from 'react-native';
+import { Stack, router } from 'expo-router';
 import { Video, ResizeMode, type AVPlaybackStatus } from 'expo-av';
+
+const { width, height } = Dimensions.get('screen');
 
 export default function VideoSplashScreen() {
   const hasNavigated = useRef(false);
@@ -20,9 +22,10 @@ export default function VideoSplashScreen() {
 
   return (
     <View style={styles.root}>
+      <Stack.Screen options={{ headerShown: false }} />
       <Video
         source={require('../../assets/wordifi.mp4')}
-        style={StyleSheet.absoluteFill}
+        style={styles.video}
         resizeMode={ResizeMode.COVER}
         shouldPlay
         isLooping={false}
@@ -33,5 +36,14 @@ export default function VideoSplashScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#000000' },
+  root: {
+    flex: 1,
+    width,
+    height,
+    backgroundColor: '#000000',
+  },
+  video: {
+    width,
+    height,
+  },
 });

@@ -173,13 +173,18 @@ export default function HomeScreen() {
               <WordifiLogo variant="blue" height={28} />
             </View>
             <View style={s.headerRight}>
-              <View style={s.bellBtn}>
+              <Pressable
+                style={s.bellBtn}
+                onPress={() => router.push('/notifications' as never)}
+                hitSlop={8}
+                testID="home-bell"
+              >
                 <Bell
                   color={data.hasUnreadNotification ? BANANI.warning : BANANI.foreground}
                   size={20}
                 />
                 {data.hasUnreadNotification && <View style={s.notifDot} />}
-              </View>
+              </Pressable>
             </View>
           </View>
         </View>
@@ -244,17 +249,22 @@ export default function HomeScreen() {
           <View style={s.heroGlow1} />
           <View style={s.heroGlow2} />
 
-          {/* Top: label + countdown */}
+          {/* Top: label + countdown + arrow */}
           <View style={s.heroTop}>
             <View style={s.heroTitleWrap}>
               <Text style={s.heroLabel}>EXAM READINESS</Text>
             </View>
-            {data.daysToExam !== null ? (
-              <View style={s.heroCountdown}>
-                <Clock color={BANANI.primaryFg} size={14} />
-                <Text style={s.heroCountdownText}>{data.daysToExam} days left</Text>
+            <View style={s.heroTopRight}>
+              {data.daysToExam !== null ? (
+                <View style={s.heroCountdown}>
+                  <Clock color={BANANI.primaryFg} size={14} />
+                  <Text style={s.heroCountdownText}>{data.daysToExam} days left</Text>
+                </View>
+              ) : null}
+              <View style={s.heroArrow}>
+                <ArrowUpRight color="rgba(255,255,255,0.72)" size={16} />
               </View>
-            ) : null}
+            </View>
           </View>
 
           {/* Score ring */}
@@ -345,6 +355,7 @@ export default function HomeScreen() {
                     </View>
                     <View style={s.secRight}>
                       <Text style={s.questionCount}>{item.questionCount}q</Text>
+                      <Text style={s.accuracyPct}>{pct}%</Text>
                       {isLocked ? (
                         <View style={s.lockWrap}>
                           <Lock color="rgba(255,255,255,0.62)" size={14} />
@@ -374,9 +385,6 @@ export default function HomeScreen() {
                     Among {data.targetLevel} {data.examType} learners
                   </Text>
                 </View>
-              </View>
-              <View style={s.rankingArrow}>
-                <ArrowUpRight color={BANANI.primary} size={18} />
               </View>
             </View>
 
@@ -668,6 +676,19 @@ const s = StyleSheet.create({
   heroTitleWrap: {
     gap: 4,
   },
+  heroTopRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  heroArrow: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   heroLabel: {
     fontFamily: fontFamily.bodyBold,
     fontSize: 12,
@@ -858,6 +879,11 @@ const s = StyleSheet.create({
     fontFamily: fontFamily.bodyBold,
     fontSize: 13,
     color: 'rgba(255,255,255,0.82)',
+  },
+  accuracyPct: {
+    fontFamily: fontFamily.bodySemiBold,
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.55)',
   },
   lockWrap: {
     width: 18,
