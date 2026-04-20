@@ -106,6 +106,7 @@ function RootLayoutNav() {
         <Stack.Screen name="sprachbausteine-test" options={{ title: 'Sprachbausteine', headerShown: false }} />
         <Stack.Screen name="sprachbausteine-results" options={{ title: 'Sprachbausteine Results', headerShown: false }} />
         <Stack.Screen name="profile-setup" options={{ title: 'Profile Setup' }} />
+        <Stack.Screen name="notification-settings" options={{ title: 'Notifications' }} />
         <Stack.Screen name="leaderboard" options={{ headerShown: false }} />
         <Stack.Screen name="review-mistakes" options={{ headerShown: false }} />
         <Stack.Screen name="desktop-code" options={{ headerShown: false, presentation: 'modal' }} />

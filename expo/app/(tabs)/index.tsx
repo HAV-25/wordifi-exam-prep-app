@@ -27,6 +27,7 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { AvatarImage } from '@/components/AvatarImage';
 import { GlowBorderCard } from '@/components/GlowBorderCard';
 import { PaywallModal } from '@/components/PaywallModal';
 import { ReadinessBottomSheet } from '@/components/ReadinessBottomSheet';
@@ -167,7 +168,14 @@ export default function HomeScreen() {
               testID="home-profile-avatar"
               hitSlop={8}
             >
-              <Text style={s.avatarInitial}>{initial}</Text>
+              <AvatarImage
+                uri={profile?.avatar_url}
+                initial={initial}
+                size={44}
+                bgColor="rgba(43,112,239,0.12)"
+                textColor={BANANI.primary}
+                fontSize={16}
+              />
             </Pressable>
             <View style={s.brandWrap}>
               <WordifiLogo variant="blue" height={28} />
@@ -202,15 +210,17 @@ export default function HomeScreen() {
         {/* ── Upgrade / Daily Stream Banner ── */}
         {showUpgradeBanner ? (
           <View style={s.upgradeRow}>
-            <Pressable style={s.upgradeCard} onPress={() => setShowPaywall(true)}>
-              <View style={s.upgradeIcon}>
-                <Sparkles color={BANANI.accentFg} size={14} />
-              </View>
-              <Text style={s.upgradeCopy}>Unlock all sections & levels</Text>
-              <View style={s.upgradeArrow}>
-                <ArrowRight color={BANANI.muted} size={16} />
-              </View>
-            </Pressable>
+            <GlowBorderCard>
+              <Pressable style={s.upgradeCard} onPress={() => setShowPaywall(true)}>
+                <View style={s.upgradeIcon}>
+                  <Sparkles color={BANANI.accentFg} size={14} />
+                </View>
+                <Text style={s.upgradeCopy}>Unlock all sections & levels</Text>
+                <View style={s.upgradeArrow}>
+                  <ArrowRight color={BANANI.muted} size={16} />
+                </View>
+              </Pressable>
+            </GlowBorderCard>
           </View>
         ) : (
           <View style={s.upgradeRow}>

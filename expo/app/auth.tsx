@@ -19,6 +19,7 @@ import {
 
 import Colors from '@/constants/colors';
 import { colors, fontFamily } from '@/theme';
+import { GlowOrb } from '@/components/GlowOrb';
 import { WordifiLogo } from '@/components/WordifiLogo';
 import { resetPassword, signInWithEmail, signInWithGoogle, signUpWithEmail, updateTcAccepted } from '@/lib/authHelpers';
 import { tagPendingOnboardingForUser } from '@/lib/profileHelpers';
@@ -188,6 +189,8 @@ export default function AuthScreen() {
 
   return (
     <View style={styles.screen}>
+      {/* Yellow glow — top-right, clipped by overflow:hidden on screen */}
+      <GlowOrb size={420} top={-170} right={-160} />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.flex}>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           <View style={styles.hero}>
@@ -430,7 +433,7 @@ export default function AuthScreen() {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  screen: { flex: 1, backgroundColor: '#F8FAFF' },
+  screen: { flex: 1, backgroundColor: '#F8FAFF', overflow: 'hidden' },
   content: {
     flexGrow: 1,
     justifyContent: 'center',

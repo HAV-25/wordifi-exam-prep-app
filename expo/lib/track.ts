@@ -16,7 +16,8 @@ export type EventKey =
   | 'trial_started'
   | 'subscription_renewed'
   | 'subscription_cancelled'
-  | 'app_opened';
+  | 'app_opened'
+  | 'notification_preferences_updated';
 
 export function track(event: EventKey, props?: PostHogEventProperties): void {
   try {

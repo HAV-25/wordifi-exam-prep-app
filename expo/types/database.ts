@@ -119,6 +119,7 @@ export type UserProfile = {
   onboarding_completed_at: string | null;
   walkthrough_completed: boolean;
   walkthrough_completed_at: string | null;
+  avatar_url: string | null;
 };
 
 export type LeaderboardEntry = {

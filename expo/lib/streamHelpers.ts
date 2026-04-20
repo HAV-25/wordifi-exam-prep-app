@@ -41,7 +41,7 @@ export async function fetchSectionAccuracy(userId: string): Promise<SectionAccur
 
     if (error || !data || data.length === 0) {
       console.log('fetchSectionAccuracy no history or error', error);
-      return { horenAccuracy: 0.5, lesenAccuracy: 0.5, hasHistory: false };
+      return { horenAccuracy: 0, lesenAccuracy: 0, hasHistory: false };
     }
 
     const rows = data as unknown as AnswerRow[];
@@ -52,7 +52,7 @@ export async function fetchSectionAccuracy(userId: string): Promise<SectionAccur
       .in('id', questionIds);
 
     if (qError || !questions) {
-      return { horenAccuracy: 0.5, lesenAccuracy: 0.5, hasHistory: false };
+      return { horenAccuracy: 0, lesenAccuracy: 0, hasHistory: false };
     }
 
     const qRows = questions as unknown as QuestionSectionRow[];
@@ -77,13 +77,13 @@ export async function fetchSectionAccuracy(userId: string): Promise<SectionAccur
       }
     }
 
-    const horenAccuracy = horenTotal > 0 ? horenCorrect / horenTotal : 0.5;
-    const lesenAccuracy = lesenTotal > 0 ? lesenCorrect / lesenTotal : 0.5;
+    const horenAccuracy = horenTotal > 0 ? horenCorrect / horenTotal : 0;
+    const lesenAccuracy = lesenTotal > 0 ? lesenCorrect / lesenTotal : 0;
 
     return { horenAccuracy, lesenAccuracy, hasHistory: horenTotal > 0 || lesenTotal > 0 };
   } catch (err) {
     console.log('fetchSectionAccuracy error', err);
-    return { horenAccuracy: 0.5, lesenAccuracy: 0.5, hasHistory: false };
+    return { horenAccuracy: 0, lesenAccuracy: 0, hasHistory: false };
   }
 }
 

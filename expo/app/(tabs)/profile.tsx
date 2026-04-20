@@ -1,7 +1,9 @@
 import * as Clipboard from 'expo-clipboard';
+import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import {
   Calendar,
+  Camera,
   ChevronRight,
   Clock,
   Copy,
@@ -9,9 +11,11 @@ import {
   FileText,
   Flame,
   Gift,
+  Image as ImageIcon,
   LogOut,
   Pencil,
   Star,
+  Trash2,
   Trophy,
   X,
 } from 'lucide-react-native';
@@ -30,6 +34,8 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
+
+import { AvatarImage } from '@/components/AvatarImage';
 
 import Colors from '@/constants/colors';
 import { colors, spacing } from '@/theme';
@@ -145,6 +151,10 @@ export default function ProfileScreen() {
   const { refreshAccess } = useAccess();
   const { leaderboardPercentile } = useHomeData();
 
+  // Avatar edit state
+  const [avatarSheetVisible, setAvatarSheetVisible] = useState(false);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+
   // Player identity edit sheet state
   const [editSheetVisible, setEditSheetVisible] = useState(false);
   const [editFirstName, setEditFirstName] = useState('');
@@ -193,6 +203,98 @@ export default function ProfileScreen() {
   const certLabel = [profile?.exam_type?.toUpperCase(), profile?.target_level]
     .filter(Boolean)
     .join(' · ') || null;
+
+  // ── Avatar helpers ───────────────────────────────────────────────────────
+
+  const uploadAvatar = useCallback(async (imageUri: string) => {
+    if (!user?.id) return;
+    setAvatarUploading(true);
+    try {
+      const ext = imageUri.split('.').pop()?.toLowerCase() ?? 'jpg';
+      const mime = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
+      const filename = `${user.id}/avatar.${ext}`;
+
+      // Fetch the local image as a Blob
+      const response = await fetch(imageUri);
+      const blob = await response.blob();
+
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filename, blob, { contentType: mime, upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      // Build public URL
+      const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(filename);
+      const publicUrl = `${urlData.publicUrl}?t=${Date.now()}`;
+
+      // Persist to user_profiles
+      const { error: dbError } = await supabase
+        .from('user_profiles')
+        .update({ avatar_url: publicUrl, updated_at: new Date().toISOString() } as never)
+        .eq('id', user.id);
+
+      if (dbError) throw dbError;
+
+      await refreshProfile();
+    } catch (err) {
+      console.error('[Avatar] upload failed', err);
+      Alert.alert('Upload failed', 'Could not save your photo. Please try again.');
+    } finally {
+      setAvatarUploading(false);
+      setAvatarSheetVisible(false);
+    }
+  }, [user?.id, refreshProfile]);
+
+  const handlePickFromLibrary = useCallback(async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission needed', 'Please allow access to your photo library in Settings.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets[0]) {
+      await uploadAvatar(result.assets[0].uri);
+    }
+  }, [uploadAvatar]);
+
+  const handleTakePhoto = useCallback(async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission needed', 'Please allow camera access in Settings.');
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets[0]) {
+      await uploadAvatar(result.assets[0].uri);
+    }
+  }, [uploadAvatar]);
+
+  const handleRemoveAvatar = useCallback(async () => {
+    if (!user?.id) return;
+    setAvatarUploading(true);
+    try {
+      await supabase
+        .from('user_profiles')
+        .update({ avatar_url: null, updated_at: new Date().toISOString() } as never)
+        .eq('id', user.id);
+      await refreshProfile();
+    } catch {
+      Alert.alert('Error', 'Could not remove your photo. Please try again.');
+    } finally {
+      setAvatarUploading(false);
+      setAvatarSheetVisible(false);
+    }
+  }, [user?.id, refreshProfile]);
 
   // Open edit sheet and pre-fill
   const openEditSheet = useCallback(() => {
@@ -271,9 +373,25 @@ export default function ProfileScreen() {
 
         {/* ── Identity block ─────────────────────────────────────────── */}
         <View style={styles.identityBlock}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{avatarLetter}</Text>
-          </View>
+          <Pressable
+            onPress={() => setAvatarSheetVisible(true)}
+            accessibilityLabel="Edit profile photo"
+            accessibilityRole="button"
+            style={styles.avatarWrap}
+          >
+            <AvatarImage
+              uri={profile?.avatar_url}
+              initial={avatarLetter}
+              size={88}
+              bgColor={Colors.primary}
+              textColor="#FFFFFF"
+              fontSize={36}
+            />
+            {/* Camera badge */}
+            <View style={styles.cameraBadge}>
+              <Camera size={14} color="#FFFFFF" />
+            </View>
+          </Pressable>
 
           {/* Name + pen */}
           <Pressable
@@ -368,11 +486,18 @@ export default function ProfileScreen() {
 
           <InfoRow
             label="Exam date"
-            showDivider={false}
             onPress={() => router.push('/profile-setup' as never)}
           >
             <Text style={styles.rowValue}>{formatLong(profile?.exam_date)}</Text>
             <Calendar size={14} color={Colors.textMuted} />
+          </InfoRow>
+
+          <InfoRow
+            label="Notifications"
+            showDivider={false}
+            onPress={() => router.push('/notification-settings' as never)}
+          >
+            <ChevronRight size={14} color={Colors.textMuted} />
           </InfoRow>
         </View>
 
@@ -448,6 +573,80 @@ export default function ProfileScreen() {
           )}
         </View>
       </ScrollView>
+
+      {/* ── Avatar Edit Sheet ───────────────────────────────────────── */}
+      <Modal
+        visible={avatarSheetVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setAvatarSheetVisible(false)}
+      >
+        <View style={styles.modalOuter}>
+          <Pressable
+            style={styles.modalBackdrop}
+            onPress={() => setAvatarSheetVisible(false)}
+          />
+          <View style={[styles.avatarSheet, { paddingBottom: insets.bottom + 24 }]}>
+          <View style={styles.sheetHandle} />
+          <View style={styles.sheetHeader}>
+            <Text style={styles.sheetTitle}>Profile photo</Text>
+            <Pressable
+              onPress={() => setAvatarSheetVisible(false)}
+              hitSlop={8}
+              style={styles.sheetClose}
+              accessibilityLabel="Close"
+            >
+              <X size={20} color={Colors.textMuted} />
+            </Pressable>
+          </View>
+
+          <Pressable
+            style={[styles.avatarOption, avatarUploading && { opacity: 0.5 }]}
+            onPress={handleTakePhoto}
+            disabled={avatarUploading}
+            accessibilityRole="button"
+          >
+            <View style={styles.avatarOptionIcon}>
+              <Camera size={20} color={Colors.primary} />
+            </View>
+            <Text style={styles.avatarOptionText}>Take a photo</Text>
+          </Pressable>
+
+          <View style={styles.rowDivider} />
+
+          <Pressable
+            style={[styles.avatarOption, avatarUploading && { opacity: 0.5 }]}
+            onPress={handlePickFromLibrary}
+            disabled={avatarUploading}
+            accessibilityRole="button"
+          >
+            <View style={styles.avatarOptionIcon}>
+              <ImageIcon size={20} color={Colors.primary} />
+            </View>
+            <Text style={styles.avatarOptionText}>Choose from library</Text>
+          </Pressable>
+
+          {profile?.avatar_url ? (
+            <>
+              <View style={styles.rowDivider} />
+              <Pressable
+                style={[styles.avatarOption, avatarUploading && { opacity: 0.5 }]}
+                onPress={handleRemoveAvatar}
+                disabled={avatarUploading}
+                accessibilityRole="button"
+              >
+                <View style={styles.avatarOptionIcon}>
+                  <Trash2 size={20} color="#EF4444" />
+                </View>
+                <Text style={[styles.avatarOptionText, { color: '#EF4444' }]}>
+                  {avatarUploading ? 'Removing…' : 'Remove photo'}
+                </Text>
+              </Pressable>
+            </>
+          ) : null}
+          </View>
+        </View>
+      </Modal>
 
       {/* ── Player Identity Edit Sheet ──────────────────────────────── */}
       <Modal
@@ -578,13 +777,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: CARD_MARGIN_H,
     paddingBottom: 16,
   },
-  avatar: {
+  avatarWrap: {
     width: 88,
     height: 88,
-    borderRadius: 44,
-    backgroundColor: Colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
     marginBottom: 16,
     shadowColor: Colors.primary,
     shadowOffset: { width: 0, height: 8 },
@@ -592,11 +787,18 @@ const styles = StyleSheet.create({
     shadowRadius: 24,
     elevation: 6,
   },
-  avatarText: {
-    fontFamily: 'Outfit_800ExtraBold',
-    fontSize: 36,
-    color: '#FFFFFF',
-    lineHeight: 44,
+  cameraBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: Colors.background,
   },
   nameRow: {
     flexDirection: 'row',
@@ -836,6 +1038,40 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.15)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+
+  // Avatar sheet
+  avatarSheet: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 24,
+    paddingTop: 12,
+    shadowColor: '#374151',
+    shadowOffset: { width: 0, height: -6 },
+    shadowOpacity: 0.08,
+    shadowRadius: 24,
+    elevation: 12,
+  },
+  avatarOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    paddingVertical: 20,
+  },
+  avatarOptionIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#ECF2FE',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarOptionText: {
+    fontFamily: 'NunitoSans_600SemiBold',
+    fontSize: 16,
+    color: Colors.textBody,
+    flex: 1,
   },
 
   // Edit sheet modal

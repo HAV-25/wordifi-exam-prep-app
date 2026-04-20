@@ -33,12 +33,15 @@ export async function ensureUserProfile(user: User): Promise<UserProfile> {
     user.user_metadata?.name ??
     user.email?.split('@')[0] ??
     'User';
+  const googlePicture: string | null =
+    (user.user_metadata?.picture as string | undefined) ?? null;
 
   const { data: inserted, error: insertError } = await supabase
     .from('user_profiles')
     .insert({
       id: user.id,
       player_name: playerName,
+      avatar_url: googlePicture,
       subscription_tier: 'free_trial',
       trial_active: true,
       trial_expires_at: trialExpiresAt,

@@ -15,7 +15,7 @@ const DOT_LENGTH   = 5;
 const BORDER_COLOR = '#2B70EF';
 const TRACK_COLOR  = 'rgba(43,112,239,0.10)';
 const BORDER_R     = 18;
-const DURATION     = 4800;
+const DURATION     = 30000;
 
 /** SVG path that traces a rounded rectangle border, inset by 1.5px so the stroke is fully visible. */
 function rrPath(w: number, h: number, r: number): string {

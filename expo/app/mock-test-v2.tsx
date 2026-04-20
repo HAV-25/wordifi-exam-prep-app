@@ -228,17 +228,33 @@ export default function MockTestV2Screen() {
           text: 'Save & exit',
           style: 'destructive',
           onPress: async () => {
-            if (mockTestId && phase.type === 'section') {
-              await saveMockV2State(
-                mockTestId,
-                {
-                  level,
-                  phaseSectionIndex: phase.sectionIndex,
-                  results: results as SavedSectionResult[],
-                  startedAt: sessionStartedAtRef.current,
-                },
-                blueprint[phase.sectionIndex]?.section ?? 'horen'
-              );
+            if (mockTestId) {
+              if (phase.type === 'section') {
+                // Mid-section pause: resume at the same section
+                await saveMockV2State(
+                  mockTestId,
+                  {
+                    level,
+                    phaseSectionIndex: phase.sectionIndex,
+                    results: results as SavedSectionResult[],
+                    startedAt: sessionStartedAtRef.current,
+                  },
+                  blueprint[phase.sectionIndex]?.section ?? 'horen'
+                );
+              } else if (phase.type === 'transition') {
+                // Transition screen: section already completed — resume at NEXT section
+                const nextIndex = phase.fromSectionIndex + 1;
+                await saveMockV2State(
+                  mockTestId,
+                  {
+                    level,
+                    phaseSectionIndex: nextIndex,
+                    results: results as SavedSectionResult[],
+                    startedAt: sessionStartedAtRef.current,
+                  },
+                  blueprint[nextIndex]?.section ?? 'completed'
+                );
+              }
             }
             router.back();
           },
@@ -358,16 +374,55 @@ function SectionRouter({
       section.teils.forEach((teil, ti) => {
         const teilPool = all.filter((q) => q.teil === teil);
         const target = section.questionsPerTeil?.[ti] ?? teilPool.length;
-        // Group by source_clip_id to preserve hybrid pairs
+        // Determine grouping key:
+        // speaker_match teils must all come from one podcast (source_test_id),
+        // so group by test rather than clip to prevent cross-podcast mixing.
+        // All other teils group by source_clip_id to preserve audio-pair integrity.
+        const isSpeakerMatch = teilPool.some((q) => q.question_type === 'speaker_match');
+        const groupKey = (q: AppQuestion): string =>
+          isSpeakerMatch
+            ? (q.source_test_id ?? q.source_clip_id ?? q.id)
+            : (q.source_clip_id ?? q.id);
+
         const clipGroups = new Map<string, AppQuestion[]>();
         for (const q of teilPool) {
-          const key = q.source_clip_id ?? q.id;
+          const key = groupKey(q);
           const group = clipGroups.get(key) ?? [];
           group.push(q);
           clipGroups.set(key, group);
         }
 
-        // Dedup-aware partitioning at clip-group level
+        // For speaker_match: prefer a single group that covers the full target.
+        // Pick the largest unseen group (or least-recently-seen if all seen).
+        if (isSpeakerMatch) {
+          const allGroups = Array.from(clipGroups.values());
+          const unseenComplete = allGroups
+            .filter((g) => g.length >= target && !g.some((q) => dedup.seen.has(q.id)))
+            .sort((a, b) => b.length - a.length);
+          const seenComplete = allGroups
+            .filter((g) => g.length >= target && g.some((q) => dedup.seen.has(q.id)))
+            .map((g) => ({
+              group: g,
+              age: g.reduce((acc, q) => {
+                const ts = dedup.seenAt.get(q.id) ?? '';
+                return ts > acc ? ts : acc;
+              }, ''),
+            }))
+            .sort((a, b) => a.age.localeCompare(b.age));
+          const candidate =
+            unseenComplete[0] ??
+            seenComplete[0]?.group ??
+            // fallback: largest group
+            allGroups.sort((a, b) => b.length - a.length)[0] ??
+            [];
+          const trimmed = candidate
+            .slice(0, target)
+            .sort((a, b) => (a.question_number ?? 0) - (b.question_number ?? 0));
+          picked.push(...trimmed);
+          return; // skip generic loop below
+        }
+
+        // Dedup-aware partitioning at clip-group level (non-speaker_match teils)
         const unseenGroups: AppQuestion[][] = [];
         const seenGroupsWithAge: Array<{ group: AppQuestion[]; age: string }> = [];
         for (const g of clipGroups.values()) {
