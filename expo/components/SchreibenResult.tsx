@@ -70,12 +70,6 @@ export function SchreibenResult({ assessment, taskType, level, teil }: Schreiben
       {taskType !== 'form_fill' && assessment.language_feedback ? (
         <LanguageFeedbackCard feedback={assessment.language_feedback} />
       ) : null}
-
-      {assessment.encouragement ? (
-        <View style={[styles.encouragementCard, shadows.card]}>
-          <Text style={styles.encouragementText}>💬 "{assessment.encouragement}"</Text>
-        </View>
-      ) : null}
     </View>
   );
 }
@@ -580,17 +574,6 @@ const styles = StyleSheet.create({
   feedbackDivider: {
     height: 0.5,
     backgroundColor: colors.border,
-  },
-  encouragementCard: {
-    backgroundColor: colors.white,
-    borderRadius: radius.lg,
-    padding: spacing.lg,
-  },
-  encouragementText: {
-    fontSize: fontSize.bodyMd,
-    color: colors.text,
-    fontStyle: 'italic',
-    lineHeight: fontSize.bodyMd * 1.6,
   },
   shareBtn: {
     flexDirection: 'row',

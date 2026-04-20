@@ -265,13 +265,19 @@ export default function SchreibenTestScreen() {
     } catch (err) {
       clearTimeout(timeoutId);
       console.log('SchreibenTest assessSchreiben error', err);
+      const isLangError =
+        err instanceof Error &&
+        (err as Error & { isLanguageError?: boolean }).isLanguageError === true;
       setQuestionStates((prev) => ({
         ...prev,
         [currentIndex]: {
-          isSubmitted: true,
+          // Language errors leave the question editable so the user can fix their text
+          isSubmitted: isLangError ? false : true,
           isLoading: false,
           assessment: null,
-          error: 'Bewertung nicht verfügbar. Bitte versuche es später.',
+          error: isLangError
+            ? (err as Error).message
+            : 'Bewertung nicht verfügbar. Bitte versuche es später.',
           isLoadingCached: false,
         },
       }));
@@ -413,9 +419,6 @@ export default function SchreibenTestScreen() {
                   <Text style={styles.summaryItemTitle}>Frage {idx + 1}</Text>
                   <Text style={styles.summaryItemScore}>{a.overall_score}/{a.max_score}</Text>
                 </View>
-                {a.encouragement ? (
-                  <Text style={styles.summaryItemEncouragement}>{a.encouragement}</Text>
-                ) : null}
               </View>
             );
           })}
@@ -803,11 +806,5 @@ const styles = StyleSheet.create({
     fontSize: fontSize.bodyMd,
     fontWeight: '800' as const,
     color: colors.navy,
-  },
-  summaryItemEncouragement: {
-    fontSize: fontSize.bodySm,
-    color: colors.muted,
-    fontStyle: 'italic',
-    paddingLeft: 30,
   },
 });

@@ -1,4 +1,5 @@
 import * as Clipboard from 'expo-clipboard';
+import * as FileSystem from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import {
@@ -211,21 +212,35 @@ export default function ProfileScreen() {
     if (!user?.id) return;
     setAvatarUploading(true);
     try {
-      const ext = imageUri.split('.').pop()?.toLowerCase() ?? 'jpg';
+      // Strip query params before inspecting extension
+      const rawExt = (imageUri.split('.').pop() ?? '').split('?')[0].toLowerCase();
+      const ext = ['jpg', 'jpeg', 'png', 'webp'].includes(rawExt) ? rawExt : 'jpg';
       const mime = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
       const filename = `${user.id}/avatar.${ext}`;
 
-      // Fetch the local image as a Blob
-      const response = await fetch(imageUri);
-      const blob = await response.blob();
+      // Read file as base64 via expo-file-system — works reliably on iOS + Android.
+      // React Native's Blob polyfill can fail silently with Supabase storage.
+      const base64 = await FileSystem.readAsStringAsync(imageUri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+
+      // Decode base64 → Uint8Array so Supabase receives raw bytes
+      const binaryString = atob(base64);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
 
       const { error: uploadError } = await supabase.storage
         .from('avatars')
-        .upload(filename, blob, { contentType: mime, upsert: true });
+        .upload(filename, bytes, { contentType: mime, upsert: true });
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error('[Avatar] storage upload error', uploadError);
+        throw uploadError;
+      }
 
-      // Build public URL
+      // Build public URL with cache-buster so the new photo loads immediately
       const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(filename);
       const publicUrl = `${urlData.publicUrl}?t=${Date.now()}`;
 
@@ -235,12 +250,16 @@ export default function ProfileScreen() {
         .update({ avatar_url: publicUrl, updated_at: new Date().toISOString() } as never)
         .eq('id', user.id);
 
-      if (dbError) throw dbError;
+      if (dbError) {
+        console.error('[Avatar] profile update error', dbError);
+        throw dbError;
+      }
 
       await refreshProfile();
     } catch (err) {
       console.error('[Avatar] upload failed', err);
-      Alert.alert('Upload failed', 'Could not save your photo. Please try again.');
+      const msg = err instanceof Error ? err.message : String(err);
+      Alert.alert('Upload failed', `Could not save your photo.\n\n${msg}`);
     } finally {
       setAvatarUploading(false);
       setAvatarSheetVisible(false);

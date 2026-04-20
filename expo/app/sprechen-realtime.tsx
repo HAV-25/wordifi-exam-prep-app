@@ -875,13 +875,6 @@ export default function SprechenRealtimeScreen() {
             </View>
           ) : (
             <>
-              {scores.encouragement_note ? (
-                <View style={[styles.feedbackCard, shadows.card]}>
-                  <Text style={styles.feedbackLabel}>Feedback</Text>
-                  <Text style={styles.feedbackText}>{scores.encouragement_note}</Text>
-                </View>
-              ) : null}
-
               {scores.improvement_tip ? (
                 <View style={[styles.tipCard, shadows.card]}>
                   <Text style={styles.tipLabel}>Improvement tip</Text>

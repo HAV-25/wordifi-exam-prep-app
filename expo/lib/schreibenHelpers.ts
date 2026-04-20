@@ -8,6 +8,69 @@ export const countWords = (text: string): number => {
   return text.trim().split(/\s+/).filter(w => w.length > 0).length;
 };
 
+// ─── Language Detection ────────────────────────────────────────────────────────
+// High-frequency English words that do NOT appear in standard German text.
+const EN_MARKERS = new Set([
+  'the','a','an','i','you','we','they','he','she','it',
+  'my','your','our','their','his','her','its',
+  'is','are','have','has','been','be','were','do','does','did',
+  'would','could','should','will','shall','may','might','must',
+  'not','but','so','because','however','therefore','although','though',
+  'this','that','these','those','which','who',
+  'of','by','with','from','for','on','about','into',
+  'and','or','if','when','where','how','what','why','then',
+  'very','also','just','more','some','all','each','both',
+  'am','get','got','like','know','think','want','said','said',
+]);
+
+// High-frequency German words that do NOT appear in standard English text.
+const DE_MARKERS = new Set([
+  'ich','du','er','wir','ihr',
+  'der','die','das','den','dem','des',
+  'ein','eine','einen','einem','eines','einer',
+  'ist','sind','war','waren','hat','haben','wird','werden',
+  'und','oder','aber','nicht','auch','schon','noch',
+  'mit','bei','von','nach','auf','aus',
+  'zu','an','am','im','zum','zur',
+  'mein','meine','sein','seine','ihre',
+  'dass','wenn','weil','als','wie',
+  'habe','bin','bist','hast',
+  'kann','muss','soll',
+  'bitte','danke','ja','nein',
+  'sich','dann','jetzt','hier','nur',
+  'diese','dieser','diesem','diesen',
+]);
+
+/**
+ * Returns 'en' only when there is strong, unambiguous evidence that the text is
+ * written in English. Defaults to 'de' to avoid false-positive blocks.
+ */
+export function detectAnswerLanguage(text: string): 'en' | 'de' {
+  // Tokenise: split on anything that isn't a letter (including German umlauts/ß)
+  const words = text
+    .toLowerCase()
+    .split(/[^a-z\u00e4\u00f6\u00fc\u00df]+/)
+    .filter(w => w.length > 1);
+
+  if (words.length < 5) return 'de'; // too short — don't risk a false block
+
+  let enCount = 0;
+  let deCount = 0;
+
+  for (const word of words) {
+    if (EN_MARKERS.has(word)) enCount++;
+    if (DE_MARKERS.has(word)) deCount++;
+  }
+
+  const total = enCount + deCount;
+  if (total < 3) return 'de'; // not enough signal — default safe
+
+  // Only flag English when the ratio is strongly skewed AND minimum 5 EN markers seen
+  const enRatio = enCount / total;
+  if (enRatio > 0.65 && enCount >= 5) return 'en';
+  return 'de';
+}
+
 export const assessSchreiben = async (
   question: AppQuestion,
   userText: string,
@@ -16,6 +79,16 @@ export const assessSchreiben = async (
   sessionId: string | null
 ): Promise<AssessmentResult> => {
   console.log('schreibenHelpers assessSchreiben', { questionId: question.id, taskType, wordCount });
+
+  // Language gate — block English answers before hitting the edge function
+  const detectedLang = detectAnswerLanguage(userText);
+  if (detectedLang === 'en') {
+    const err = new Error(
+      'Your answer is in English. This is a German writing exam — please write your response in German.'
+    );
+    (err as Error & { isLanguageError: boolean }).isLanguageError = true;
+    throw err;
+  }
 
   // Client-side cache check — skip Edge Function if already assessed
   try {
@@ -77,6 +150,7 @@ export const assessSchreiben = async (
     task_type: taskType,
     required_points: requiredPoints,
     options: taskType === 'form_fill' ? question.options : undefined,
+    user_answer_language: 'de', // always 'de' here — English blocked above
   };
 
   console.log('schreibenHelpers assessSchreiben request body', JSON.stringify(requestBody).slice(0, 300));
