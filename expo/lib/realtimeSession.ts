@@ -152,9 +152,9 @@ export async function scoreSprechenConversation(params: {
   const rubricToPct = (raw: unknown): number => {
     const n = typeof raw === 'number' ? raw : Number(raw);
     if (!Number.isFinite(n)) return 0;
-    // Heuristic: edge function uses 0–5 rubric. Anything ≤5 we treat as rubric
-    // and scale ×20. Anything >5 we assume is already a percentage.
-    return n <= 5 ? Math.round(n * 20) : Math.round(n);
+    // Keep scores on the 0–5 rubric scale (1 decimal place).
+    // If the edge function ever returns a 0–100 percentage (>5), convert back to 0–5.
+    return n <= 5 ? Math.round(n * 10) / 10 : Math.round((n / 20) * 10) / 10;
   };
 
   const flat = (data.scores ?? data) as Record<string, unknown>;
@@ -169,7 +169,7 @@ export async function scoreSprechenConversation(params: {
     task_completion:    flat.task_completion === true || flat.task_completion === 'true',
   };
 
-  track('section_completed', { section: 'Sprechen', cefr_level: params.level, score_pct: scores.overall, duration_sec: params.duration_seconds });
+  track('section_completed', { section: 'Sprechen', cefr_level: params.level, score_pct: Math.round(scores.overall * 20), duration_sec: params.duration_seconds });
 
   return scores;
 }
@@ -363,7 +363,7 @@ export class WebRTCRealtimeSession implements IRealtimeSession {
           type: 'server_vad',
           threshold: 0.5,
           prefix_padding_ms: 300,
-          silence_duration_ms: isMonologue ? 8000 : 700,
+          silence_duration_ms: isMonologue ? 8000 : 1500,
         },
       },
     });

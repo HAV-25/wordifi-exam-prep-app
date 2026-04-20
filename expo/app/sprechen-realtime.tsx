@@ -76,6 +76,8 @@ export default function SprechenRealtimeScreen() {
   const finalCountdownScaleAnim = useRef(new Animated.Value(0.5)).current;
   const finalCountdownOpacityAnim = useRef(new Animated.Value(0)).current;
   const finalCountdownTriggeredRef = useRef<boolean>(false);
+  const [showSilenceNudge, setShowSilenceNudge] = useState<boolean>(false);
+  const silenceNudgeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const sessionRef = useRef<IRealtimeSession | null>(null);
   const sessionIdRef = useRef<string | null>(null);
@@ -244,6 +246,10 @@ export default function SprechenRealtimeScreen() {
           if (!isMountedRef.current) return;
           setTranscriptEntries(prev => [...prev, entry]);
           setCurrentAiText('');
+          if (entry.role === 'user') {
+            setShowSilenceNudge(false);
+            if (silenceNudgeTimerRef.current) clearTimeout(silenceNudgeTimerRef.current);
+          }
         },
         onAiSpeakingText: (delta) => {
           if (isMountedRef.current) setCurrentAiText(prev => prev + delta);
@@ -391,6 +397,26 @@ export default function SprechenRealtimeScreen() {
     const t = setTimeout(() => setFinalCountdown((v) => (v !== null && v > 0 ? v - 1 : null)), 1000);
     return () => clearTimeout(t);
   }, [finalCountdown, finalCountdownScaleAnim, finalCountdownOpacityAnim]);
+
+  // ── 7-second silence nudge ─────────────────────────────────────────────────
+  // Show "Bitte sprechen Sie jetzt" if user hasn't spoken for 7s while it's their turn.
+  useEffect(() => {
+    if (convState === 'listening') {
+      silenceNudgeTimerRef.current = setTimeout(() => setShowSilenceNudge(true), 7000);
+    } else {
+      setShowSilenceNudge(false);
+      if (silenceNudgeTimerRef.current) {
+        clearTimeout(silenceNudgeTimerRef.current);
+        silenceNudgeTimerRef.current = null;
+      }
+    }
+    return () => {
+      if (silenceNudgeTimerRef.current) {
+        clearTimeout(silenceNudgeTimerRef.current);
+        silenceNudgeTimerRef.current = null;
+      }
+    };
+  }, [convState]);
 
   const handleNativeRecord = useCallback(async () => {
     const s = sessionRef.current;
@@ -628,6 +654,15 @@ export default function SprechenRealtimeScreen() {
         <View style={styles.convHeader}>
           <Text style={styles.convTitle}>{level} Sprechen · Teil {teil}</Text>
           <Text style={styles.convSubtitle}>{question?.question_text?.slice(0, 60) ?? ''}</Text>
+          <View style={styles.timerProgressTrack}>
+            <View style={[
+              styles.timerProgressFill,
+              {
+                width: `${Math.min(100, (elapsedSeconds / (isMonologue ? recordingTimeLimitSec : MAX_DURATION)) * 100)}%` as `${number}%`,
+                backgroundColor: isTimeLow ? colors.red : colors.blue,
+              },
+            ]} />
+          </View>
         </View>
 
         <View style={styles.statusBar}>
@@ -677,6 +712,12 @@ export default function SprechenRealtimeScreen() {
             </View>
           ) : null}
         </ScrollView>
+
+        {showSilenceNudge && (
+          <View style={styles.silenceNudge} pointerEvents="none">
+            <Text style={styles.silenceNudgeText}>🎙 Bitte sprechen Sie jetzt</Text>
+          </View>
+        )}
 
         <View style={[styles.convFooter, { paddingBottom: insets.bottom + spacing.lg }]}>
           {!isWebRTC && (
@@ -765,6 +806,8 @@ export default function SprechenRealtimeScreen() {
     const vocabularyNum = Number(s.vocabulary_score ?? s.vocabulary ?? 0);
     const taskCompletion: string = s.task_completion ?? '';
     const starCount = Math.max(0, Math.min(5, Math.round(overallNum)));
+    const hasUserSpeech = transcriptEntries.some(e => e.role === 'user');
+    const noSpeechDetected = !hasUserSpeech && overallNum <= 1;
 
     return (
       <View style={styles.screen}>
@@ -824,19 +867,30 @@ export default function SprechenRealtimeScreen() {
             </View>
           ) : null}
 
-          {scores.encouragement_note ? (
+          {noSpeechDetected ? (
             <View style={[styles.feedbackCard, shadows.card]}>
-              <Text style={styles.feedbackLabel}>Feedback</Text>
-              <Text style={styles.feedbackText}>{scores.encouragement_note}</Text>
+              <Text style={styles.feedbackLabel}>Hinweis</Text>
+              <Text style={styles.feedbackText}>
+                Es wurde keine Sprache erkannt. Bitte überprüfen Sie Ihr Mikrofon und versuchen Sie es erneut.
+              </Text>
             </View>
-          ) : null}
+          ) : (
+            <>
+              {scores.encouragement_note ? (
+                <View style={[styles.feedbackCard, shadows.card]}>
+                  <Text style={styles.feedbackLabel}>Feedback</Text>
+                  <Text style={styles.feedbackText}>{scores.encouragement_note}</Text>
+                </View>
+              ) : null}
 
-          {scores.improvement_tip ? (
-            <View style={[styles.tipCard, shadows.card]}>
-              <Text style={styles.tipLabel}>Improvement tip</Text>
-              <Text style={styles.tipText}>{scores.improvement_tip}</Text>
-            </View>
-          ) : null}
+              {scores.improvement_tip ? (
+                <View style={[styles.tipCard, shadows.card]}>
+                  <Text style={styles.tipLabel}>Improvement tip</Text>
+                  <Text style={styles.tipText}>{scores.improvement_tip}</Text>
+                </View>
+              ) : null}
+            </>
+          )}
 
           <Text style={styles.durationNote}>
             Conversation duration: {formatTime(elapsedSeconds)}
@@ -1382,5 +1436,30 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.65)',
     textAlign: 'center',
     paddingHorizontal: 32,
+  },
+  timerProgressTrack: {
+    height: 4,
+    backgroundColor: 'rgba(0,0,0,0.08)',
+    borderRadius: 2,
+    overflow: 'hidden',
+    marginTop: spacing.sm,
+  },
+  timerProgressFill: {
+    height: 4,
+    borderRadius: 2,
+  },
+  silenceNudge: {
+    marginHorizontal: spacing.xl,
+    marginBottom: spacing.sm,
+    backgroundColor: colors.blue,
+    borderRadius: radius.md,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    alignItems: 'center',
+  },
+  silenceNudgeText: {
+    color: colors.white,
+    fontSize: fontSize.bodySm,
+    fontWeight: '600' as const,
   },
 });

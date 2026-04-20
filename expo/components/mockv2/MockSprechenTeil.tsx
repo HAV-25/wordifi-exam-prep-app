@@ -95,6 +95,9 @@ export function MockSprechenTeil({
   const [isNativeRecording, setIsNativeRecording] = useState<boolean>(false);
   const [finalCountdown, setFinalCountdown] = useState<number | null>(null);
 
+  const [showSilenceNudge, setShowSilenceNudge] = useState<boolean>(false);
+  const silenceNudgeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const sessionRef = useRef<IRealtimeSession | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startTimeRef = useRef<number>(0);
@@ -226,6 +229,10 @@ export function MockSprechenTeil({
           if (!isMountedRef.current) return;
           setTranscriptEntries((prev) => [...prev, entry]);
           setCurrentAiText('');
+          if (entry.role === 'user') {
+            setShowSilenceNudge(false);
+            if (silenceNudgeTimerRef.current) clearTimeout(silenceNudgeTimerRef.current);
+          }
         },
         onAiSpeakingText: (delta) => {
           if (isMountedRef.current) setCurrentAiText((prev) => prev + delta);
@@ -293,6 +300,25 @@ export function MockSprechenTeil({
   useEffect(() => {
     handleEndRef.current = handleEndConversation;
   }, [handleEndConversation]);
+
+  // ── 7-second silence nudge ───────────────────────────────────────────────
+  useEffect(() => {
+    if (convState === 'listening') {
+      silenceNudgeTimerRef.current = setTimeout(() => setShowSilenceNudge(true), 7000);
+    } else {
+      setShowSilenceNudge(false);
+      if (silenceNudgeTimerRef.current) {
+        clearTimeout(silenceNudgeTimerRef.current);
+        silenceNudgeTimerRef.current = null;
+      }
+    }
+    return () => {
+      if (silenceNudgeTimerRef.current) {
+        clearTimeout(silenceNudgeTimerRef.current);
+        silenceNudgeTimerRef.current = null;
+      }
+    };
+  }, [convState]);
 
   // ── Native push-to-talk (when WebRTC unavailable) ───────────────────────
   const handleNativeRecord = useCallback(async () => {
@@ -458,6 +484,15 @@ export function MockSprechenTeil({
           <TimerIcon color={isLowTime ? '#EF4444' : B.muted} size={14} />
           <Text style={[styles.timerText, isLowTime && styles.timerTextUrgent]}>{formatTime(remainingSeconds)}</Text>
         </View>
+        <View style={styles.timerProgressTrack}>
+          <View style={[
+            styles.timerProgressFill,
+            {
+              width: `${Math.min(100, (elapsedSeconds / recordingTimeLimitSec) * 100)}%` as `${number}%`,
+              backgroundColor: isLowTime ? '#EF4444' : B.primary,
+            },
+          ]} />
+        </View>
       </View>
 
       {/* Topic + transcript. Prefer stimulus_text (the actual topic) when present. */}
@@ -482,6 +517,12 @@ export function MockSprechenTeil({
           </View>
         ) : null}
       </ScrollView>
+
+      {showSilenceNudge && (
+        <View style={styles.silenceNudge} pointerEvents="none">
+          <Text style={styles.silenceNudgeText}>🎙 Bitte sprechen Sie jetzt</Text>
+        </View>
+      )}
 
       {/* Footer */}
       <View style={styles.convFooter}>
@@ -641,4 +682,29 @@ const styles = StyleSheet.create({
   },
   countdownNumber: { fontSize: 56, fontWeight: '800' as const, color: '#EF4444' },
   countdownMessage: { fontSize: 16, fontWeight: '700' as const, color: '#fff', textAlign: 'center', paddingHorizontal: 32 },
+  timerProgressTrack: {
+    height: 4,
+    backgroundColor: 'rgba(0,0,0,0.08)',
+    borderRadius: 2,
+    overflow: 'hidden',
+    marginTop: 8,
+  },
+  timerProgressFill: {
+    height: 4,
+    borderRadius: 2,
+  },
+  silenceNudge: {
+    marginHorizontal: 16,
+    marginBottom: 8,
+    backgroundColor: B.primary,
+    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+  },
+  silenceNudgeText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600' as const,
+  },
 });
