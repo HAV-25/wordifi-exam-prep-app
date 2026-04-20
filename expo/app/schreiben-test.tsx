@@ -1,5 +1,5 @@
 import { Stack, router, useLocalSearchParams } from 'expo-router';
-import { PenLine, Share2, X } from 'lucide-react-native';
+import { ChevronLeft, PenLine, Share2 } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -18,12 +18,13 @@ import {
   View,
 } from 'react-native';
 
-import { AppHeader } from '@/components/AppHeader';
 import { CTAButton } from '@/components/CTAButton';
 import { EmptyState } from '@/components/EmptyState';
 import { SchreibenQuestion } from '@/components/SchreibenQuestion';
 import { SchreibenResult } from '@/components/SchreibenResult';
-import { colors, fontSize, radius, shadows, spacing } from '@/theme';
+import { B } from '@/theme/banani';
+import { fontFamily, fontSize } from '@/theme/typography';
+import { colors, radius, shadows, spacing } from '@/theme';
 import { assessSchreiben, fetchExistingSubmission } from '@/lib/schreibenHelpers';
 import { updateReadinessScore } from '@/lib/streamHelpers';
 import { supabase } from '@/lib/supabaseClient';
@@ -370,7 +371,6 @@ export default function SchreibenTestScreen() {
     return (
       <View style={[styles.screen, { paddingTop: insets.top }]}>
         <Stack.Screen options={{ headerShown: false }} />
-        <AppHeader />
         <View style={styles.emptyWrap}>
           <EmptyState
             title="No writing questions available"
@@ -391,7 +391,6 @@ export default function SchreibenTestScreen() {
     return (
       <View style={[styles.screen, { paddingTop: insets.top }]}>
         <Stack.Screen options={{ headerShown: false }} />
-        <AppHeader />
         <ScrollView contentContainerStyle={[styles.summaryContent, { paddingBottom: insets.bottom + CTA_BUTTON_HEIGHT + BOTTOM_CONTENT_BUFFER }]} showsVerticalScrollIndicator={false}>
           <View style={[styles.summaryHero, shadows.card]}>
             <View style={styles.summaryIconWrap}>
@@ -446,20 +445,18 @@ export default function SchreibenTestScreen() {
     >
       <Stack.Screen options={{ headerShown: false }} />
 
-      {/* Brand header */}
-      <AppHeader
-        rightElement={
-          <Pressable
-            accessibilityLabel="Close"
-            onPress={handleBack}
-            style={styles.closeBtn}
-            testID="schreiben-back-button"
-            hitSlop={8}
-          >
-            <X color="#94A3B8" size={20} />
-          </Pressable>
-        }
-      />
+      {/* Inline header — matches Banani Schreiben Test design */}
+      <View style={styles.topHeader}>
+        <Pressable
+          onPress={handleBack}
+          style={styles.backBtn}
+          testID="schreiben-back-button"
+          hitSlop={8}
+        >
+          <ChevronLeft size={20} color={B.muted} />
+          <Text style={styles.backBtnText}>Zurück</Text>
+        </Pressable>
+      </View>
 
       <View style={styles.headerCard}>
         <View style={styles.progressTrack}>
@@ -467,11 +464,11 @@ export default function SchreibenTestScreen() {
         </View>
         <View style={styles.headerRow}>
           <Text style={styles.counter}>
-            Question {Math.min(currentIndex + 1, questions.length)} of {questions.length}
+            Frage {Math.min(currentIndex + 1, questions.length)} von {questions.length}
           </Text>
           <View style={styles.metaRow}>
             <View style={styles.sectionPill}>
-              <PenLine color={colors.white} size={11} />
+              <PenLine color="#8B5CF6" size={13} />
               <Text style={styles.sectionPillText}>Schreiben</Text>
             </View>
             <Text style={styles.meta}>Teil {teil} · {level}</Text>
@@ -566,10 +563,10 @@ function PulsingCachedLoader() {
   return (
     <Animated.View style={{ opacity: pulseAnim, alignItems: 'center', gap: 8 }}>
       <Text style={{ fontSize: 32 }}>✍️</Text>
-      <Text style={{ fontSize: fontSize.bodyMd, color: colors.navy, fontWeight: '600' as const, textAlign: 'center' as const }}>
+      <Text style={{ fontSize: fontSize.bodyMd, color: B.foreground, fontFamily: fontFamily.bodySemiBold, textAlign: 'center' as const }}>
         Deine Antwort wird geladen…
       </Text>
-      <Text style={{ fontSize: 13, color: colors.muted, textAlign: 'center' as const }}>
+      <Text style={{ fontSize: 13, color: B.muted, fontFamily: fontFamily.bodyRegular, textAlign: 'center' as const }}>
         Das dauert nur einen Moment
       </Text>
     </Animated.View>
@@ -585,45 +582,45 @@ function getRetestDate(): string {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: colors.surface,
+    backgroundColor: B.background,
   },
   emptyWrap: {
     flex: 1,
     padding: spacing.xl,
     justifyContent: 'center',
   },
-  closeBtn: {
-    width: 44,
-    height: 44,
+  // Inline header
+  topHeader: {
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    paddingBottom: 8,
+  },
+  backBtn: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 4,
   },
-  headerBtn: {
-    minHeight: 40,
-    justifyContent: 'center',
-    paddingRight: spacing.md,
-  },
-  headerBtnText: {
-    color: colors.navy,
-    fontWeight: '700' as const,
-    fontSize: fontSize.bodyMd,
+  backBtnText: {
+    fontSize: 15,
+    color: B.muted,
+    fontFamily: fontFamily.bodyRegular,
   },
   headerCard: {
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.sm,
-    gap: spacing.sm,
+    paddingHorizontal: 24,
+    paddingTop: 4,
+    paddingBottom: 12,
+    gap: 12,
   },
   progressTrack: {
-    height: 8,
+    height: 4,
     borderRadius: 999,
-    backgroundColor: colors.ringTrack,
+    backgroundColor: B.border,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
     borderRadius: 999,
-    backgroundColor: colors.blue,
+    backgroundColor: B.primary,
   },
   headerRow: {
     flexDirection: 'row',
@@ -632,33 +629,33 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   counter: {
-    color: colors.navy,
-    fontWeight: '800' as const,
-    fontSize: fontSize.bodyMd,
+    fontSize: 16,
+    color: B.foreground,
+    fontFamily: fontFamily.bodySemiBold,
   },
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
+    gap: 8,
   },
   sectionPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: spacing.sm,
+    gap: 6,
+    paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 99,
-    backgroundColor: '#D84315',
+    borderRadius: 16,
+    backgroundColor: '#F3E8FF',
   },
   sectionPillText: {
-    color: colors.white,
-    fontSize: fontSize.micro,
-    fontWeight: '700' as const,
+    color: '#8B5CF6',
+    fontSize: 13,
+    fontFamily: fontFamily.bodySemiBold,
   },
   meta: {
-    color: colors.muted,
-    fontWeight: '600' as const,
-    fontSize: fontSize.bodySm,
+    color: B.muted,
+    fontSize: 14,
+    fontFamily: fontFamily.bodyRegular,
   },
   content: {
     padding: spacing.xl,
@@ -672,7 +669,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     padding: spacing.xl,
     gap: spacing.sm,
-    backgroundColor: colors.surface,
+    backgroundColor: B.background,
   },
   footerBtn: {
     marginHorizontal: 0,
