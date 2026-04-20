@@ -35,6 +35,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 
+import { AppHeader } from '@/components/AppHeader';
 import { AvatarImage } from '@/components/AvatarImage';
 
 import Colors from '@/constants/colors';
@@ -356,20 +357,24 @@ export default function ProfileScreen() {
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 32 }]}
-      >
-        {/* ── Header actions ─────────────────────────────────────────── */}
-        <View style={styles.headerActions}>
+      {/* Brand header */}
+      <AppHeader
+        rightElement={
           <Pressable
             onPress={handleSignOut}
             style={styles.logoutBtn}
             accessibilityLabel="Sign out"
+            hitSlop={8}
           >
-            <LogOut size={24} color={Colors.textMuted} />
+            <LogOut size={22} color={Colors.textMuted} />
           </Pressable>
-        </View>
+        }
+      />
+
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 32 }]}
+      >
 
         {/* ── Identity block ─────────────────────────────────────────── */}
         <View style={styles.identityBlock}>

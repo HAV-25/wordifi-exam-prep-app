@@ -18,6 +18,7 @@ import {
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 
+import { AppHeader } from '@/components/AppHeader';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import ConfettiBurst, { type ConfettiBurstRef } from '@/components/ConfettiBurst';
 import { QuestionCard } from '@/components/QuestionCard';
@@ -137,11 +138,22 @@ export default function ResultsScreen() {
   }, []);
 
   return (
-    <View ref={rootViewRef} style={styles.screen}>
+    <View ref={rootViewRef} style={[styles.screen, { paddingTop: insets.top }]}>
       {/* Confetti overlay — non-interactive, above all content */}
       <ConfettiBurst ref={confettiRef} />
 
-      <Stack.Screen options={{ title: 'Results', headerBackVisible: false }} />
+      <Stack.Screen options={{ headerShown: false }} />
+      <AppHeader rightElement={
+        <Pressable
+          ref={shareButtonRef}
+          accessibilityLabel="Share your result"
+          onPress={handleSharePress}
+          style={styles.shareIconBtn}
+          testID="share-result-button-header"
+        >
+          <Share2 size={22} color={Colors.accent} />
+        </Pressable>
+      } />
 
       <ScrollView
         contentContainerStyle={[
@@ -288,6 +300,7 @@ function AnimatedXpText({ value, style }: { value: Animated.AnimatedInterpolatio
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: Colors.background },
+  shareIconBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   content: { padding: 20, gap: 16 },
   heroCard: { borderRadius: 28, backgroundColor: Colors.primary, padding: 20, gap: 16, overflow: 'hidden' as const },
   heroMeta: { color: 'rgba(255,255,255,0.74)', fontWeight: '700' as const },

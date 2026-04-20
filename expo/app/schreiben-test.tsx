@@ -1,5 +1,5 @@
 import { Stack, router, useLocalSearchParams } from 'expo-router';
-import { PenLine, Share2 } from 'lucide-react-native';
+import { PenLine, Share2, X } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -18,6 +18,7 @@ import {
   View,
 } from 'react-native';
 
+import { AppHeader } from '@/components/AppHeader';
 import { CTAButton } from '@/components/CTAButton';
 import { EmptyState } from '@/components/EmptyState';
 import { SchreibenQuestion } from '@/components/SchreibenQuestion';
@@ -361,8 +362,9 @@ export default function SchreibenTestScreen() {
 
   if (questions.length === 0) {
     return (
-      <View style={styles.screen}>
-        <Stack.Screen options={{ title: 'Schreiben', headerShown: true }} />
+      <View style={[styles.screen, { paddingTop: insets.top }]}>
+        <Stack.Screen options={{ headerShown: false }} />
+        <AppHeader />
         <View style={styles.emptyWrap}>
           <EmptyState
             title="No writing questions available"
@@ -381,8 +383,9 @@ export default function SchreibenTestScreen() {
     const passedCount = Object.values(questionStates).filter((s) => s.assessment?.passed).length;
 
     return (
-      <View style={styles.screen}>
-        <Stack.Screen options={{ title: 'Results', headerBackVisible: false }} />
+      <View style={[styles.screen, { paddingTop: insets.top }]}>
+        <Stack.Screen options={{ headerShown: false }} />
+        <AppHeader />
         <ScrollView contentContainerStyle={[styles.summaryContent, { paddingBottom: insets.bottom + CTA_BUTTON_HEIGHT + BOTTOM_CONTENT_BUFFER }]} showsVerticalScrollIndicator={false}>
           <View style={[styles.summaryHero, shadows.card]}>
             <View style={styles.summaryIconWrap}>
@@ -434,24 +437,25 @@ export default function SchreibenTestScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={styles.screen}
+      style={[styles.screen, { paddingTop: insets.top }]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 24}
     >
-      <Stack.Screen
-        options={{
-          title: '',
-          headerLeft: () => (
-            <Pressable
-              accessibilityLabel="Back"
-              onPress={handleBack}
-              style={styles.headerBtn}
-              testID="schreiben-back-button"
-            >
-              <Text style={styles.headerBtnText}>Back</Text>
-            </Pressable>
-          ),
-        }}
+      <Stack.Screen options={{ headerShown: false }} />
+
+      {/* Brand header */}
+      <AppHeader
+        rightElement={
+          <Pressable
+            accessibilityLabel="Close"
+            onPress={handleBack}
+            style={styles.closeBtn}
+            testID="schreiben-back-button"
+            hitSlop={8}
+          >
+            <X color="#94A3B8" size={20} />
+          </Pressable>
+        }
       />
 
       <View style={styles.headerCard}>
@@ -583,6 +587,12 @@ const styles = StyleSheet.create({
   emptyWrap: {
     flex: 1,
     padding: spacing.xl,
+    justifyContent: 'center',
+  },
+  closeBtn: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
     justifyContent: 'center',
   },
   headerBtn: {

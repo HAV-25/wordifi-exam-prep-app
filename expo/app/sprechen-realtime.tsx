@@ -18,6 +18,7 @@ import {
   View,
 } from 'react-native';
 
+import { AppHeader } from '@/components/AppHeader';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { CTAButton } from '@/components/CTAButton';
 import { colors, fontSize, radius, shadows, spacing } from '@/theme';
@@ -531,8 +532,9 @@ export default function SprechenRealtimeScreen() {
 
   if (screenState === 'loading') {
     return (
-      <View style={styles.screen}>
-        <Stack.Screen options={{ title: 'Sprechen', headerShown: true }} />
+      <View style={[styles.screen, { paddingTop: insets.top }]}>
+        <Stack.Screen options={{ headerShown: false }} />
+        <AppHeader />
         <View style={styles.center}>
           <ActivityIndicator color={colors.blue} size="large" />
           <Text style={styles.loadingText}>Loading questions...</Text>
@@ -543,8 +545,9 @@ export default function SprechenRealtimeScreen() {
 
   if (screenState === 'error') {
     return (
-      <View style={styles.screen}>
-        <Stack.Screen options={{ title: 'Sprechen', headerShown: true }} />
+      <View style={[styles.screen, { paddingTop: insets.top }]}>
+        <Stack.Screen options={{ headerShown: false }} />
+        <AppHeader />
         <View style={styles.center}>
           <View style={styles.errorIcon}>
             <AlertCircle color={colors.red} size={40} />
@@ -564,13 +567,9 @@ export default function SprechenRealtimeScreen() {
 
   if (screenState === 'instruction') {
     return (
-      <View style={styles.screen}>
-        <Stack.Screen
-          options={{
-            title: `${level} Sprechen · Teil ${teil}`,
-            headerShown: true,
-          }}
-        />
+      <View style={[styles.screen, { paddingTop: insets.top }]}>
+        <Stack.Screen options={{ headerShown: false }} />
+        <AppHeader />
         <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + CTA_BUTTON_HEIGHT + BOTTOM_CONTENT_BUFFER }]} showsVerticalScrollIndicator={false}>
           <View style={styles.instructionHeader}>
             <View style={styles.sectionPill}>
@@ -622,8 +621,9 @@ export default function SprechenRealtimeScreen() {
 
   if (screenState === 'connecting') {
     return (
-      <View style={styles.screen}>
-        <Stack.Screen options={{ title: 'Verbinde...', headerShown: true }} />
+      <View style={[styles.screen, { paddingTop: insets.top }]}>
+        <Stack.Screen options={{ headerShown: false }} />
+        <AppHeader />
         <View style={styles.center}>
           <ActivityIndicator color={colors.blue} size="large" />
           <Text style={styles.loadingText}>Connecting AI partner...</Text>
@@ -642,14 +642,11 @@ export default function SprechenRealtimeScreen() {
     const isTimeLow = timeRemaining <= 30;
 
     return (
-      <View style={styles.screen}>
+      <View style={[styles.screen, { paddingTop: insets.top }]}>
         <Stack.Screen
-          options={{
-            title: '',
-            headerShown: true,
-            headerLeft: () => null,
-          }}
+          options={{ headerShown: false }}
         />
+        <AppHeader />
 
         <View style={styles.convHeader}>
           <Text style={styles.convTitle}>{level} Sprechen · Teil {teil}</Text>
@@ -787,8 +784,9 @@ export default function SprechenRealtimeScreen() {
 
   if (screenState === 'scoring') {
     return (
-      <View style={styles.screen}>
-        <Stack.Screen options={{ title: 'Assessment', headerShown: true, headerBackVisible: false }} />
+      <View style={[styles.screen, { paddingTop: insets.top }]}>
+        <Stack.Screen options={{ headerShown: false }} />
+        <AppHeader />
         <View style={styles.center}>
           <ActivityIndicator color={colors.blue} size="large" />
           <Text style={styles.loadingText}>Your answer is being evaluated...</Text>
@@ -810,8 +808,9 @@ export default function SprechenRealtimeScreen() {
     const noSpeechDetected = !hasUserSpeech && overallNum <= 1;
 
     return (
-      <View style={styles.screen}>
-        <Stack.Screen options={{ title: 'Ergebnis', headerShown: true, headerBackVisible: false }} />
+      <View style={[styles.screen, { paddingTop: insets.top }]}>
+        <Stack.Screen options={{ headerShown: false }} />
+        <AppHeader />
         <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + CTA_BUTTON_HEIGHT + BOTTOM_CONTENT_BUFFER }]} showsVerticalScrollIndicator={false}>
           <View style={[styles.resultsHero, shadows.card]}>
             <View style={styles.resultsIconWrap}>
@@ -909,8 +908,9 @@ export default function SprechenRealtimeScreen() {
   }
 
   return (
-    <View style={styles.screen}>
-      <Stack.Screen options={{ title: 'Sprechen', headerShown: true }} />
+    <View style={[styles.screen, { paddingTop: insets.top }]}>
+      <Stack.Screen options={{ headerShown: false }} />
+      <AppHeader />
       <View style={styles.center}>
         <RefreshCw color={colors.muted} size={32} />
         <Pressable onPress={handleRetry} style={styles.backLink}>

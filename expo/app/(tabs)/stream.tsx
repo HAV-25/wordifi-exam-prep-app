@@ -29,6 +29,7 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { AppHeader } from '@/components/AppHeader';
 import { CelebrationOverlay } from '@/components/CelebrationOverlay';
 import { PaywallModal } from '@/components/PaywallModal';
 import { ReadinessBottomSheet } from '@/components/ReadinessBottomSheet';
@@ -341,6 +342,7 @@ export default function TestStreamScreen() {
     const dailyLimit = access.stream_questions_per_day ?? 0;
     return (
       <SafeAreaView style={s.safeArea}>
+        <AppHeader />
         <View style={s.emptyWrap}>
           <Text style={s.emptyEmoji}>⏰</Text>
           <Text style={s.emptyTitle}>Daily limit reached</Text>
@@ -363,6 +365,7 @@ export default function TestStreamScreen() {
   if (questions.length === 0) {
     return (
       <SafeAreaView style={s.safeArea}>
+        <AppHeader />
         <View style={s.emptyWrap}>
           <Text style={s.emptyEmoji}>🏆</Text>
           <Text style={s.emptyTitle}>No questions available</Text>
@@ -378,6 +381,15 @@ export default function TestStreamScreen() {
   // ── Render: Main stream ────────────────────────────────────────────────────
   return (
     <SafeAreaView style={s.safeArea}>
+      {/* Brand header */}
+      <AppHeader
+        rightElement={
+          <View style={s.headerCounter}>
+            <Text style={s.headerCounterText}>{currentIndex + 1}/{totalQuestions}</Text>
+          </View>
+        }
+      />
+
       {/* Upgrade nudge / trial banner */}
       {!isPaidUser ? (
         <Pressable style={s.nudgeCard} onPress={() => setShowPaywall(true)}>
@@ -396,26 +408,21 @@ export default function TestStreamScreen() {
         </Pressable>
       ) : null}
 
-      {/* Stream header */}
-      <View style={s.streamHeader}>
-        <View style={s.headerContext}>
-          {currentQuestion ? (
-            <>
-              <View style={s.headerIcon}>
-                {currentQuestion.section === 'Hören'
-                  ? <Headphones color={B.muted} size={18} />
-                  : <BookOpenText color={B.muted} size={18} />}
-              </View>
-              <Text style={s.headerContextText}>
-                {targetLevel} · {currentQuestion.section} · Teil {currentQuestion.teil}
-              </Text>
-            </>
-          ) : null}
+      {/* Stream context strip */}
+      {currentQuestion ? (
+        <View style={s.streamHeader}>
+          <View style={s.headerContext}>
+            <View style={s.headerIcon}>
+              {currentQuestion.section === 'Hören'
+                ? <Headphones color={B.muted} size={18} />
+                : <BookOpenText color={B.muted} size={18} />}
+            </View>
+            <Text style={s.headerContextText}>
+              {targetLevel} · {currentQuestion.section} · Teil {currentQuestion.teil}
+            </Text>
+          </View>
         </View>
-        <View style={s.headerCounter}>
-          <Text style={s.headerCounterText}>{currentIndex + 1}/{totalQuestions}</Text>
-        </View>
-      </View>
+      ) : null}
 
       {/* Recycled banner */}
       {isRecycledBanner ? (
@@ -537,8 +544,8 @@ const s = StyleSheet.create({
 
   // Stream header
   streamHeader: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: 20, paddingTop: 12, paddingBottom: 20,
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 20, paddingTop: 4, paddingBottom: 16,
   },
   headerContext: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   headerIcon: { width: 18, height: 18, alignItems: 'center', justifyContent: 'center' },

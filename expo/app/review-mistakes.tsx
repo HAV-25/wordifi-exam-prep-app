@@ -12,9 +12,10 @@ import {
   Text,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 
+import { AppHeader } from '@/components/AppHeader';
 import { StreamCard } from '@/components/StreamCard';
 import Colors from '@/constants/colors';
 import { colors } from '@/theme';
@@ -70,6 +71,7 @@ function toAppQuestion(item: RecentIncorrectAnswer): AppQuestion {
 }
 
 export default function ReviewMistakesScreen() {
+  const insets = useSafeAreaInsets();
   const { user } = useAuth();
 
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -211,9 +213,12 @@ export default function ReviewMistakesScreen() {
 
   if (isLoading) {
     return (
-      <View style={styles.loadingWrap}>
-        <ActivityIndicator size="large" color={colors.navy} />
-        <Text style={styles.loadingText}>Loading your questions…</Text>
+      <View style={[styles.loadingScreen, { paddingTop: insets.top }]}>
+        <AppHeader />
+        <View style={styles.loadingCenter}>
+          <ActivityIndicator size="large" color={colors.navy} />
+          <Text style={styles.loadingText}>Loading your questions…</Text>
+        </View>
       </View>
     );
   }
@@ -221,7 +226,10 @@ export default function ReviewMistakesScreen() {
   if (screenState === 'practice' && currentQ) {
     const sectionCfg = SECTION_CONFIG[practiceSection] ?? SECTION_CONFIG['Lesen'];
     return (
-      <SafeAreaView style={styles.practiceContainer}>
+      <View style={[styles.practiceContainer, { paddingTop: insets.top }]}>
+        <AppHeader rightElement={
+          <Text style={styles.practiceProgress}>{practiceIndex + 1}/{practiceQuestions.length}</Text>
+        } />
         <View style={styles.practiceHeader}>
           <Pressable onPress={goBackToMenu} style={styles.practiceBackBtn} testID="practice-back">
             <ChevronLeft color={colors.navy} size={22} />
@@ -230,9 +238,6 @@ export default function ReviewMistakesScreen() {
           <View style={[styles.sectionPillSmall, { backgroundColor: sectionCfg.color }]}>
             <Text style={styles.sectionPillSmallText}>{sectionCfg.emoji} {practiceSection}</Text>
           </View>
-          <Text style={styles.practiceProgress}>
-            {practiceIndex + 1}/{practiceQuestions.length}
-          </Text>
         </View>
 
         <View style={styles.practiceCardWrap}>
@@ -259,14 +264,15 @@ export default function ReviewMistakesScreen() {
             </Pressable>
           </View>
         ) : null}
-      </SafeAreaView>
+      </View>
     );
   }
 
   if (screenState === 'summary') {
     const isPerfect = summaryCorrect === practiceQuestions.length;
     return (
-      <SafeAreaView style={styles.summaryContainer}>
+      <View style={[styles.summaryContainer, { paddingTop: insets.top }]}>
+        <AppHeader />
         <View style={styles.summaryHeader}>
           <Pressable onPress={goBackToMenu} style={styles.practiceBackBtn} testID="summary-back">
             <ChevronLeft color={colors.navy} size={22} />
@@ -313,12 +319,13 @@ export default function ReviewMistakesScreen() {
             </Pressable>
           </View>
         </ScrollView>
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.menuContainer}>
+    <View style={[styles.menuContainer, { paddingTop: insets.top }]}>
+      <AppHeader />
       <View style={styles.menuHero}>
         <View style={styles.menuHeaderRow}>
           <Pressable onPress={() => router.back()} style={styles.menuBackBtn} testID="menu-back">
@@ -402,16 +409,19 @@ export default function ReviewMistakesScreen() {
           })
         )}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  loadingWrap: {
+  loadingScreen: {
+    flex: 1,
+    backgroundColor: Colors.background,
+  },
+  loadingCenter: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.background,
     gap: 16,
   },
   loadingText: {

@@ -18,6 +18,7 @@ import {
   View,
 } from 'react-native';
 
+import { AppHeader } from '@/components/AppHeader';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { ScoreRing } from '@/components/ScoreRing';
 import { StimulusCard, shouldShowStimulus } from '@/components/StimulusCard';
@@ -324,23 +325,18 @@ export default function MockResultsScreen() {
   );
 
   return (
-    <View style={styles.screen}>
-      <Stack.Screen
-        options={{
-          title: 'Mock Results',
-          headerBackVisible: false,
-          headerRight: () => (
-            <Pressable
-              accessibilityLabel="Share result"
-              onPress={handleShare}
-              style={styles.shareBtn}
-              testID="share-mock-result"
-            >
-              <ShareIcon color={Colors.primary} size={20} />
-            </Pressable>
-          ),
-        }}
-      />
+    <View style={[styles.screen, { paddingTop: insets.top }]}>
+      <Stack.Screen options={{ headerShown: false }} />
+      <AppHeader rightElement={
+        <Pressable
+          accessibilityLabel="Share result"
+          onPress={handleShare}
+          style={styles.shareBtn}
+          testID="share-mock-result"
+        >
+          <ShareIcon color={Colors.primary} size={22} />
+        </Pressable>
+      } />
 
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + CTA_BUTTON_HEIGHT + BOTTOM_CONTENT_BUFFER }]} showsVerticalScrollIndicator={false}>
         <View style={styles.heroCard}>

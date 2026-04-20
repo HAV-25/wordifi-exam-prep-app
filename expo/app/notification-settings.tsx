@@ -22,6 +22,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { AppHeader } from '@/components/AppHeader';
 import Colors from '@/constants/colors';
 import { useAuth } from '@/providers/AuthProvider';
 import {
@@ -239,6 +240,9 @@ export default function NotificationSettingsScreen() {
 
   return (
     <View style={[s.screen, { paddingTop: insets.top }]}>
+      {/* Brand header */}
+      <AppHeader />
+
       {/* Save error banner */}
       {saveError ? (
         <View style={s.errorBanner}>

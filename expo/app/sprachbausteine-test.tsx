@@ -4,6 +4,7 @@
  * Teil 2: Multiple choice a/b/c per blank (8 blanks)
  */
 import { Stack, router, useLocalSearchParams } from 'expo-router';
+import { X } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -16,6 +17,7 @@ import {
   View,
 } from 'react-native';
 
+import { AppHeader } from '@/components/AppHeader';
 import Colors from '@/constants/colors';
 import { colors } from '@/theme';
 import {
@@ -293,8 +295,9 @@ export default function SprachbausteineTestScreen() {
 
   if (!t1Question && !t2Question) {
     return (
-      <View style={styles.screen}>
-        <Stack.Screen options={{ title: 'Sprachbausteine', headerShown: false }} />
+      <View style={[styles.screen, { paddingTop: insets.top }]}>
+        <Stack.Screen options={{ headerShown: false }} />
+        <AppHeader />
         <View style={styles.emptyWrap}>
           <Text style={styles.emptyEmoji}>📚</Text>
           <Text style={styles.emptyTitle}>No questions available yet</Text>
@@ -317,22 +320,13 @@ export default function SprachbausteineTestScreen() {
   const canProceed = isT1Phase ? t1AllFilled : t2AllAnswered;
 
   return (
-    <View style={styles.screen}>
-      <Stack.Screen options={{ title: 'Sprachbausteine', headerShown: false }} />
-
-      {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-        <Pressable onPress={handleBack} style={styles.backBtn} accessibilityLabel="Go back">
-          <Text style={styles.backIcon}>‹</Text>
+    <View style={[styles.screen, { paddingTop: insets.top }]}>
+      <Stack.Screen options={{ headerShown: false }} />
+      <AppHeader rightElement={
+        <Pressable onPress={handleBack} style={styles.closeBtn} accessibilityLabel="Close test" hitSlop={8}>
+          <X size={22} color={Colors.textMuted} />
         </Pressable>
-        <View style={styles.headerCenter}>
-          <Text style={styles.headerTitle}>Sprachbausteine</Text>
-          <Text style={styles.headerSub}>Teil {currentTeil} · B1</Text>
-        </View>
-        <View style={styles.teilBadge}>
-          <Text style={styles.teilBadgeText}>{currentTeil}/2</Text>
-        </View>
-      </View>
+      } />
 
       {/* Progress bar */}
       <View style={styles.progressTrack}>
@@ -486,49 +480,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.background,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-    backgroundColor: Colors.background,
-    gap: 12,
-  },
-  backBtn: {
-    width: 36,
-    height: 36,
+  closeBtn: {
+    width: 44,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  backIcon: {
-    fontSize: 28,
-    color: Colors.textMuted,
-    lineHeight: 32,
-  },
-  headerCenter: {
-    flex: 1,
-  },
-  headerTitle: {
-    fontFamily: 'Outfit_800ExtraBold',
-    fontSize: 18,
-    color: colors.navy,
-  },
-  headerSub: {
-    fontFamily: 'NunitoSans_400Regular',
-    fontSize: 12,
-    color: Colors.textMuted,
-    marginTop: 1,
-  },
-  teilBadge: {
-    backgroundColor: colors.blue + '18',
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  teilBadgeText: {
-    fontFamily: 'Outfit_800ExtraBold',
-    fontSize: 13,
-    color: colors.blue,
   },
   progressTrack: {
     height: 4,

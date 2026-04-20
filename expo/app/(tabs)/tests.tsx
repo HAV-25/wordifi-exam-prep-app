@@ -30,6 +30,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AppHeader } from '@/components/AppHeader';
 import { EmptyState } from '@/components/EmptyState';
 import { PaywallModal } from '@/components/PaywallModal';
 import Colors from '@/constants/colors';
@@ -549,21 +550,19 @@ export default function TestsScreen() {
   // ─── Render ────────────────────────────────────────────────────
   return (
     <SafeAreaView style={styles.safeArea}>
+      {/* Brand header */}
+      <AppHeader
+        rightElement={
+          <View style={styles.levelPill}>
+            <Text style={styles.levelPillText}>{targetLevel}</Text>
+          </View>
+        }
+      />
+
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
-        <View style={styles.pageHeader}>
-          <View style={styles.headerTitles}>
-            <Text style={styles.pageTitle}>Sectional Tests</Text>
-            <Text style={styles.pageSubtitle}>Practice by exam section</Text>
-          </View>
-          <View style={styles.levelPill}>
-            <Text style={styles.levelPillText}>{targetLevel}</Text>
-          </View>
-        </View>
-
         {/* Nudge */}
         {nudge ? (
           <Pressable

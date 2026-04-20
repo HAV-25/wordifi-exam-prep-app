@@ -18,6 +18,7 @@ import {
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 
+import { AppHeader } from '@/components/AppHeader';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import ConfettiBurst, { type ConfettiBurstRef } from '@/components/ConfettiBurst';
 import { QuestionCard } from '@/components/QuestionCard';
@@ -185,16 +186,22 @@ export default function SectionalResultsScreen() {
   const retestDate = useMemo(() => retestDateString(), []);
 
   return (
-    <View ref={rootViewRef} style={styles.screen}>
+    <View ref={rootViewRef} style={[styles.screen, { paddingTop: insets.top }]}>
       {/* Confetti overlay — non-interactive, above all content */}
       <ConfettiBurst ref={confettiRef} />
 
-      <Stack.Screen
-        options={{
-          title: 'Results',
-          headerBackVisible: false,
-        }}
-      />
+      <Stack.Screen options={{ headerShown: false }} />
+      <AppHeader rightElement={
+        <Pressable
+          ref={shareButtonRef}
+          accessibilityLabel="Share your result"
+          onPress={handleSharePress}
+          style={styles.shareIconBtn}
+          testID="sectional-share-button-header"
+        >
+          <Share2 size={22} color={Colors.accent} />
+        </Pressable>
+      } />
 
       <ScrollView
         contentContainerStyle={[
@@ -407,6 +414,12 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: Colors.background,
+  },
+  shareIconBtn: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   content: {
     padding: 20,

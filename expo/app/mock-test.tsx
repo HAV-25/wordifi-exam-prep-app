@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 
+import { AppHeader } from '@/components/AppHeader';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { OptionButton } from '@/components/OptionButton';
 import { StimulusCard, shouldShowStimulus } from '@/components/StimulusCard';
@@ -334,8 +335,9 @@ export default function MockTestScreen() {
 
   if (totalQuestions === 0) {
     return (
-      <View style={styles.screen}>
-        <Stack.Screen options={{ title: 'Mock Test', headerShown: true }} />
+      <View style={[styles.screen, { paddingTop: insets.top }]}>
+        <Stack.Screen options={{ headerShown: false }} />
+        <AppHeader />
         <View style={styles.emptyWrap}>
           <View style={styles.emptyContent}>
             <Text style={styles.emptyEmoji}>📚</Text>
@@ -356,8 +358,9 @@ export default function MockTestScreen() {
 
   if (phase === 'transition') {
     return (
-      <View style={styles.screen}>
-        <Stack.Screen options={{ title: '', headerShown: false }} />
+      <View style={[styles.screen, { paddingTop: insets.top }]}>
+        <Stack.Screen options={{ headerShown: false }} />
+        <AppHeader />
         <View style={styles.transitionContainer}>
           <View style={styles.transitionCard}>
             <View style={styles.transitionIconWrap}>
@@ -457,8 +460,20 @@ export default function MockTestScreen() {
     };
 
     return (
-      <View style={styles.screen}>
-        <Stack.Screen options={{ title: '', headerShown: false }} />
+      <View style={[styles.screen, { paddingTop: insets.top }]}>
+        <Stack.Screen options={{ headerShown: false }} />
+        <AppHeader
+          rightElement={
+            <Pressable
+              accessibilityLabel="Close test"
+              onPress={handleBack}
+              style={styles.closeBtn}
+              hitSlop={8}
+            >
+              <X color={Colors.textMuted} size={20} />
+            </Pressable>
+          }
+        />
         <View style={styles.headerCard}>
           <View style={styles.mockBadgeRow}>
             <View style={styles.mockBadge}>
@@ -612,8 +627,9 @@ export default function MockTestScreen() {
 
   if (phase === 'submitting') {
     return (
-      <View style={styles.screen}>
-        <Stack.Screen options={{ title: '', headerShown: false }} />
+      <View style={[styles.screen, { paddingTop: insets.top }]}>
+        <Stack.Screen options={{ headerShown: false }} />
+        <AppHeader />
         <View style={styles.submittingWrap}>
           <Text style={styles.submittingEmoji}>📝</Text>
           <Text style={styles.submittingTitle}>Submitting your exam...</Text>
@@ -636,47 +652,45 @@ export default function MockTestScreen() {
     : 'Next';
 
   return (
-    <View style={styles.screen}>
-      <Stack.Screen
-        options={{
-          title: '',
-          headerLeft: () => (
-            <Pressable
-              accessibilityLabel="Abort test"
-              onPress={handleBack}
-              style={styles.headerBtn}
-              testID="mock-back-button"
-            >
-              <View style={styles.abortRow}>
-                <X color={Colors.danger} size={18} />
-                <Text style={styles.headerBtnText}>Abort</Text>
-              </View>
-            </Pressable>
-          ),
-          headerRight: isTimed
-            ? () => (
-                <Animated.View
-                  style={[
-                    styles.timerChip,
-                    remainingSeconds <= 60 ? styles.timerChipUrgent : null,
-                    remainingSeconds <= 60 ? { transform: [{ scale: timerPulse }] } : null,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.timerText,
-                      remainingSeconds <= 60 ? styles.timerTextUrgent : null,
-                    ]}
-                  >
-                    {formatTime(remainingSeconds)}
-                  </Text>
-                </Animated.View>
-              )
-            : undefined,
-        }}
+    <View style={[styles.screen, { paddingTop: insets.top }]}>
+      <Stack.Screen options={{ headerShown: false }} />
+
+      {/* Brand header */}
+      <AppHeader
+        rightElement={
+          <Pressable
+            accessibilityLabel="Abort test"
+            onPress={handleBack}
+            style={styles.closeBtn}
+            testID="mock-back-button"
+            hitSlop={8}
+          >
+            <X color={Colors.textMuted} size={20} />
+          </Pressable>
+        }
       />
 
       <View style={styles.headerCard}>
+        {isTimed ? (
+          <View style={styles.timerRow}>
+            <Animated.View
+              style={[
+                styles.timerChip,
+                remainingSeconds <= 60 ? styles.timerChipUrgent : null,
+                remainingSeconds <= 60 ? { transform: [{ scale: timerPulse }] } : null,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.timerText,
+                  remainingSeconds <= 60 ? styles.timerTextUrgent : null,
+                ]}
+              >
+                {formatTime(remainingSeconds)}
+              </Text>
+            </Animated.View>
+          </View>
+        ) : null}
         <View style={styles.mockBadgeRow}>
           <View style={styles.mockBadge}>
             <Text style={styles.mockBadgeText}>Mock Exam</Text>
@@ -820,6 +834,16 @@ const styles = StyleSheet.create({
     color: Colors.danger,
     fontWeight: '700' as const,
     fontSize: 15,
+  },
+  closeBtn: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  timerRow: {
+    alignItems: 'flex-end',
+    paddingBottom: 4,
   },
   timerChip: {
     paddingHorizontal: 12,

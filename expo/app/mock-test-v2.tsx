@@ -35,6 +35,7 @@ import { useAuth } from '@/providers/AuthProvider';
 import { supabase } from '@/lib/supabaseClient';
 import { shuffleArray } from '@/theme/constants';
 import type { AppQuestion } from '@/types/database';
+import { AppHeader } from '@/components/AppHeader';
 import { SectionPlayerMCQ, type MCQSectionResult } from '@/components/mockv2/SectionPlayerMCQ';
 import { SectionPlayerSchreiben, type SchreibenSectionResult } from '@/components/mockv2/SectionPlayerSchreiben';
 import { SectionPlayerSprachbausteine } from '@/components/mockv2/SectionPlayerSprachbausteine';
@@ -266,11 +267,14 @@ export default function MockTestV2Screen() {
   // ── Render ───────────────────────────────────────────────────────────────
   if (phase.type === 'loading') {
     return (
-      <View style={styles.center}>
-        <Stack.Screen options={{ title: 'Mock Test', headerShown: true }} />
-        <ActivityIndicator color={Colors.primary} size="large" />
-        <Text style={styles.loadingText}>Preparing your mock exam...</Text>
-      </View>
+      <SafeAreaView style={styles.screen}>
+        <Stack.Screen options={{ headerShown: false }} />
+        <AppHeader />
+        <View style={styles.center}>
+          <ActivityIndicator color={Colors.primary} size="large" />
+          <Text style={styles.loadingText}>Preparing your mock exam...</Text>
+        </View>
+      </SafeAreaView>
     );
   }
 
@@ -278,7 +282,19 @@ export default function MockTestV2Screen() {
     const section = blueprint[phase.sectionIndex]!;
     return (
       <SafeAreaView style={styles.screen}>
-        <Stack.Screen options={{ title: '', headerShown: true, headerBackVisible: false }} />
+        <Stack.Screen options={{ headerShown: false }} />
+        <AppHeader
+          rightElement={
+            <Pressable
+              accessibilityLabel="Pause and save"
+              onPress={handlePauseAndExit}
+              style={styles.pauseBtn}
+              hitSlop={8}
+            >
+              <Pause color={B.muted} size={20} />
+            </Pressable>
+          }
+        />
         <SectionRouter
           level={level}
           section={section}
@@ -300,7 +316,19 @@ export default function MockTestV2Screen() {
 
     return (
       <SafeAreaView style={styles.screen}>
-        <Stack.Screen options={{ title: '', headerShown: true, headerBackVisible: false }} />
+        <Stack.Screen options={{ headerShown: false }} />
+        <AppHeader
+          rightElement={
+            <Pressable
+              accessibilityLabel="Pause and save"
+              onPress={handlePauseAndExit}
+              style={styles.pauseBtn}
+              hitSlop={8}
+            >
+              <Pause color={B.muted} size={20} />
+            </Pressable>
+          }
+        />
         <TransitionScreen
           completedSection={completedSection}
           lastResult={lastResult ?? null}
@@ -315,11 +343,14 @@ export default function MockTestV2Screen() {
 
   if (phase.type === 'submitting') {
     return (
-      <View style={styles.center}>
-        <Stack.Screen options={{ title: 'Scoring', headerShown: true, headerBackVisible: false }} />
-        <ActivityIndicator color={Colors.primary} size="large" />
-        <Text style={styles.loadingText}>Calculating your results...</Text>
-      </View>
+      <SafeAreaView style={styles.screen}>
+        <Stack.Screen options={{ headerShown: false }} />
+        <AppHeader />
+        <View style={styles.center}>
+          <ActivityIndicator color={Colors.primary} size="large" />
+          <Text style={styles.loadingText}>Calculating your results...</Text>
+        </View>
+      </SafeAreaView>
     );
   }
 
@@ -640,7 +671,8 @@ function TransitionScreen({
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: B.background },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, backgroundColor: B.background },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16 },
+  pauseBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   loadingText: { fontSize: 15, fontWeight: '600' as const, color: B.muted },
 
   // Placeholder (Phase 2 will replace)

@@ -16,6 +16,7 @@ import {
   View,
 } from 'react-native';
 
+import { AppHeader } from '@/components/AppHeader';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { OptionButton } from '@/components/OptionButton';
 import { StimulusCard, shouldShowStimulus } from '@/components/StimulusCard';
@@ -341,40 +342,41 @@ export default function SectionalTestScreen() {
   };
 
   return (
-    <View style={styles.screen}>
-      <Stack.Screen
-        options={{
-          title: '',
-          headerLeft: () => (
-            <Pressable
-              accessibilityLabel="Go back"
-              onPress={handleBack}
-              style={styles.headerBtn}
-              testID="sectional-back-button"
-            >
-              <Text style={styles.headerBtnText}>Back</Text>
-            </Pressable>
-          ),
-          headerRight: isTimed
-            ? () => (
-                <Animated.View style={[
-                  styles.timerChip,
-                  remainingSeconds <= 60 ? styles.timerChipUrgent : null,
-                  remainingSeconds <= 60 ? { transform: [{ scale: timerPulse }] } : null,
-                ]}>
-                  <Text style={[
-                    styles.timerText,
-                    remainingSeconds <= 60 ? styles.timerTextUrgent : null,
-                  ]}>
-                    {formatTime(remainingSeconds)}
-                  </Text>
-                </Animated.View>
-              )
-            : undefined,
-        }}
+    <View style={[styles.screen, { paddingTop: insets.top }]}>
+      <Stack.Screen options={{ headerShown: false }} />
+
+      {/* Brand header */}
+      <AppHeader
+        rightElement={
+          <Pressable
+            accessibilityLabel="Close test"
+            onPress={handleBack}
+            style={styles.closeBtn}
+            testID="sectional-back-button"
+            hitSlop={8}
+          >
+            <X color={Colors.textMuted} size={20} />
+          </Pressable>
+        }
       />
 
       <View style={styles.headerCard}>
+        {isTimed ? (
+          <View style={styles.timerRow}>
+            <Animated.View style={[
+              styles.timerChip,
+              remainingSeconds <= 60 ? styles.timerChipUrgent : null,
+              remainingSeconds <= 60 ? { transform: [{ scale: timerPulse }] } : null,
+            ]}>
+              <Text style={[
+                styles.timerText,
+                remainingSeconds <= 60 ? styles.timerTextUrgent : null,
+              ]}>
+                {formatTime(remainingSeconds)}
+              </Text>
+            </Animated.View>
+          </View>
+        ) : null}
         <View style={styles.progressTrack}>
           <Animated.View style={[styles.progressFill, { width: progressWidth }]} />
         </View>
@@ -493,6 +495,18 @@ const styles = StyleSheet.create({
   headerBtnText: {
     color: Colors.primary,
     fontWeight: '700' as const,
+  },
+  closeBtn: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  timerRow: {
+    alignItems: 'flex-end',
+    paddingHorizontal: 16,
+    paddingTop: 4,
+    paddingBottom: 4,
   },
   timerChip: {
     paddingHorizontal: 12,

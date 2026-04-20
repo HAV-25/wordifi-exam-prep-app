@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { ArrowLeft, Crown, Flame, Medal, Trophy } from 'lucide-react-native';
+import { Crown, Flame, Medal, Trophy } from 'lucide-react-native';
 import React, { useCallback, useMemo } from 'react';
 import {
   ActivityIndicator,
@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 
+import { AppHeader } from '@/components/AppHeader';
 import Colors from '@/constants/colors';
 import { colors } from '@/theme';
 import { fetchLeaderboard } from '@/lib/profileHelpers';
@@ -63,22 +64,14 @@ export default function LeaderboardScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <View style={styles.header}>
-        <Pressable
-          style={styles.backBtn}
-          onPress={() => router.back()}
-          testID="leaderboard-back"
-        >
-          <ArrowLeft color={Colors.primary} size={22} />
-        </Pressable>
-        <View style={styles.headerCenter}>
-          <Trophy color={Colors.accent} size={20} />
-          <Text style={styles.headerTitle}>Leaderboard</Text>
-        </View>
-        <View style={styles.levelPill}>
-          <Text style={styles.levelPillText}>{targetLevel}</Text>
-        </View>
-      </View>
+      {/* Brand header */}
+      <AppHeader
+        rightElement={
+          <View style={styles.levelPill}>
+            <Text style={styles.levelPillText}>{targetLevel}</Text>
+          </View>
+        }
+      />
 
       {hasNoName ? (
         <View style={styles.noNameWrap}>

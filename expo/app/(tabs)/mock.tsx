@@ -30,6 +30,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AppHeader } from '@/components/AppHeader';
 import { PaywallModal } from '@/components/PaywallModal';
 import Colors from '@/constants/colors';
 import {
@@ -247,44 +248,40 @@ export default function MockScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      {/* ── Header ────────────────────────────────────────────────────────── */}
-      <View style={styles.headerRow}>
-        <View style={styles.headerText}>
-          <Text style={styles.pageTitle}>Complete Test</Text>
-          <Text style={styles.pageSub}>Complete exam simulation</Text>
-        </View>
+      {/* Brand header with level dropdown in right slot */}
+      <AppHeader
+        rightElement={
+          <View style={styles.levelWrap}>
+            <Pressable
+              style={styles.levelPill}
+              onPress={() => setDropdownOpen((v) => !v)}
+              hitSlop={8}
+              accessibilityLabel={`Selected level: ${selectedLevel}. Tap to change.`}
+            >
+              <Text style={styles.levelPillText}>{selectedLevel}</Text>
+              <ChevronDown size={14} color={Colors.primary} />
+            </Pressable>
 
-        {/* Level pill + dropdown */}
-        <View style={styles.levelWrap}>
-          <Pressable
-            style={styles.levelPill}
-            onPress={() => setDropdownOpen((v) => !v)}
-            hitSlop={8}
-            accessibilityLabel={`Selected level: ${selectedLevel}. Tap to change.`}
-          >
-            <Text style={styles.levelPillText}>{selectedLevel}</Text>
-            <ChevronDown size={14} color={Colors.primary} />
-          </Pressable>
-
-          {dropdownOpen && (
-            <View style={styles.levelDropdown}>
-              {LEVELS.map((level, i) => (
-                <Pressable
-                  key={level}
-                  style={[styles.levelOption, i > 0 && styles.levelOptionBorder, level === selectedLevel && styles.levelOptionActive]}
-                  onPress={() => { setSelectedLevel(level); setDropdownOpen(false); }}
-                  accessibilityLabel={`${level}${level === selectedLevel ? ', selected' : ''}`}
-                >
-                  <Text style={[styles.levelOptionText, level === selectedLevel && styles.levelOptionTextActive]}>
-                    {level}
-                  </Text>
-                  {level === selectedLevel && <Check size={16} color={Colors.primary} />}
-                </Pressable>
-              ))}
-            </View>
-          )}
-        </View>
-      </View>
+            {dropdownOpen && (
+              <View style={styles.levelDropdown}>
+                {LEVELS.map((level, i) => (
+                  <Pressable
+                    key={level}
+                    style={[styles.levelOption, i > 0 && styles.levelOptionBorder, level === selectedLevel && styles.levelOptionActive]}
+                    onPress={() => { setSelectedLevel(level); setDropdownOpen(false); }}
+                    accessibilityLabel={`${level}${level === selectedLevel ? ', selected' : ''}`}
+                  >
+                    <Text style={[styles.levelOptionText, level === selectedLevel && styles.levelOptionTextActive]}>
+                      {level}
+                    </Text>
+                    {level === selectedLevel && <Check size={16} color={Colors.primary} />}
+                  </Pressable>
+                ))}
+              </View>
+            )}
+          </View>
+        }
+      />
 
       {/* Overlay to dismiss dropdown on outside tap */}
       {dropdownOpen && (

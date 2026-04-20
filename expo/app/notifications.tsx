@@ -8,9 +8,10 @@ import {
   Text,
   View,
 } from 'react-native';
-import { Stack, useRouter } from 'expo-router';
+import { Stack } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { AppHeader } from '@/components/AppHeader';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/providers/AuthProvider';
 import { colors, fontFamily, fontSize, radius, shadows, spacing } from '@/theme';
@@ -26,7 +27,6 @@ function timeAgo(dateStr: string): string {
 
 export default function NotificationsScreen() {
   const { user } = useAuth();
-  const router = useRouter();
   const insets = useSafeAreaInsets();
   const [notifications, setNotifications] = useState<UserNotification[]>([]);
   const [loading, setLoading] = useState(true);
@@ -64,20 +64,17 @@ export default function NotificationsScreen() {
   const unreadCount = notifications.filter((n) => !n.read_at).length;
 
   return (
-    <View style={[styles.screen, { paddingBottom: insets.bottom }]}>
-      <Stack.Screen
-        options={{
-          title: 'Notifications',
-          headerShown: true,
-          headerRight: unreadCount > 0
-            ? () => (
-                <Pressable onPress={markAllRead} style={styles.markAllBtn} hitSlop={8}>
-                  <CheckCheck color={colors.blue} size={18} />
-                  <Text style={styles.markAllText}>Mark all read</Text>
-                </Pressable>
-              )
-            : undefined,
-        }}
+    <View style={[styles.screen, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+      <Stack.Screen options={{ headerShown: false }} />
+
+      <AppHeader
+        rightElement={
+          unreadCount > 0 ? (
+            <Pressable onPress={markAllRead} style={styles.markAllBtn} hitSlop={8}>
+              <CheckCheck color={colors.blue} size={18} />
+            </Pressable>
+          ) : undefined
+        }
       />
 
       {loading ? (
@@ -128,15 +125,10 @@ const styles = StyleSheet.create({
     color: colors.muted,
   },
   markAllBtn: {
-    flexDirection: 'row',
+    width: 44,
+    height: 44,
     alignItems: 'center',
-    gap: 4,
-    marginRight: 8,
-  },
-  markAllText: {
-    fontFamily: fontFamily.bodySemiBold,
-    fontSize: fontSize.sm,
-    color: colors.blue,
+    justifyContent: 'center',
   },
   list: {
     paddingVertical: spacing.sm,

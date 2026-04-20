@@ -13,6 +13,7 @@ import {
   View,
 } from 'react-native';
 
+import { AppHeader } from '@/components/AppHeader';
 import { ScoreRing } from '@/components/ScoreRing';
 import Colors from '@/constants/colors';
 import { colors } from '@/theme';
@@ -187,11 +188,12 @@ export default function SprachbausteineResultsScreen() {
   const ringColor = scoreColor(scorePct);
 
   return (
-    <View style={styles.screen}>
-      <Stack.Screen options={{ title: 'Results', headerShown: false }} />
+    <View style={[styles.screen, { paddingTop: insets.top }]}>
+      <Stack.Screen options={{ headerShown: false }} />
+      <AppHeader />
 
       <ScrollView
-        contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 140 }]}
+        contentContainerStyle={[styles.scrollContent, { paddingTop: 20, paddingBottom: insets.bottom + 140 }]}
         showsVerticalScrollIndicator={false}
       >
         {/* Score header */}

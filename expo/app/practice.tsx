@@ -8,6 +8,7 @@ const TAB_BAR_HEIGHT = 64;       // rendered bottom tab bar height
 const BOTTOM_CONTENT_BUFFER = 24; // breathing room below last content item
 import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { AppHeader } from '@/components/AppHeader';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { EmptyState } from '@/components/EmptyState';
 import { OptionButton } from '@/components/OptionButton';
@@ -207,17 +208,13 @@ export default function PracticeScreen() {
   };
 
   return (
-    <View style={styles.screen}>
-      <Stack.Screen
-        options={{
-          title: 'Practice',
-          headerLeft: () => (
-            <Pressable accessibilityLabel="Go back" onPress={handleBack} style={styles.headerButton} testID="practice-back-button">
-              <Text style={styles.headerButtonText}>Back</Text>
-            </Pressable>
-          ),
-        }}
-      />
+    <View style={[styles.screen, { paddingTop: insets.top }]}>
+      <Stack.Screen options={{ headerShown: false }} />
+      <AppHeader rightElement={
+        <Pressable accessibilityLabel="Close" onPress={handleBack} style={styles.closeBtn} hitSlop={8} testID="practice-back-button">
+          <X size={22} color={Colors.textMuted} />
+        </Pressable>
+      } />
       <View style={styles.headerCard}>
         <View style={styles.progressTrack}><View style={[styles.progressFill, { width: `${progress}%` }]} /></View>
         <View style={styles.headerRow}>
@@ -283,7 +280,8 @@ export default function PracticeScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: Colors.background },
-  headerCard: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8, gap: 10 },
+  closeBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  headerCard: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 8, gap: 10 },
   progressTrack: { height: 8, borderRadius: 999, backgroundColor: Colors.ringTrack, overflow: 'hidden' },
   progressFill: { height: '100%', borderRadius: 999, backgroundColor: Colors.accent },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 },
@@ -306,8 +304,6 @@ const styles = StyleSheet.create({
   tooltipTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   tooltipTitle: { fontSize: 14, fontWeight: '600', color: Colors.text, flex: 1 },
   tooltipBody: { fontSize: 13, fontWeight: '400', color: Colors.textBody, marginTop: 8, lineHeight: 19 },
-  headerButton: { minHeight: 40, justifyContent: 'center', paddingRight: 12 },
-  headerButtonText: { color: Colors.primary, fontWeight: '700' },
   loadingWrap: { padding: 20, gap: 12 },
   skeleton: { height: 120, borderRadius: 24, backgroundColor: Colors.surfaceMuted },
   emptyWrap: { flex: 1, padding: 20, justifyContent: 'center' },

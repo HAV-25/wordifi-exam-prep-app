@@ -24,8 +24,9 @@ import {
 } from 'lucide-react-native';
 import React, { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { AppHeader } from '@/components/AppHeader';
 import { B } from '@/theme/banani';
 import type { SavedSectionResult } from '@/lib/mockV2Helpers';
 import { PASS_MARK_PCT } from '@/lib/examBlueprint';
@@ -74,6 +75,7 @@ type TeilAssessment = {
 
 // ─── Main screen ───────────────────────────────────────────────────────────────
 export default function MockResultsV2Screen() {
+  const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{
     mockTestId?: string;
     level?: string;
@@ -104,8 +106,9 @@ export default function MockResultsV2Screen() {
   const set2Sections = results.filter((r) => r.section === 'Sprechen');
 
   return (
-    <SafeAreaView style={styles.screen}>
-      <Stack.Screen options={{ title: 'Your Results', headerShown: true }} />
+    <View style={[styles.screen, { paddingTop: insets.top }]}>
+      <Stack.Screen options={{ headerShown: false }} />
+      <AppHeader />
       <ScrollView contentContainerStyle={styles.scroll}>
         {/* Overall hero */}
         <View style={[styles.hero, overallPass ? styles.heroPass : styles.heroFail]}>
@@ -140,7 +143,7 @@ export default function MockResultsV2Screen() {
           </Pressable>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
