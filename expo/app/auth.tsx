@@ -51,6 +51,7 @@ export default function AuthScreen() {
   const [tcAccepted, setTcAccepted] = useState<boolean>(false);
   const [touched, setTouched] = useState<{ email: boolean; password: boolean }>({ email: false, password: false });
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [tcError, setTcError] = useState<boolean>(false);
 
   const [showForgotModal, setShowForgotModal] = useState<boolean>(false);
   const [forgotEmail, setForgotEmail] = useState<string>('');
@@ -124,7 +125,10 @@ export default function AuthScreen() {
   };
 
   const handleGoogleAuth = async () => {
-    if (mode === 'signUp' && !tcAccepted) return;
+    if (mode === 'signUp' && !tcAccepted) {
+      setTcError(true);
+      return;
+    }
     setIsLoading(true);
     try {
       await signInWithGoogle();
@@ -297,35 +301,42 @@ export default function AuthScreen() {
             </View>
 
             {mode === 'signUp' ? (
-              <View style={styles.tcRow}>
-                <Pressable
-                  onPress={() => setTcAccepted((prev) => !prev)}
-                  style={styles.tcCheckbox}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  accessibilityLabel="Agree to terms and conditions"
-                  testID="tc-checkbox"
-                >
-                  {tcAccepted
-                    ? <CheckSquare size={20} color={Colors.primary} />
-                    : <Square size={20} color={Colors.textMuted} />
-                  }
-                </Pressable>
-                <Text style={styles.tcText}>
-                  {'I agree to the '}
-                  <Text
-                    style={styles.tcLink}
-                    onPress={() => Linking.openURL(config.terms_url)}
+              <View style={styles.tcWrap}>
+                <View style={[styles.tcRow, tcError && styles.tcRowError]}>
+                  <Pressable
+                    onPress={() => { setTcAccepted((prev) => !prev); setTcError(false); }}
+                    style={styles.tcCheckbox}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    accessibilityLabel="Agree to terms and conditions"
+                    testID="tc-checkbox"
                   >
-                    Terms & Conditions
+                    {tcAccepted
+                      ? <CheckSquare size={20} color={Colors.primary} />
+                      : <Square size={20} color={tcError ? '#EF4444' : Colors.textMuted} />
+                    }
+                  </Pressable>
+                  <Text style={styles.tcText}>
+                    {'I agree to the '}
+                    <Text
+                      style={styles.tcLink}
+                      onPress={() => Linking.openURL(config.terms_url)}
+                    >
+                      Terms & Conditions
+                    </Text>
+                    {' and '}
+                    <Text
+                      style={styles.tcLink}
+                      onPress={() => Linking.openURL(config.privacy_url)}
+                    >
+                      Privacy Policy
+                    </Text>
                   </Text>
-                  {' and '}
-                  <Text
-                    style={styles.tcLink}
-                    onPress={() => Linking.openURL(config.privacy_url)}
-                  >
-                    Privacy Policy
+                </View>
+                {tcError ? (
+                  <Text style={styles.tcErrorText}>
+                    Please accept the Terms & Conditions to continue
                   </Text>
-                </Text>
+                ) : null}
               </View>
             ) : null}
 
@@ -450,14 +461,26 @@ const styles = StyleSheet.create({
     shadowRadius: 24,
     elevation: 4,
   },
+  tcWrap: {
+    gap: 6,
+  },
   tcRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 10,
     marginHorizontal: 6,
   },
+  tcRowError: {
+    // visual container highlight handled by icon + text colour change
+  },
   tcCheckbox: {
     paddingTop: 1,
+  },
+  tcErrorText: {
+    fontFamily: 'NunitoSans_600SemiBold',
+    fontSize: 12,
+    color: '#EF4444',
+    marginHorizontal: 6,
   },
   tcText: {
     fontFamily: fontFamily.bodyRegular,
