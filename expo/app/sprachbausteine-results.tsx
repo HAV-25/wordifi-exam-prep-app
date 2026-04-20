@@ -3,9 +3,11 @@
  * Shows per-blank feedback: green = correct, red = wrong (with correct answer shown)
  */
 import { Stack, router, useLocalSearchParams } from 'expo-router';
-import React, { useMemo } from 'react';
+import { ChevronRight, Share2 } from 'lucide-react-native';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
+  AccessibilityInfo,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -14,9 +16,12 @@ import {
 } from 'react-native';
 
 import { AppHeader } from '@/components/AppHeader';
+import ConfettiBurst, { type ConfettiBurstRef } from '@/components/ConfettiBurst';
 import { ScoreRing } from '@/components/ScoreRing';
+import ShareResultSheet from '@/components/ShareResultSheet';
 import Colors from '@/constants/colors';
 import { colors } from '@/theme';
+import { useAuth } from '@/providers/AuthProvider';
 import type { AppQuestion } from '@/types/database';
 import type { BlankAnswers } from '@/lib/sectionalHelpers';
 
@@ -41,12 +46,6 @@ function performanceLabel(score: number): { text: string; color: string } {
   if (score >= 70) return { text: 'Excellent! Exam-ready performance', color: colors.green };
   if (score >= 40) return { text: 'Good progress — keep practising', color: colors.amber };
   return { text: 'Every blank is a learning step 💪', color: colors.navy };
-}
-
-function scoreColor(score: number): string {
-  if (score >= 70) return colors.green;
-  if (score >= 40) return colors.amber;
-  return colors.navy;
 }
 
 function formatDuration(seconds: number): string {
@@ -146,6 +145,12 @@ function BlankFeedback({ label, question, userAnswers }: BlankFeedbackProps) {
 
 export default function SprachbausteineResultsScreen() {
   const insets = useSafeAreaInsets();
+  const { profile } = useAuth();
+  const [sheetVisible, setSheetVisible] = useState(false);
+  const confettiRef = useRef<ConfettiBurstRef>(null);
+  const shareButtonRef = useRef<View>(null);
+  const rootViewRef = useRef<View>(null);
+
   const params = useLocalSearchParams<{
     sessionId?: string;
     t1Question?: string;
@@ -185,10 +190,26 @@ export default function SprachbausteineResultsScreen() {
   const timeTaken = Number(params.timeTaken ?? '0');
 
   const perf = performanceLabel(scorePct);
-  const ringColor = scoreColor(scorePct);
+  const examType = profile?.exam_type ?? 'German language';
+
+  const handleSharePress = useCallback(() => {
+    AccessibilityInfo.isReduceMotionEnabled()
+      .then((reduced) => {
+        if (!reduced) {
+          shareButtonRef.current?.measureInWindow((bx, by, bw, bh) => {
+            rootViewRef.current?.measureInWindow((rx, ry) => {
+              confettiRef.current?.burst(bx - rx + bw / 2, by - ry + bh / 2);
+            });
+          });
+        }
+        setTimeout(() => setSheetVisible(true), reduced ? 0 : 600);
+      })
+      .catch(() => setSheetVisible(true));
+  }, []);
 
   return (
-    <View style={[styles.screen, { paddingTop: insets.top }]}>
+    <View ref={rootViewRef} style={[styles.screen, { paddingTop: insets.top }]}>
+      <ConfettiBurst ref={confettiRef} />
       <Stack.Screen options={{ headerShown: false }} />
       <AppHeader />
 
@@ -198,7 +219,7 @@ export default function SprachbausteineResultsScreen() {
       >
         {/* Score header */}
         <View style={styles.scoreHeader}>
-          <ScoreRing scorePct={scorePct} size={100} color={ringColor} />
+          <ScoreRing score={scorePct} label="Score" size={100} />
           <View style={styles.scoreHeaderText}>
             <Text style={styles.scoreSectionName}>Sprachbausteine</Text>
             <Text style={[styles.perfLabel, { color: perf.color }]}>{perf.text}</Text>
@@ -227,9 +248,18 @@ export default function SprachbausteineResultsScreen() {
         )}
       </ScrollView>
 
-      {/* Footer — two CTAs match other results screens; primary returns to Sectional,
-          secondary returns home. Fixes prior freeze caused by single router.replace('/'). */}
       <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
+        <Pressable
+          ref={shareButtonRef}
+          onPress={handleSharePress}
+          style={styles.shareButton}
+          accessibilityLabel="Share your result"
+          testID="sprachbausteine-results-share"
+        >
+          <Share2 size={20} color={Colors.accent} />
+          <Text style={styles.shareButtonText}>Share your result</Text>
+          <ChevronRight size={16} color={Colors.textMuted} />
+        </Pressable>
         <Pressable
           onPress={() => router.replace('/(tabs)/tests')}
           style={styles.ctaBtn}
@@ -247,6 +277,19 @@ export default function SprachbausteineResultsScreen() {
           <Text style={styles.ctaBtnSecondaryText}>Home</Text>
         </Pressable>
       </View>
+
+      <ShareResultSheet
+        visible={sheetVisible}
+        onClose={() => setSheetVisible(false)}
+        section="Sprachbausteine"
+        level={params.level ?? 'B1'}
+        teilNameEn="Sprachbausteine"
+        teilNameDe="Sprachbausteine"
+        score={totalCorrect}
+        total={totalBlanks}
+        scorePct={scorePct}
+        examType={examType}
+      />
     </View>
   );
 }
@@ -424,6 +467,21 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: Colors.border,
     gap: 10,
+  },
+  shareButton: {
+    height: 56,
+    borderRadius: 16,
+    backgroundColor: Colors.primaryDeep,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    gap: 12,
+  },
+  shareButtonText: {
+    flex: 1,
+    fontFamily: 'Outfit_800ExtraBold',
+    fontSize: 16,
+    color: Colors.white,
   },
   ctaBtn: {
     backgroundColor: colors.blue,
