@@ -1,5 +1,5 @@
 import { Stack, router, useLocalSearchParams } from 'expo-router';
-import { ChevronLeft, PenLine, Share2 } from 'lucide-react-native';
+import { PenLine, Share2, X } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -18,6 +18,7 @@ import {
   View,
 } from 'react-native';
 
+import { AppHeader } from '@/components/AppHeader';
 import { CTAButton } from '@/components/CTAButton';
 import { EmptyState } from '@/components/EmptyState';
 import { SchreibenQuestion } from '@/components/SchreibenQuestion';
@@ -371,6 +372,7 @@ export default function SchreibenTestScreen() {
     return (
       <View style={[styles.screen, { paddingTop: insets.top }]}>
         <Stack.Screen options={{ headerShown: false }} />
+        <AppHeader />
         <View style={styles.emptyWrap}>
           <EmptyState
             title="No writing questions available"
@@ -391,6 +393,7 @@ export default function SchreibenTestScreen() {
     return (
       <View style={[styles.screen, { paddingTop: insets.top }]}>
         <Stack.Screen options={{ headerShown: false }} />
+        <AppHeader />
         <ScrollView contentContainerStyle={[styles.summaryContent, { paddingBottom: insets.bottom + CTA_BUTTON_HEIGHT + BOTTOM_CONTENT_BUFFER }]} showsVerticalScrollIndicator={false}>
           <View style={[styles.summaryHero, shadows.card]}>
             <View style={styles.summaryIconWrap}>
@@ -445,18 +448,20 @@ export default function SchreibenTestScreen() {
     >
       <Stack.Screen options={{ headerShown: false }} />
 
-      {/* Inline header — matches Banani Schreiben Test design */}
-      <View style={styles.topHeader}>
-        <Pressable
-          onPress={handleBack}
-          style={styles.backBtn}
-          testID="schreiben-back-button"
-          hitSlop={8}
-        >
-          <ChevronLeft size={20} color={B.muted} />
-          <Text style={styles.backBtnText}>Zurück</Text>
-        </Pressable>
-      </View>
+      {/* Brand header — Wordifi logo always visible */}
+      <AppHeader
+        rightElement={
+          <Pressable
+            accessibilityLabel="Close"
+            onPress={handleBack}
+            style={styles.closeBtn}
+            testID="schreiben-back-button"
+            hitSlop={8}
+          >
+            <X color={B.muted} size={20} />
+          </Pressable>
+        }
+      />
 
       <View style={styles.headerCard}>
         <View style={styles.progressTrack}>
@@ -589,21 +594,11 @@ const styles = StyleSheet.create({
     padding: spacing.xl,
     justifyContent: 'center',
   },
-  // Inline header
-  topHeader: {
-    paddingHorizontal: 24,
-    paddingTop: 16,
-    paddingBottom: 8,
-  },
-  backBtn: {
-    flexDirection: 'row',
+  closeBtn: {
+    width: 44,
+    height: 44,
     alignItems: 'center',
-    gap: 4,
-  },
-  backBtnText: {
-    fontSize: 15,
-    color: B.muted,
-    fontFamily: fontFamily.bodyRegular,
+    justifyContent: 'center',
   },
   headerCard: {
     paddingHorizontal: 24,
