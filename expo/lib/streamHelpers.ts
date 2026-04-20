@@ -10,8 +10,14 @@ export type StreamFetchParams = {
 };
 
 export type SectionAccuracy = {
-  horenAccuracy: number;
-  lesenAccuracy: number;
+  // Hören + Lesen: raw counts for last 30 days
+  horenCorrect: number;
+  horenTotal: number;
+  lesenCorrect: number;
+  lesenTotal: number;
+  // Schreiben + Sprechen: average score_pct across all sessions (last 30 days)
+  schreibenAvgPct: number | null;
+  sprechenAvgPct: number | null;
   hasHistory: boolean;
 };
 
@@ -27,63 +33,95 @@ const XP_PER_LEVEL: Record<string, number> = {
   B1: 15,
 };
 
+const EMPTY_ACCURACY: SectionAccuracy = {
+  horenCorrect: 0, horenTotal: 0,
+  lesenCorrect: 0, lesenTotal: 0,
+  schreibenAvgPct: null, sprechenAvgPct: null,
+  hasHistory: false,
+};
+
 export async function fetchSectionAccuracy(userId: string): Promise<SectionAccuracy> {
-  const fourteenDaysAgo = new Date();
-  fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
-  const cutoff = fourteenDaysAgo.toISOString();
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  const cutoff = thirtyDaysAgo.toISOString();
 
   try {
-    const { data, error } = await supabase
-      .from('user_answers')
-      .select('is_correct, question_id')
-      .eq('user_id', userId)
-      .gte('created_at', cutoff);
+    // Run all three queries in parallel
+    const [answersResult, schreibenResult, sprechenResult] = await Promise.all([
+      supabase
+        .from('user_answers')
+        .select('is_correct, question_id')
+        .eq('user_id', userId)
+        .gte('created_at', cutoff),
+      supabase
+        .from('test_sessions')
+        .select('score_pct')
+        .eq('user_id', userId)
+        .eq('section', 'Schreiben')
+        .not('completed_at', 'is', null)
+        .gte('completed_at', cutoff),
+      supabase
+        .from('test_sessions')
+        .select('score_pct')
+        .eq('user_id', userId)
+        .eq('section', 'Sprechen')
+        .not('completed_at', 'is', null)
+        .gte('completed_at', cutoff),
+    ]);
 
-    if (error || !data || data.length === 0) {
-      console.log('fetchSectionAccuracy no history or error', error);
-      return { horenAccuracy: 0, lesenAccuracy: 0, hasHistory: false };
-    }
+    // ── Hören / Lesen counts ─────────────────────────────────────────────────
+    let horenCorrect = 0, horenTotal = 0, lesenCorrect = 0, lesenTotal = 0;
 
-    const rows = data as unknown as AnswerRow[];
-    const questionIds = [...new Set(rows.map((r) => r.question_id))];
-    const { data: questions, error: qError } = await supabase
-      .from('app_questions')
-      .select('id, section')
-      .in('id', questionIds);
+    if (answersResult.data && answersResult.data.length > 0) {
+      const rows = answersResult.data as unknown as AnswerRow[];
+      const questionIds = [...new Set(rows.map((r) => r.question_id))];
 
-    if (qError || !questions) {
-      return { horenAccuracy: 0, lesenAccuracy: 0, hasHistory: false };
-    }
+      const { data: questions } = await supabase
+        .from('app_questions')
+        .select('id, section')
+        .in('id', questionIds);
 
-    const qRows = questions as unknown as QuestionSectionRow[];
-    const sectionMap = new Map<string, string>();
-    for (const q of qRows) {
-      sectionMap.set(q.id, q.section);
-    }
-
-    let horenCorrect = 0;
-    let horenTotal = 0;
-    let lesenCorrect = 0;
-    let lesenTotal = 0;
-
-    for (const answer of rows) {
-      const section = sectionMap.get(answer.question_id);
-      if (section === 'Hören') {
-        horenTotal++;
-        if (answer.is_correct) horenCorrect++;
-      } else if (section === 'Lesen') {
-        lesenTotal++;
-        if (answer.is_correct) lesenCorrect++;
+      if (questions) {
+        const sectionMap = new Map<string, string>();
+        for (const q of questions as unknown as QuestionSectionRow[]) {
+          sectionMap.set(q.id, q.section);
+        }
+        for (const answer of rows) {
+          const section = sectionMap.get(answer.question_id);
+          if (section === 'Hören') {
+            horenTotal++;
+            if (answer.is_correct) horenCorrect++;
+          } else if (section === 'Lesen') {
+            lesenTotal++;
+            if (answer.is_correct) lesenCorrect++;
+          }
+        }
       }
     }
 
-    const horenAccuracy = horenTotal > 0 ? horenCorrect / horenTotal : 0;
-    const lesenAccuracy = lesenTotal > 0 ? lesenCorrect / lesenTotal : 0;
+    // ── Schreiben average ───────────────────────────────────────────────────
+    let schreibenAvgPct: number | null = null;
+    if (schreibenResult.data && schreibenResult.data.length > 0) {
+      const scores = (schreibenResult.data as { score_pct: number }[]).map((r) => r.score_pct ?? 0);
+      schreibenAvgPct = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+    }
 
-    return { horenAccuracy, lesenAccuracy, hasHistory: horenTotal > 0 || lesenTotal > 0 };
+    // ── Sprechen average ────────────────────────────────────────────────────
+    let sprechenAvgPct: number | null = null;
+    if (sprechenResult.data && sprechenResult.data.length > 0) {
+      const scores = (sprechenResult.data as { score_pct: number }[]).map((r) => r.score_pct ?? 0);
+      sprechenAvgPct = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+    }
+
+    return {
+      horenCorrect, horenTotal,
+      lesenCorrect, lesenTotal,
+      schreibenAvgPct, sprechenAvgPct,
+      hasHistory: horenTotal > 0 || lesenTotal > 0 || schreibenAvgPct !== null || sprechenAvgPct !== null,
+    };
   } catch (err) {
     console.log('fetchSectionAccuracy error', err);
-    return { horenAccuracy: 0, lesenAccuracy: 0, hasHistory: false };
+    return EMPTY_ACCURACY;
   }
 }
 

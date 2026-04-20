@@ -28,6 +28,11 @@ export type SectionHistoryItem = {
   questionCount: number;
   testCount: number;
   progressPct: number;
+  // Hören / Lesen: raw counts for the "X/Y Correct" display
+  correctCount: number;
+  totalCount: number;
+  // Schreiben / Sprechen: average score_pct (null = no data yet)
+  avgPct: number | null;
 };
 
 export type LeaderboardNeighbor = {
@@ -371,25 +376,48 @@ export function useHomeData(): HomeData {
     staleTime: Infinity, // Don't refetch within this session
   });
 
-  const horenAccuracy = sectionAccuracyQuery.data
-    ? Math.round(sectionAccuracyQuery.data.horenAccuracy * 100)
+  const acc = sectionAccuracyQuery.data;
+  const horenAccuracy = acc && acc.horenTotal > 0
+    ? Math.round((acc.horenCorrect / acc.horenTotal) * 100)
     : 0;
-  const lesenAccuracy = sectionAccuracyQuery.data
-    ? Math.round(sectionAccuracyQuery.data.lesenAccuracy * 100)
+  const lesenAccuracy = acc && acc.lesenTotal > 0
+    ? Math.round((acc.lesenCorrect / acc.lesenTotal) * 100)
     : 0;
 
   const sectionMap = statsQuery.data?.sectionMap ?? {};
   const sectionHistory: SectionHistoryItem[] = SECTION_ORDER.map((section) => {
     const entry = sectionMap[section] ?? { questionCount: 0, testCount: 0 };
-    let progressPct: number;
-    if (section === 'Hören') progressPct = horenAccuracy;
-    else if (section === 'Lesen') progressPct = lesenAccuracy;
-    else progressPct = Math.min(entry.testCount * 33, 100);
+
+    let progressPct = 0;
+    let correctCount = 0;
+    let totalCount = 0;
+    let avgPct: number | null = null;
+
+    if (section === 'Hören') {
+      correctCount = acc?.horenCorrect ?? 0;
+      totalCount = acc?.horenTotal ?? 0;
+      progressPct = totalCount > 0 ? Math.round((correctCount / totalCount) * 100) : 0;
+    } else if (section === 'Lesen') {
+      correctCount = acc?.lesenCorrect ?? 0;
+      totalCount = acc?.lesenTotal ?? 0;
+      progressPct = totalCount > 0 ? Math.round((correctCount / totalCount) * 100) : 0;
+    } else if (section === 'Schreiben') {
+      avgPct = acc?.schreibenAvgPct ?? null;
+      progressPct = avgPct ?? 0;
+    } else {
+      // Sprechen
+      avgPct = acc?.sprechenAvgPct ?? null;
+      progressPct = avgPct ?? 0;
+    }
+
     return {
       section,
       questionCount: entry.questionCount,
       testCount: entry.testCount,
       progressPct,
+      correctCount,
+      totalCount,
+      avgPct,
     };
   });
 

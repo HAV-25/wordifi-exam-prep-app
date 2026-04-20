@@ -326,56 +326,54 @@ export default function HomeScreen() {
           </View>
 
           <View style={s.sectionsList}>
-            {(() => {
-              const maxQ = Math.max(...data.sectionHistory.map(s => s.questionCount), 1);
-              return data.sectionHistory.map((item) => {
-                const pct = Math.min(item.progressPct, 100);
-                const barColor = statusColor(pct);
-                const qPct = Math.round((item.questionCount / maxQ) * 100);
-                const isLocked = (item.section === 'Schreiben' && !access.schreiben_enabled) ||
-                                 (item.section === 'Sprechen' && !access.sprechen_enabled);
-                return (
-                  <Pressable
-                    key={item.section}
-                    style={s.sectionRow}
-                    onPress={() => router.push('/(tabs)/tests' as never)}
-                  >
-                    <View style={s.secLeft}>
-                      <View style={s.secIconWrap}>
-                        <SectionIcon section={item.section} />
-                      </View>
-                      <Text style={s.secName}>{item.section}</Text>
+            {data.sectionHistory.map((item) => {
+              const pct = Math.min(item.progressPct, 100);
+              const barColor = statusColor(pct);
+              const isLocked = (item.section === 'Schreiben' && !access.schreiben_enabled) ||
+                               (item.section === 'Sprechen' && !access.sprechen_enabled);
+
+              // Label: "X/Y Correct" for Hören/Lesen, "X% avg" for Schreiben/Sprechen
+              let statLabel: string;
+              if (item.section === 'Hören' || item.section === 'Lesen') {
+                statLabel = item.totalCount > 0
+                  ? `${item.correctCount}/${item.totalCount} Correct`
+                  : '—';
+              } else {
+                statLabel = item.avgPct !== null ? `${item.avgPct}% avg` : '—';
+              }
+
+              return (
+                <Pressable
+                  key={item.section}
+                  style={s.sectionRow}
+                  onPress={() => router.push('/(tabs)/tests' as never)}
+                >
+                  <View style={s.secLeft}>
+                    <View style={s.secIconWrap}>
+                      <SectionIcon section={item.section} />
                     </View>
-                    <View style={s.secMid}>
-                      {/* Bar 1 — questions completed (normalized) */}
-                      <View style={s.microBarBg}>
-                        <View style={[s.microBarFill, {
-                          width: `${qPct}%` as any,
-                          backgroundColor: sectionAccentColor(item.section),
-                          opacity: 0.7,
-                        }]} />
-                      </View>
-                      {/* Bar 2 — accuracy % */}
-                      <View style={s.microBarBg}>
-                        <View style={[s.microBarFill, {
-                          width: `${pct}%` as any,
-                          backgroundColor: barColor,
-                        }]} />
-                      </View>
+                    <Text style={s.secName}>{item.section}</Text>
+                  </View>
+                  <View style={s.secMid}>
+                    {/* Single accuracy bar */}
+                    <View style={s.microBarBg}>
+                      <View style={[s.microBarFill, {
+                        width: `${pct}%` as any,
+                        backgroundColor: barColor,
+                      }]} />
                     </View>
-                    <View style={s.secRight}>
-                      <Text style={s.questionCount}>{item.questionCount}q</Text>
-                      <Text style={s.accuracyPct}>{pct}%</Text>
-                      {isLocked ? (
-                        <View style={s.lockWrap}>
-                          <Lock color="rgba(255,255,255,0.62)" size={14} />
-                        </View>
-                      ) : null}
-                    </View>
-                  </Pressable>
-                );
-              });
-            })()}
+                  </View>
+                  <View style={s.secRight}>
+                    <Text style={s.accuracyPct}>{statLabel}</Text>
+                    {isLocked ? (
+                      <View style={s.lockWrap}>
+                        <Lock color="rgba(255,255,255,0.62)" size={14} />
+                      </View>
+                    ) : null}
+                  </View>
+                </Pressable>
+              );
+            })}
           </View>
         </Pressable>
 
@@ -885,15 +883,11 @@ const s = StyleSheet.create({
     gap: 8,
     justifyContent: 'flex-end',
   },
-  questionCount: {
-    fontFamily: fontFamily.bodyBold,
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.82)',
-  },
   accuracyPct: {
     fontFamily: fontFamily.bodySemiBold,
     fontSize: 12,
-    color: 'rgba(255,255,255,0.55)',
+    color: 'rgba(255,255,255,0.82)',
+    textAlign: 'right' as const,
   },
   lockWrap: {
     width: 18,
