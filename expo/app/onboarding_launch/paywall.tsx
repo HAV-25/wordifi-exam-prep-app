@@ -35,12 +35,12 @@ export default function PaywallScreen() {
 
         // Whether purchased, restored, or dismissed — save onboarding and continue to auth
         await savePendingOnboarding(onboardingStore, onboardingSessionNonce);
-        router.replace('/auth');
+        router.replace('/auth?mode=signUp');
       } catch (err) {
         console.error('[Paywall] Error presenting paywall:', err);
         // Fallback: save onboarding and continue as free user
         await savePendingOnboarding(onboardingStore, onboardingSessionNonce);
-        router.replace('/auth');
+        router.replace('/auth?mode=signUp');
       } finally {
         setIsPresenting(false);
       }
@@ -63,7 +63,7 @@ export default function PaywallScreen() {
           <Pressable
             onPress={async () => {
               await savePendingOnboarding(onboardingStore, onboardingSessionNonce);
-              router.replace('/auth');
+              router.replace('/auth?mode=signUp');
             }}
             style={styles.skipBtn}
           >

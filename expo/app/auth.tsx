@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { CheckSquare, Eye, EyeOff, Lock, Mail, Square, X } from 'lucide-react-native';
 import React, { useMemo, useRef, useState } from 'react';
 import {
@@ -40,8 +40,11 @@ function getFriendlySignInError(errorMessage: string): string {
 
 export default function AuthScreen() {
   const config = useAppConfig();
+  const { mode: modeParam } = useLocalSearchParams<{ mode?: string }>();
 
-  const [mode, setMode] = useState<'signIn' | 'signUp'>('signIn');
+  const [mode, setMode] = useState<'signIn' | 'signUp'>(
+    modeParam === 'signUp' ? 'signUp' : 'signIn'
+  );
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [showPassword, setShowPassword] = useState<boolean>(false);
@@ -127,8 +130,9 @@ export default function AuthScreen() {
       await signInWithGoogle();
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        // Only tag pending onboarding for new signups — don't stamp stale data onto existing users
-        if (mode === 'signUp') {
+        // Detect new vs existing by account age — reliable regardless of which tab was selected
+        const isNewUser = Date.now() - new Date(user.created_at).getTime() < 60_000;
+        if (isNewUser) {
           await tagPendingOnboardingForUser(user.id, onboardingSessionNonce);
           track('user_signed_up', { signup_method: 'google' });
         } else {

@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import createContextHook from '@nkzw/create-context-hook';
 import type { Session, User } from '@supabase/supabase-js';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -6,6 +7,8 @@ import * as Linking from 'expo-linking';
 import * as Sentry from '@sentry/react-native';
 
 import { adapty } from 'react-native-adapty';
+
+const HAS_ACCOUNT_KEY = 'wordifi_has_account_v1';
 
 import { signOutUser, updateTcAccepted } from '@/lib/authHelpers';
 import { syncSubscriptionOnLaunch } from '@/lib/adaptyPaywall';
@@ -21,15 +24,39 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
   const config = useAppConfig();
   const [session, setSession] = useState<Session | null>(null);
   const [isSessionLoading, setIsSessionLoading] = useState<boolean>(true);
+  const [hasKnownAccount, setHasKnownAccount] = useState<boolean>(false);
 
   useEffect(() => {
     let isMounted = true;
 
-    void supabase.auth.getSession().then(({ data }) => {
+    void supabase.auth.getSession().then(async ({ data }) => {
       console.log('AuthProvider getSession', Boolean(data.session));
-      if (!isMounted) {
-        return;
+      if (!isMounted) return;
+
+      if (!data.session) {
+        // Check if this device has had an account before
+        const flag = await AsyncStorage.getItem(HAS_ACCOUNT_KEY).catch(() => null);
+        if (flag === 'true') {
+          setHasKnownAccount(true);
+        } else {
+          // Fallback: check Adapty for active subscription (handles reinstall scenario)
+          try {
+            const adaptyProfile = await Promise.race<boolean>([
+              adapty.getProfile().then(
+                (p) => p?.accessLevels?.['premium']?.isActive === true
+              ),
+              new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 2000)),
+            ]);
+            if (adaptyProfile) setHasKnownAccount(true);
+          } catch {
+            // no-op — Adapty unavailable
+          }
+        }
+      } else {
+        // Active session — ensure flag is written
+        AsyncStorage.setItem(HAS_ACCOUNT_KEY, 'true').catch(() => {});
       }
+
       setSession(data.session);
       setIsSessionLoading(false);
     });
@@ -40,6 +67,8 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       setIsSessionLoading(false);
 
       if (nextSession?.user) {
+        AsyncStorage.setItem(HAS_ACCOUNT_KEY, 'true').catch(() => {});
+        setHasKnownAccount(true);
         Sentry.setUser({
           id: nextSession.user.id,
           email: nextSession.user.email,
@@ -219,6 +248,7 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       profile: profileQuery.data ?? null,
       isLoading: isSessionLoading || profileQuery.isLoading,
       hasCompletedOnboarding: Boolean(profileQuery.data?.onboarding_completed_at ?? profileQuery.data?.target_level),
+      hasKnownAccount,
       refreshProfile,
       signOut: signOutMutation.mutateAsync,
       isSigningOut: signOutMutation.isPending,
@@ -229,6 +259,7 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       profileQuery.data,
       profileQuery.isLoading,
       isSessionLoading,
+      hasKnownAccount,
       refreshProfile,
       signOutMutation.mutateAsync,
       signOutMutation.isPending,

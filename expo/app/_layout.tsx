@@ -45,7 +45,7 @@ const queryClient = new QueryClient();
 
 function RouteGate() {
   const segments = useSegments();
-  const { isLoading, session, hasCompletedOnboarding } = useAuth();
+  const { isLoading, session, hasCompletedOnboarding, hasKnownAccount } = useAuth();
   const { isMetaLoading } = useQuestionTypeMetaContext();
 
   useEffect(() => {
@@ -67,9 +67,9 @@ function RouteGate() {
   const isOnboardingRoute =
     topSegment === 'onboarding_prelaunch' || topSegment === 'onboarding_launch';
 
-  // No session → show onboarding (unless already there or on auth)
+  // No session → returning user goes to sign-in, new user goes to onboarding
   if (!session && !isAuthRoute && !isOnboardingRoute) {
-    return <Redirect href="/onboarding_launch" />;
+    return <Redirect href={hasKnownAccount ? '/auth' : '/onboarding_launch'} />;
   }
 
   // Has session but onboarding not complete → send back to onboarding
