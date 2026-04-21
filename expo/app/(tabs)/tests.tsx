@@ -32,6 +32,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppHeader } from '@/components/AppHeader';
 import { EmptyState } from '@/components/EmptyState';
+import { PaywallBottomSheet, type PaywallTriggerContext } from '@/components/PaywallBottomSheet';
 import { PaywallModal } from '@/components/PaywallModal';
 import Colors from '@/constants/colors';
 import { fetchSchreibenQuestions, fetchSchreibenTeile } from '@/lib/schreibenHelpers';
@@ -136,6 +137,8 @@ export default function TestsScreen() {
   const userId = user?.id ?? '';
   const targetLevel = profile?.target_level ?? 'A1';
   const [showPaywall, setShowPaywall] = useState<boolean>(false);
+  const [showPaywallSheet, setShowPaywallSheet] = useState<boolean>(false);
+  const [paywallSheetTrigger, setPaywallSheetTrigger] = useState<PaywallTriggerContext>('schreiben_locked');
   const sectionalEnabled = access.sectional_tests_enabled;
 
   useFocusEffect(
@@ -215,7 +218,9 @@ export default function TestsScreen() {
 
   const handleStartSprechen = useCallback((teil: number) => {
     if (!sprechenEnabled) {
-      setShowPaywall(true);
+      // Trigger #7 — bottom sheet first
+      setPaywallSheetTrigger('sprechen_locked');
+      setShowPaywallSheet(true);
       return;
     }
     setSprechenStarting(teil);
@@ -224,7 +229,9 @@ export default function TestsScreen() {
 
   const handleStartSchreiben = useCallback(async (teil: number) => {
     if (!schreibenEnabled) {
-      setShowPaywall(true);
+      // Trigger #6 — bottom sheet first
+      setPaywallSheetTrigger('schreiben_locked');
+      setShowPaywallSheet(true);
       return;
     }
     setSchreibenStarting(teil);
@@ -254,6 +261,7 @@ export default function TestsScreen() {
   const openSetup = useCallback(
     async (teilInfo: TeilInfo) => {
       if (!sectionalEnabled) {
+        // Trigger #5 — sectional exhausted → direct Adapty (hard block)
         setShowPaywall(true);
         return;
       }
@@ -823,6 +831,12 @@ export default function TestsScreen() {
         variant="sectional"
         onUpgrade={() => setShowPaywall(false)}
         onDismiss={() => setShowPaywall(false)}
+      />
+      <PaywallBottomSheet
+        visible={showPaywallSheet}
+        triggerContext={paywallSheetTrigger}
+        onUnlock={() => { setShowPaywallSheet(false); setShowPaywall(true); }}
+        onDismiss={() => setShowPaywallSheet(false)}
       />
     </SafeAreaView>
   );

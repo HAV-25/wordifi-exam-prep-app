@@ -12,12 +12,14 @@ export type EventKey =
   | 'streak_broken'
   | 'paywall_viewed'
   | 'paywall_dismissed'
+  | 'paywall_cta_tapped'
   | 'subscription_started'
   | 'trial_started'
   | 'subscription_renewed'
   | 'subscription_cancelled'
   | 'app_opened'
-  | 'notification_preferences_updated';
+  | 'notification_preferences_updated'
+  | 'push_permission_response';
 
 export function track(event: EventKey, props?: PostHogEventProperties): void {
   try {

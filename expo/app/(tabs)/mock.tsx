@@ -31,6 +31,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppHeader } from '@/components/AppHeader';
+import { PaywallBottomSheet, type PaywallTriggerContext } from '@/components/PaywallBottomSheet';
 import { PaywallModal } from '@/components/PaywallModal';
 import Colors from '@/constants/colors';
 import {
@@ -101,6 +102,8 @@ export default function MockScreen() {
   const mockEnabled = access.mock_tests_enabled;
 
   const [showPaywall, setShowPaywall] = useState(false);
+  const [showPaywallSheet, setShowPaywallSheet] = useState(false);
+  const [paywallSheetTrigger, setPaywallSheetTrigger] = useState<PaywallTriggerContext>('mock_locked');
   const [selectedLevel, setSelectedLevel] = useState<Level>(targetLevel);
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
@@ -143,7 +146,9 @@ export default function MockScreen() {
   // Outer gate: paywall + active-session check before opening setup modal
   const openSetup = useCallback(async () => {
     if (!mockEnabled) {
-      setShowPaywall(true);
+      // Trigger #8: mock_locked — show soft nudge bottom sheet first
+      setPaywallSheetTrigger('mock_locked');
+      setShowPaywallSheet(true);
       return;
     }
     if (MOCK_V2_ENABLED) {
@@ -298,7 +303,7 @@ export default function MockScreen() {
       >
         {/* Upgrade nudge */}
         {!mockEnabled && (
-          <Pressable style={styles.nudge} onPress={() => setShowPaywall(true)}>
+          <Pressable style={styles.nudge} onPress={() => { setPaywallSheetTrigger('mock_locked'); setShowPaywallSheet(true); }}>
             <Sparkles size={22} color="#F0C808" />
             <View style={styles.nudgeTextWrap}>
               <Text style={styles.nudgeTitle}>Unlock all sections & levels</Text>
@@ -504,6 +509,13 @@ export default function MockScreen() {
           </Pressable>
         </Pressable>
       </Modal>
+
+      <PaywallBottomSheet
+        visible={showPaywallSheet}
+        triggerContext={paywallSheetTrigger}
+        onUnlock={() => { setShowPaywallSheet(false); setShowPaywall(true); }}
+        onDismiss={() => setShowPaywallSheet(false)}
+      />
 
       <PaywallModal
         visible={showPaywall}

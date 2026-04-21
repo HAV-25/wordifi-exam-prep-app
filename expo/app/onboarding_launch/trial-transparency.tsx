@@ -93,7 +93,7 @@ export default function TrialTransparencyScreen() {
 
   const ctaFooter = (
     <Pressable
-      onPress={() => router.push('/onboarding_launch/paywall')}
+      onPress={() => router.push('/onboarding_launch/start' as any)}
       style={({ pressed }) => [styles.cta, pressed && styles.ctaPressed]}
       accessibilityRole="button"
       accessibilityLabel="I understand — show me my plan"

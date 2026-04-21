@@ -31,12 +31,15 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { AppHeader } from '@/components/AppHeader';
 import { CelebrationOverlay } from '@/components/CelebrationOverlay';
+import { PaywallBottomSheet, type PaywallTriggerContext } from '@/components/PaywallBottomSheet';
 import { PaywallModal } from '@/components/PaywallModal';
 import { ReadinessBottomSheet } from '@/components/ReadinessBottomSheet';
 import { ReportModal } from '@/components/ReportModal';
 import { StreamCard } from '@/components/StreamCard';
 import { TrialBanner } from '@/components/TrialBanner';
 import { fontFamily, fontSize, PAID_TIERS } from '@/theme';
+import { useBadgeLadder, getBadgeByStreak } from '@/hooks/useBadgeLadder';
+import { useGameState, useInvalidateGameState } from '@/hooks/useGameState';
 import { TEIL_NAMES } from '@/theme/constants';
 import { didCrossBadgeThreshold, formatXp, getBadgeTier } from '@/lib/badgeHelpers';
 import {
@@ -97,8 +100,14 @@ export default function TestStreamScreen() {
   const [isRecycledBanner, setIsRecycledBanner] = useState<boolean>(false);
   const [audioUnlockedMap, setAudioUnlockedMap] = useState<Record<string, boolean>>({});
 
-  // ── Gamification state ─────────────────────────────────────────────────────
+  // ── Paywall state ─────────────────────────────────────────────────────────
   const [showPaywall, setShowPaywall] = useState<boolean>(false);
+  const [showPaywallSheet, setShowPaywallSheet] = useState<boolean>(false);
+  const [paywallSheetTrigger, setPaywallSheetTrigger] = useState<PaywallTriggerContext>('stream_80_free');
+  /** Prevents 80% warning from re-firing in the same session after dismissal */
+  const warned80Ref = useRef(false);
+
+  // ── Gamification state ─────────────────────────────────────────────────────
   const [localReadiness, setLocalReadiness] = useState<number>(profile?.readiness_score ?? 0);
   const [localXp, setLocalXp] = useState<number>(profile?.xp_total ?? 0);
   const [localStreak, setLocalStreak] = useState<number>(profile?.streak_count ?? 0);
@@ -130,7 +139,26 @@ export default function TestStreamScreen() {
   const formattedXp = useMemo(() => formatXp(localXp), [localXp]);
 
   const isPaidUser = PAID_TIERS.has(profile?.subscription_tier ?? 'free_trial');
+  const isTrial = !isPaidUser && (profile?.subscription_tier === 'free_trial' || (access.trial_hours_remaining ?? 0) > 0);
   const trialHours = access.trial_hours_remaining;
+
+  // ── Game state (streak requirement for trigger #9) ─────────────────────────
+  const { data: gameState } = useGameState(targetLevel, userId || undefined);
+  const { data: badgeLadder } = useBadgeLadder();
+  const invalidateGameState = useInvalidateGameState();
+
+  const streakDays      = gameState?.streak?.current_days ?? 0;
+  const todayRequirement = gameState?.today?.requirement ?? 5;
+  const requirementMet  = gameState?.today?.requirement_met ?? false;
+  const badgeName       = getBadgeByStreak(streakDays, badgeLadder ?? [])?.name ?? '';
+
+  /** True when free user's streak requirement has escalated past the 5-question free cap */
+  const isStreakReqExceedsFree =
+    !isPaidUser &&
+    !isTrial &&
+    isStreamLimited &&
+    todayRequirement > 5 &&
+    !requirementMet;
 
   // ── Sync profile values ────────────────────────────────────────────────────
   useEffect(() => {
@@ -271,15 +299,50 @@ export default function TestStreamScreen() {
         checkAndAwardBadges(userId, targetLevel, localXp).then((badge) => { if (badge) setCelebrationBadge(badge); }).catch(() => {});
         refreshProfile().catch(() => {});
       }
+
+      // Invalidate game state so trigger #9 check sees fresh requirement_met / questions_remaining
+      invalidateGameState(targetLevel, userId || undefined);
     },
     [sessionId, userId, profile, localXp, localStreak, targetLevel, sessionAnsweredCount,
      correctStreak, decrementStreamRemaining, incrementDailyStreamCount, triggerXpBurst,
-     showStreakToastBanner, showComboToastBanner, refreshProfile]
+     showStreakToastBanner, showComboToastBanner, refreshProfile, invalidateGameState]
   );
 
   // ── Handle Next ────────────────────────────────────────────────────────────
   const handleNext = useCallback(() => {
-    if (isStreamLimited) { setShowPaywall(true); return; }
+    // Hard block: daily limit already reached
+    if (isStreamLimited) {
+      if (isStreakReqExceedsFree) {
+        // Trigger #9 — streak requirement exceeds free cap
+        setPaywallSheetTrigger('streak_req_exceeds_free');
+        setShowPaywallSheet(true);
+      } else {
+        // Trigger #4 — mid-session hard block → direct Adapty
+        setShowPaywall(true);
+      }
+      return;
+    }
+
+    // Soft warning: 80% of daily cap used (fire once per session)
+    const remaining = access.stream_questions_remaining ?? 0;
+    if (!warned80Ref.current && !isPaidUser) {
+      const dailyCap = access.stream_questions_per_day ?? 5;
+      if (!isTrial && remaining === 1) {
+        // Trigger #1 — free user, 1 question left
+        warned80Ref.current = true;
+        setPaywallSheetTrigger('stream_80_free');
+        setShowPaywallSheet(true);
+        return; // Let user dismiss sheet before advancing
+      }
+      if (isTrial && remaining === 4) {
+        // Trigger #2 — trial user, 4 questions left (16/20)
+        warned80Ref.current = true;
+        setPaywallSheetTrigger('stream_80_trial');
+        setShowPaywallSheet(true);
+        return;
+      }
+    }
+
     const newIndex = currentIndex + 1;
     const isNowComplete = newIndex >= totalQuestions;
     if (sessionId) advanceSession(sessionId, newIndex, totalQuestions).catch((err) => console.error('[Stream] Advance error:', err));
@@ -345,10 +408,27 @@ export default function TestStreamScreen() {
         <AppHeader />
         <View style={s.emptyWrap}>
           <Text style={s.emptyEmoji}>⏰</Text>
-          <Text style={s.emptyTitle}>Daily limit reached</Text>
-          <Text style={s.emptyDesc}>You've answered {dailyLimit} question{dailyLimit !== 1 ? 's' : ''} today — your daily allowance.{'\n'}Upgrade to practise unlimited questions every day.</Text>
+          <Text style={s.emptyTitle}>
+            {isStreakReqExceedsFree ? 'Streak requirement not met' : 'Daily limit reached'}
+          </Text>
+          <Text style={s.emptyDesc}>
+            {isStreakReqExceedsFree
+              ? `Today's streak requires ${todayRequirement} questions. You've used your ${dailyLimit} free.`
+              : `You've answered ${dailyLimit} question${dailyLimit !== 1 ? 's' : ''} today — your daily allowance.\nUpgrade to practise unlimited questions every day.`}
+          </Text>
           <View style={s.emptyCtas}>
-            <Pressable style={s.ctaPrimary} onPress={() => setShowPaywall(true)}>
+            <Pressable
+              style={s.ctaPrimary}
+              onPress={() => {
+                if (isStreakReqExceedsFree) {
+                  setPaywallSheetTrigger('streak_req_exceeds_free');
+                  setShowPaywallSheet(true);
+                } else {
+                  // Trigger #3 — direct Adapty
+                  setShowPaywall(true);
+                }
+              }}
+            >
               <Text style={s.ctaPrimaryText}>Unlock Unlimited</Text>
             </Pressable>
             <Pressable style={s.ctaSecondary} onPress={() => router.push('/(tabs)/tests' as never)}>
@@ -357,6 +437,17 @@ export default function TestStreamScreen() {
           </View>
         </View>
         <PaywallModal visible={showPaywall} variant="stream_limit" onUpgrade={() => setShowPaywall(false)} onDismiss={() => setShowPaywall(false)} />
+        <PaywallBottomSheet
+          visible={showPaywallSheet}
+          triggerContext={paywallSheetTrigger}
+          streamUsed={dailyLimit}
+          streamTotal={access.stream_questions_per_day ?? 5}
+          streakDays={streakDays}
+          streakRequirement={todayRequirement}
+          badgeName={badgeName}
+          onUnlock={() => { setShowPaywallSheet(false); setShowPaywall(true); }}
+          onDismiss={() => setShowPaywallSheet(false)}
+        />
       </SafeAreaView>
     );
   }
@@ -516,6 +607,17 @@ export default function TestStreamScreen() {
       <ReadinessBottomSheet visible={showBottomSheet} onClose={() => setShowBottomSheet(false)} level={targetLevel} overallScore={localReadiness} horenPct={horenPct} lesenPct={lesenPct} streak={localStreak} lastActiveDate={profile?.last_active_date ?? null} />
       <ReportModal visible={Boolean(reportQuestionId)} questionId={reportQuestionId ?? ''} userId={userId} onClose={() => setReportQuestionId(null)} />
       <PaywallModal visible={showPaywall} variant="stream_limit" onUpgrade={() => setShowPaywall(false)} onDismiss={() => setShowPaywall(false)} />
+      <PaywallBottomSheet
+        visible={showPaywallSheet}
+        triggerContext={paywallSheetTrigger}
+        streamUsed={(access.stream_questions_per_day ?? 5) - (access.stream_questions_remaining ?? 0)}
+        streamTotal={paywallSheetTrigger === 'stream_80_trial' ? 20 : (access.stream_questions_per_day ?? 5)}
+        streakDays={streakDays}
+        streakRequirement={todayRequirement}
+        badgeName={badgeName}
+        onUnlock={() => { setShowPaywallSheet(false); setShowPaywall(true); }}
+        onDismiss={() => setShowPaywallSheet(false)}
+      />
     </SafeAreaView>
   );
 }

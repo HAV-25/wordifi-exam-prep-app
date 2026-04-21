@@ -29,6 +29,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { AvatarImage } from '@/components/AvatarImage';
 import { GlowBorderCard } from '@/components/GlowBorderCard';
+import { PaywallBottomSheet } from '@/components/PaywallBottomSheet';
 import { PaywallModal } from '@/components/PaywallModal';
 import { ReadinessBottomSheet } from '@/components/ReadinessBottomSheet';
 import { ProgressRing } from '@/components/ProgressRing';
@@ -36,6 +37,8 @@ import { Sparkline } from '@/components/Sparkline';
 import { WordifiLogo } from '@/components/WordifiLogo';
 import { formatXp } from '@/lib/badgeHelpers';
 import { useHomeData, type LeaderboardNeighbor } from '@/lib/useHomeData';
+import { getBadgeByStreak, useBadgeLadder } from '@/hooks/useBadgeLadder';
+import { useGameState } from '@/hooks/useGameState';
 import { useAccess } from '@/providers/AccessProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import {
@@ -123,13 +126,36 @@ export default function HomeScreen() {
 
   const [showBottomSheet, setShowBottomSheet] = React.useState(false);
   const [showPaywall, setShowPaywall] = React.useState(false);
+  const [showStreakPaywallSheet, setShowStreakPaywallSheet] = React.useState(false);
+
+  const isPaidUser = PAID_TIERS.has(data.subscriptionTier);
+  const showUpgradeBanner = !isPaidUser;
+
+  // Trigger #9 home variant — streak requirement exceeds free cap
+  const { data: gameState } = useGameState(targetLevel, userId);
+  const { data: ladder = [] } = useBadgeLadder();
+
+  const isTrial = !isPaidUser && (
+    (data.subscriptionTier as string) === 'free_trial' ||
+    (data as any).trialHoursRemaining > 0
+  );
+  const todayRequirement = gameState?.today.requirement ?? 0;
+  const requirementMet   = gameState?.today.requirement_met ?? false;
+  const questionsRemaining = gameState?.today.questions_remaining ?? 1;
+  const streakDays       = gameState?.streak.current_days ?? 0;
+  const badgeName        = getBadgeByStreak(streakDays, ladder)?.name ?? '';
+
+  // Show streak nudge card when: free user, streak req > 5 free cap, not yet met, no questions remaining
+  const showStreakNudge =
+    !isPaidUser &&
+    !isTrial &&
+    todayRequirement > 5 &&
+    !requirementMet &&
+    questionsRemaining === 0;
 
   const formattedXp = useMemo(() => formatXp(data.xp), [data.xp]);
   const initial = (data.firstName ?? user?.email ?? '?').charAt(0).toUpperCase();
   const scoreInt = Math.round(data.readiness);
-
-  const isPaidUser = PAID_TIERS.has(data.subscriptionTier);
-  const showUpgradeBanner = !isPaidUser;
 
   // Sparkline data arrays (7 values)
   const xpSparkData = useMemo(
@@ -238,6 +264,25 @@ export default function HomeScreen() {
               </Pressable>
             </GlowBorderCard>
           </View>
+        )}
+
+        {/* ── Streak exceeds free nudge (Trigger #9) ── */}
+        {showStreakNudge && (
+          <Pressable
+            style={s.streakNudgeBanner}
+            onPress={() => setShowStreakPaywallSheet(true)}
+            testID="home-streak-nudge"
+          >
+            <Flame color="#92400E" size={20} />
+            <View style={s.streakNudgeBannerText}>
+              <Text style={s.streakNudgeBannerTitle}>
+                Your streak needs {todayRequirement} questions today
+              </Text>
+              <Text style={s.streakNudgeBannerSub}>
+                Unlock unlimited to keep{badgeName ? ` ${badgeName}` : ' your streak'} alive.
+              </Text>
+            </View>
+          </Pressable>
         )}
 
         {/* ── Level Badge ── */}
@@ -417,6 +462,17 @@ export default function HomeScreen() {
         sprechenSessions={data.sectionHistory.find((s) => s.section === 'Sprechen')?.testCount ?? 0}
         streak={data.streak}
         lastActiveDate={profile?.last_active_date ?? null}
+      />
+
+      {/* Trigger #9: streak requirement exceeds free cap */}
+      <PaywallBottomSheet
+        visible={showStreakPaywallSheet}
+        triggerContext="streak_req_exceeds_free"
+        streakDays={streakDays}
+        streakRequirement={todayRequirement}
+        badgeName={badgeName}
+        onUnlock={() => { setShowStreakPaywallSheet(false); setShowPaywall(true); }}
+        onDismiss={() => setShowStreakPaywallSheet(false)}
       />
 
       <PaywallModal
@@ -603,6 +659,36 @@ const s = StyleSheet.create({
     height: 18,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+
+  // ── Streak exceeds free nudge banner ──
+  streakNudgeBanner: {
+    marginHorizontal: 20,
+    marginTop: 12,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    backgroundColor: '#FEFCE8',
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  streakNudgeBannerText: {
+    flex: 1,
+  },
+  streakNudgeBannerTitle: {
+    fontFamily: fontFamily.bodySemiBold,
+    fontSize: 14,
+    color: '#92400E',
+    lineHeight: 20,
+  },
+  streakNudgeBannerSub: {
+    fontFamily: fontFamily.bodyRegular,
+    fontSize: 13,
+    color: '#92400E',
+    lineHeight: 18,
+    marginTop: 2,
+    opacity: 0.85,
   },
 
   // ── Level Badge ──
