@@ -43,6 +43,10 @@ import type { AppQuestion } from '@/types/database';
 const SUPABASE_URL = 'https://wwfiauhsbssjowaxmqyn.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind3ZmlhdWhzYnNzam93YXhtcXluIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE0MTQxMzUsImV4cCI6MjA4Njk5MDEzNX0.lSPPEQCtdigdXpwB2X5hUTrC2dThil6qleQtqcUEKAE';
 
+// Friendly AI partner names — never expose raw OpenAI voice IDs
+const AI_PARTNER_NAMES = ['Anna', 'Felix', 'Laura', 'Markus', 'Sophie', 'Thomas', 'Lena', 'Klaus', 'Marie', 'Jan'];
+const ORANGE = '#F97316';
+
 type ScreenState =
   | 'loading'
   | 'instruction'
@@ -80,6 +84,7 @@ export default function SprechenRealtimeScreen() {
   const [showSilenceNudge, setShowSilenceNudge] = useState<boolean>(false);
   const silenceNudgeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const aiPartnerNameRef = useRef(AI_PARTNER_NAMES[Math.floor(Math.random() * AI_PARTNER_NAMES.length)]!);
   const sessionRef = useRef<IRealtimeSession | null>(null);
   const sessionIdRef = useRef<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -433,10 +438,11 @@ export default function SprechenRealtimeScreen() {
   }, []);
 
   const getStatusLabel = (): string => {
+    const name = aiPartnerNameRef.current;
     switch (convState) {
       case 'connecting': return 'Connecting...';
       case 'connected': return 'Connected';
-      case 'ai_speaking': return 'Alex is speaking...';
+      case 'ai_speaking': return `${name} is speaking...`;
       case 'listening': return isMonologue ? 'Recording in progress...' : 'Listening...';
       default: return '';
     }
@@ -452,11 +458,11 @@ export default function SprechenRealtimeScreen() {
     }
   };
 
-  // ─── Helper: Alex avatar ──────────────────────────────────────────────────
+  // ─── Helper: AI partner avatar (instruction screen) ──────────────────────
   const renderAlexAvatar = () => (
     <View style={styles.alexSection}>
       <View style={styles.alexAvatar} />
-      <Text style={styles.alexName}>Alex</Text>
+      <Text style={styles.alexName}>{aiPartnerNameRef.current}</Text>
       <Text style={styles.alexRole}>Your conversation partner - AI</Text>
       <Text style={styles.alexSubRole}>Always where you are</Text>
     </View>
@@ -676,43 +682,42 @@ export default function SprechenRealtimeScreen() {
           ]} />
         </View>
 
-        {/* Avatar section */}
+        {/* Dual-circle avatar section */}
         <View style={styles.avatarSection}>
-          <Animated.View style={[styles.avatarCircle, { opacity: pulseAnim }]} />
-          <Text style={styles.avatarName}>Alex</Text>
-          <Text style={[styles.avatarStatus, { color: statusColor }]}>{statusLabel}</Text>
+          {/* AI partner circle — pulses when AI speaks */}
+          <View style={styles.avatarItem}>
+            <Animated.View style={[
+              styles.avatarCircle,
+              styles.avatarCircleAi,
+              { opacity: convState === 'ai_speaking' ? pulseAnim : 0.3 },
+            ]} />
+            <Text style={styles.avatarName}>{aiPartnerNameRef.current}</Text>
+          </View>
+
+          {/* User circle — pulses when user speaks */}
+          <View style={styles.avatarItem}>
+            <Animated.View style={[
+              styles.avatarCircle,
+              styles.avatarCircleUser,
+              { opacity: convState === 'listening' ? pulseAnim : 0.3 },
+            ]} />
+            <Text style={styles.avatarName}>Sie</Text>
+          </View>
         </View>
 
-        {/* Transcript */}
-        <ScrollView
-          style={styles.transcriptScroll}
-          contentContainerStyle={styles.transcriptContent}
-          showsVerticalScrollIndicator={false}
-        >
-          {transcriptEntries.map((entry, idx) => (
-            <View
-              key={String(idx)}
-              style={[
-                styles.bubble,
-                entry.role === 'assistant' ? styles.bubbleAi : styles.bubbleUser,
-              ]}
-            >
-              <Text style={[styles.bubbleRole, entry.role === 'user' && styles.bubbleRoleUser]}>
-                {entry.role === 'assistant' ? 'Partner' : 'Sie'}
-              </Text>
-              <Text style={[styles.bubbleText, entry.role === 'user' && styles.bubbleTextUser]}>
-                {entry.text}
-              </Text>
-            </View>
-          ))}
+        {/* Status text */}
+        <Text style={[styles.avatarStatus, { color: statusColor }]}>{statusLabel}</Text>
 
-          {currentAiText ? (
-            <View style={[styles.bubble, styles.bubbleAi]}>
-              <Text style={styles.bubbleRole}>Partner</Text>
-              <Text style={styles.bubbleText}>{currentAiText}</Text>
-            </View>
-          ) : null}
-        </ScrollView>
+        {/* Monologue: show topic card so user can reference it while presenting */}
+        {isMonologue ? (
+          <View style={styles.monologueTopicCard}>
+            <Text style={styles.monologueTopicLabel}>THEMA</Text>
+            <Text style={styles.monologueTopicText}>{question?.question_text ?? ''}</Text>
+          </View>
+        ) : null}
+
+        {/* Spacer to push footer down */}
+        <View style={{ flex: 1 }} />
 
         {showSilenceNudge && (
           <View style={styles.silenceNudge} pointerEvents="none">
@@ -930,8 +935,7 @@ export default function SprechenRealtimeScreen() {
   );
 }
 
-// ─── Orange accent for live conversation + bullet dots ────────────────────
-const ORANGE = '#F97316';
+// ─── Styles ───────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   // ── Structural ──────────────────────────────────────────────────────────
@@ -1246,70 +1250,61 @@ const styles = StyleSheet.create({
     height: 4,
   },
 
-  // ── Conversation — Avatar ─────────────────────────────────────────────────
+  // ── Conversation — Dual-circle avatar ────────────────────────────────────
   avatarSection: {
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: spacing.xl,
+    justifyContent: 'center',
+    paddingVertical: spacing.xxl,
+    gap: 48,
+  },
+  avatarItem: {
+    alignItems: 'center',
     gap: spacing.sm,
   },
   avatarCircle: {
     width: 100,
     height: 100,
     borderRadius: 50,
+  },
+  avatarCircleAi: {
     backgroundColor: colors.blue,
-    marginBottom: 4,
+  },
+  avatarCircleUser: {
+    backgroundColor: ORANGE,
   },
   avatarName: {
-    fontSize: fontSize.bodyLg,
-    fontWeight: '800' as const,
+    fontSize: fontSize.bodyMd,
+    fontWeight: '700' as const,
     color: colors.navy,
   },
   avatarStatus: {
     fontSize: fontSize.bodySm,
     fontWeight: '600' as const,
+    textAlign: 'center' as const,
+    paddingHorizontal: spacing.xl,
   },
 
-  // ── Conversation — Transcript ─────────────────────────────────────────────
-  transcriptScroll: {
-    flex: 1,
-  },
-  transcriptContent: {
-    paddingHorizontal: spacing.xl,
-    paddingBottom: 120,
-    gap: spacing.sm,
-  },
-  bubble: {
-    borderRadius: radius.lg,
-    padding: spacing.md,
-    maxWidth: '82%',
-  },
-  bubbleAi: {
+  // ── Conversation — Monologue topic card ───────────────────────────────────
+  monologueTopicCard: {
+    marginHorizontal: spacing.xl,
+    marginTop: spacing.lg,
     backgroundColor: colors.white,
-    alignSelf: 'flex-start',
-    borderBottomLeftRadius: 4,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    gap: 6,
   },
-  bubbleUser: {
-    backgroundColor: colors.blue,
-    alignSelf: 'flex-end',
-    borderBottomRightRadius: 4,
-  },
-  bubbleRole: {
+  monologueTopicLabel: {
     fontSize: fontSize.label,
     fontWeight: '700' as const,
     color: colors.muted,
-    marginBottom: 2,
+    letterSpacing: 0.8,
   },
-  bubbleRoleUser: {
-    color: 'rgba(255,255,255,0.7)',
-  },
-  bubbleText: {
+  monologueTopicText: {
     fontSize: fontSize.bodyMd,
-    fontWeight: '500' as const,
-    color: colors.bodyText,
+    fontWeight: '600' as const,
+    color: colors.navy,
     lineHeight: 22,
-  },
-  bubbleTextUser: {
-    color: colors.white,
   },
 
   // ── Conversation — Silence nudge ──────────────────────────────────────────

@@ -57,6 +57,8 @@ import type { AppQuestion } from '@/types/database';
 const SUPABASE_URL = 'https://wwfiauhsbssjowaxmqyn.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind3ZmlhdWhzYnNzam93YXhtcXluIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE0MTQxMzUsImV4cCI6MjA4Njk5MDEzNX0.lSPPEQCtdigdXpwB2X5hUTrC2dThil6qleQtqcUEKAE';
 
+const AI_PARTNER_NAMES = ['Anna', 'Felix', 'Laura', 'Markus', 'Sophie', 'Thomas', 'Lena', 'Klaus', 'Marie', 'Jan'];
+
 export type MockSprechenTeilResult = {
   scores: SprechenScores;
   transcript: string;
@@ -109,6 +111,7 @@ export function MockSprechenTeil({
   const monologueTimerStartedRef = useRef<boolean>(false);
   const isWebRTC = isWebRTCAvailable();
   const pulseAnim = useRef(new Animated.Value(0.4)).current;
+  const aiPartnerNameRef = useRef(AI_PARTNER_NAMES[Math.floor(Math.random() * AI_PARTNER_NAMES.length)]!);
 
   const partnerPrompts = React.useMemo(() => {
     const raw = question as Record<string, unknown> | null;
@@ -480,11 +483,12 @@ export function MockSprechenTeil({
   const remainingSeconds = Math.max(0, recordingTimeLimitSec - elapsedSeconds);
   const isLowTime = remainingSeconds <= 30;
   const progressPct = Math.min(100, (elapsedSeconds / recordingTimeLimitSec) * 100);
+  const partnerName = aiPartnerNameRef.current;
   const statusLabel = (() => {
     switch (convState) {
       case 'connecting': return 'Connecting…';
       case 'connected':  return 'Connected';
-      case 'ai_speaking': return 'Alex is speaking...';
+      case 'ai_speaking': return `${partnerName} is speaking...`;
       case 'listening':  return 'Listening...';
       case 'ended':      return 'Conversation ended';
       case 'error':      return 'Error';
@@ -524,30 +528,41 @@ export function MockSprechenTeil({
         ]} />
       </View>
 
-      {/* Alex avatar (pulsing) */}
+      {/* Dual-circle avatar */}
       <View style={styles.avatarSection}>
-        <Animated.View style={[styles.avatarCircle, { opacity: pulseAnim }]} />
-        <Text style={styles.avatarName}>Alex</Text>
-        <Text style={[styles.avatarStatus, { color: statusColor }]}>{statusLabel}</Text>
+        {/* AI partner circle — pulses when AI speaks */}
+        <View style={styles.avatarItem}>
+          <Animated.View style={[
+            styles.avatarCircle,
+            styles.avatarCircleAi,
+            { opacity: convState === 'ai_speaking' ? pulseAnim : 0.3 },
+          ]} />
+          <Text style={styles.avatarName}>{partnerName}</Text>
+        </View>
+
+        {/* User circle — pulses when user speaks */}
+        <View style={styles.avatarItem}>
+          <Animated.View style={[
+            styles.avatarCircle,
+            styles.avatarCircleUser,
+            { opacity: convState === 'listening' ? pulseAnim : 0.3 },
+          ]} />
+          <Text style={styles.avatarName}>Sie</Text>
+        </View>
       </View>
 
-      {/* Transcript */}
-      <ScrollView style={styles.transcriptScroll} contentContainerStyle={styles.transcriptContent}>
-        {transcriptEntries.map((entry, i) => (
-          <View key={i} style={[styles.bubble, entry.role === 'assistant' ? styles.bubbleAi : styles.bubbleUser]}>
-            <Text style={[styles.bubbleRole, entry.role === 'user' && styles.bubbleRoleUser]}>
-              {entry.role === 'assistant' ? 'Partner' : 'Sie'}
-            </Text>
-            <Text style={[styles.bubbleText, entry.role === 'user' && styles.bubbleTextUser]}>{entry.text}</Text>
-          </View>
-        ))}
-        {currentAiText ? (
-          <View style={[styles.bubble, styles.bubbleAi]}>
-            <Text style={styles.bubbleRole}>Partner</Text>
-            <Text style={styles.bubbleText}>{currentAiText}</Text>
-          </View>
-        ) : null}
-      </ScrollView>
+      {/* Status text */}
+      <Text style={[styles.avatarStatus, { color: statusColor }]}>{statusLabel}</Text>
+
+      {/* Monologue: keep topic visible for reference */}
+      {isMonologue ? (
+        <View style={styles.monologueTopicCard}>
+          <Text style={styles.monologueTopicLabel}>THEMA</Text>
+          <Text style={styles.monologueTopicText}>{question.stimulus_text || question.question_text}</Text>
+        </View>
+      ) : null}
+
+      <View style={{ flex: 1 }} />
 
       {showSilenceNudge && (
         <View style={styles.silenceNudge} pointerEvents="none">
@@ -681,32 +696,30 @@ const styles = StyleSheet.create({
   },
   timerProgressFill: { height: 4 },
 
-  // Avatar section (centered)
+  // ── Dual-circle avatar ─────────────────────────────────────────────────
   avatarSection: {
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 20,
-    gap: 8,
+    justifyContent: 'center',
+    paddingVertical: 32,
+    gap: 48,
   },
-  avatarCircle: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: B.primary,
-    marginBottom: 4,
-  },
-  avatarName: { fontSize: 16, fontWeight: '800' as const, color: B.questionColor },
-  avatarStatus: { fontSize: 13, fontWeight: '600' as const },
+  avatarItem: { alignItems: 'center', gap: 8 },
+  avatarCircle: { width: 100, height: 100, borderRadius: 50 },
+  avatarCircleAi: { backgroundColor: B.primary },
+  avatarCircleUser: { backgroundColor: ORANGE },
+  avatarName: { fontSize: 14, fontWeight: '700' as const, color: B.questionColor },
+  avatarStatus: { fontSize: 13, fontWeight: '600' as const, textAlign: 'center' as const, paddingHorizontal: 24 },
 
-  // Transcript
-  transcriptScroll: { flex: 1 },
-  transcriptContent: { paddingHorizontal: 16, paddingBottom: 100, gap: 8 },
-  bubble: { borderRadius: 14, padding: 12, maxWidth: '85%' },
-  bubbleAi: { backgroundColor: B.card, borderWidth: 1, borderColor: B.border, alignSelf: 'flex-start', borderBottomLeftRadius: 4 },
-  bubbleUser: { backgroundColor: B.primary, alignSelf: 'flex-end', borderBottomRightRadius: 4 },
-  bubbleRole: { fontSize: 10, fontWeight: '800' as const, color: B.muted, letterSpacing: 0.4, marginBottom: 2, textTransform: 'uppercase' as const },
-  bubbleRoleUser: { color: 'rgba(255,255,255,0.7)' },
-  bubbleText: { fontSize: 14, fontWeight: '500' as const, color: B.questionColor, lineHeight: 20 },
-  bubbleTextUser: { color: '#fff' },
+  // Monologue topic reference card
+  monologueTopicCard: {
+    marginHorizontal: 20, marginTop: 16,
+    backgroundColor: B.card, borderRadius: 14,
+    borderWidth: 1, borderColor: B.border,
+    padding: 14, gap: 6,
+  },
+  monologueTopicLabel: { fontSize: 11, fontWeight: '700' as const, color: B.muted, letterSpacing: 0.8 },
+  monologueTopicText: { fontSize: 14, fontWeight: '600' as const, color: B.questionColor, lineHeight: 20 },
 
   // Silence nudge
   silenceNudge: {
