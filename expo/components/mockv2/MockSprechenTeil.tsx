@@ -39,6 +39,8 @@ import {
   View,
 } from 'react-native';
 
+const ORANGE = '#F97316';
+
 import {
   createRealtimeSession,
   isWebRTCAvailable,
@@ -106,6 +108,7 @@ export function MockSprechenTeil({
   const finalCountdownTriggeredRef = useRef<boolean>(false);
   const monologueTimerStartedRef = useRef<boolean>(false);
   const isWebRTC = isWebRTCAvailable();
+  const pulseAnim = useRef(new Animated.Value(0.4)).current;
 
   const partnerPrompts = React.useMemo(() => {
     const raw = question as Record<string, unknown> | null;
@@ -320,6 +323,22 @@ export function MockSprechenTeil({
     };
   }, [convState]);
 
+  // ── Pulse animation for avatar ──────────────────────────────────────────
+  useEffect(() => {
+    if (convState === 'ai_speaking' || convState === 'listening' || convState === 'connected') {
+      const loop = Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
+          Animated.timing(pulseAnim, { toValue: 0.4, duration: 800, useNativeDriver: true }),
+        ])
+      );
+      loop.start();
+      return () => loop.stop();
+    }
+    pulseAnim.setValue(1);
+    return undefined;
+  }, [convState, pulseAnim]);
+
   // ── Native push-to-talk (when WebRTC unavailable) ───────────────────────
   const handleNativeRecord = useCallback(async () => {
     const s = sessionRef.current;
@@ -460,58 +479,70 @@ export function MockSprechenTeil({
   // PHASE: conversation
   const remainingSeconds = Math.max(0, recordingTimeLimitSec - elapsedSeconds);
   const isLowTime = remainingSeconds <= 30;
+  const progressPct = Math.min(100, (elapsedSeconds / recordingTimeLimitSec) * 100);
   const statusLabel = (() => {
     switch (convState) {
       case 'connecting': return 'Connecting…';
-      case 'connected':  return 'Ready';
-      case 'ai_speaking': return 'AI is speaking…';
-      case 'listening':  return 'Your turn — speak now';
+      case 'connected':  return 'Connected';
+      case 'ai_speaking': return 'Alex is speaking...';
+      case 'listening':  return 'Listening...';
       case 'ended':      return 'Conversation ended';
       case 'error':      return 'Error';
       default:           return '...';
     }
   })();
+  const statusColor = (() => {
+    switch (convState) {
+      case 'ai_speaking': return '#14B86A';
+      case 'listening': return B.primary;
+      case 'connected': return B.primary;
+      default: return B.muted;
+    }
+  })();
 
   return (
     <View style={styles.convScreen}>
-      {/* Header */}
+      {/* Compact header: breadcrumb + timer */}
       <View style={styles.convHeader}>
-        <View style={styles.convStatusRow}>
-          <View style={[styles.statusDot, convState === 'ai_speaking' ? styles.dotAi : convState === 'listening' ? styles.dotUser : styles.dotIdle]} />
-          <Text style={styles.statusText}>{statusLabel}</Text>
-        </View>
-        <View style={[styles.timerChip, isLowTime && styles.timerChipUrgent]}>
-          <TimerIcon color={isLowTime ? '#EF4444' : B.muted} size={14} />
-          <Text style={[styles.timerText, isLowTime && styles.timerTextUrgent]}>{formatTime(remainingSeconds)}</Text>
-        </View>
-        <View style={styles.timerProgressTrack}>
-          <View style={[
-            styles.timerProgressFill,
-            {
-              width: `${Math.min(100, (elapsedSeconds / recordingTimeLimitSec) * 100)}%` as `${number}%`,
-              backgroundColor: isLowTime ? '#EF4444' : B.primary,
-            },
-          ]} />
+        <Text style={styles.convTitle}>{teilIndexLabel}</Text>
+        <View style={[styles.timerBadge, isLowTime && styles.timerBadgeRed]}>
+          <TimerIcon color={isLowTime ? '#fff' : B.muted} size={12} />
+          <Text style={[styles.timerText, isLowTime && styles.timerTextUrgent]}>
+            {formatTime(remainingSeconds)}
+          </Text>
         </View>
       </View>
 
-      {/* Topic + transcript. Prefer stimulus_text (the actual topic) when present. */}
+      {/* Progress bar */}
+      <View style={styles.timerProgressTrack}>
+        <View style={[
+          styles.timerProgressFill,
+          {
+            width: `${progressPct}%` as `${number}%`,
+            backgroundColor: isLowTime ? '#EF4444' : B.primary,
+          },
+        ]} />
+      </View>
+
+      {/* Alex avatar (pulsing) */}
+      <View style={styles.avatarSection}>
+        <Animated.View style={[styles.avatarCircle, { opacity: pulseAnim }]} />
+        <Text style={styles.avatarName}>Alex</Text>
+        <Text style={[styles.avatarStatus, { color: statusColor }]}>{statusLabel}</Text>
+      </View>
+
+      {/* Transcript */}
       <ScrollView style={styles.transcriptScroll} contentContainerStyle={styles.transcriptContent}>
-        <View style={styles.topicCard}>
-          <Text style={styles.topicLabel}>Topic</Text>
-          <Text style={styles.topicText}>{question.stimulus_text || question.question_text}</Text>
-          {question.stimulus_text ? (
-            <Text style={styles.topicInstruction} numberOfLines={2}>{question.question_text}</Text>
-          ) : null}
-        </View>
         {transcriptEntries.map((entry, i) => (
           <View key={i} style={[styles.bubble, entry.role === 'assistant' ? styles.bubbleAi : styles.bubbleUser]}>
-            <Text style={styles.bubbleRole}>{entry.role === 'assistant' ? 'Partner' : 'You'}</Text>
-            <Text style={styles.bubbleText}>{entry.text}</Text>
+            <Text style={[styles.bubbleRole, entry.role === 'user' && styles.bubbleRoleUser]}>
+              {entry.role === 'assistant' ? 'Partner' : 'Sie'}
+            </Text>
+            <Text style={[styles.bubbleText, entry.role === 'user' && styles.bubbleTextUser]}>{entry.text}</Text>
           </View>
         ))}
         {currentAiText ? (
-          <View style={[styles.bubble, styles.bubbleAi, styles.bubbleStreaming]}>
+          <View style={[styles.bubble, styles.bubbleAi]}>
             <Text style={styles.bubbleRole}>Partner</Text>
             <Text style={styles.bubbleText}>{currentAiText}</Text>
           </View>
@@ -540,7 +571,7 @@ export function MockSprechenTeil({
           onPress={() => {
             Alert.alert(
               'End Conversation?',
-              'Your response will be saved. You won\'t see your score until the end of the mock.',
+              "Your response will be saved. You won't see your score until the end of the mock.",
               [
                 { text: 'Continue', style: 'cancel' },
                 { text: 'End', style: 'destructive', onPress: () => void handleEndConversation() },
@@ -621,39 +652,76 @@ const styles = StyleSheet.create({
   skipLink: { paddingVertical: 8, paddingHorizontal: 12 },
   skipLinkText: { color: B.muted, fontSize: 13, fontWeight: '600' as const },
 
-  // Conversation screen
+  // ── Conversation screen ──────────────────────────────────────────────────
   convScreen: { flex: 1, backgroundColor: B.background },
-  convHeader: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingVertical: 10,
-    backgroundColor: B.card, borderBottomWidth: 1, borderBottomColor: B.border,
-  },
-  convStatusRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  statusDot: { width: 8, height: 8, borderRadius: 4 },
-  dotIdle: { backgroundColor: B.muted },
-  dotAi: { backgroundColor: B.primary },
-  dotUser: { backgroundColor: '#22C55E' },
-  timerChip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, backgroundColor: '#F1F5F9' },
-  timerChipUrgent: { backgroundColor: '#FEE2E2' },
-  timerText: { fontSize: 12, fontWeight: '800' as const, color: B.muted, fontVariant: ['tabular-nums'] },
-  timerTextUrgent: { color: '#EF4444' },
 
+  // Header: compact row with breadcrumb + timer badge
+  convHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+  },
+  convTitle: { fontSize: 14, fontWeight: '700' as const, color: B.questionColor },
+  timerBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 10, paddingVertical: 4,
+    borderRadius: 999, backgroundColor: '#F1F5F9',
+  },
+  timerBadgeRed: { backgroundColor: '#EF4444' },
+  timerText: { fontSize: 12, fontWeight: '800' as const, color: B.muted, fontVariant: ['tabular-nums'] },
+  timerTextUrgent: { color: '#fff' },
+
+  // Progress bar (full-width, below header)
+  timerProgressTrack: {
+    height: 4,
+    backgroundColor: 'rgba(0,0,0,0.06)',
+    overflow: 'hidden',
+  },
+  timerProgressFill: { height: 4 },
+
+  // Avatar section (centered)
+  avatarSection: {
+    alignItems: 'center',
+    paddingVertical: 20,
+    gap: 8,
+  },
+  avatarCircle: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: B.primary,
+    marginBottom: 4,
+  },
+  avatarName: { fontSize: 16, fontWeight: '800' as const, color: B.questionColor },
+  avatarStatus: { fontSize: 13, fontWeight: '600' as const },
+
+  // Transcript
   transcriptScroll: { flex: 1 },
-  transcriptContent: { padding: 16, gap: 10, paddingBottom: 24 },
-  topicCard: { backgroundColor: B.card, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: B.border, gap: 4 },
-  topicLabel: { fontSize: 11, fontWeight: '800' as const, color: B.muted, letterSpacing: 0.4, textTransform: 'uppercase' as const },
-  topicText: { fontSize: 14, fontWeight: '600' as const, color: B.questionColor, lineHeight: 20 },
-  topicInstruction: { fontSize: 12, fontWeight: '500' as const, color: B.muted, fontStyle: 'italic' as const, marginTop: 2 },
-  bubble: { borderRadius: 14, padding: 12, maxWidth: '88%' },
+  transcriptContent: { paddingHorizontal: 16, paddingBottom: 100, gap: 8 },
+  bubble: { borderRadius: 14, padding: 12, maxWidth: '85%' },
   bubbleAi: { backgroundColor: B.card, borderWidth: 1, borderColor: B.border, alignSelf: 'flex-start', borderBottomLeftRadius: 4 },
   bubbleUser: { backgroundColor: B.primary, alignSelf: 'flex-end', borderBottomRightRadius: 4 },
-  bubbleStreaming: { opacity: 0.85 },
   bubbleRole: { fontSize: 10, fontWeight: '800' as const, color: B.muted, letterSpacing: 0.4, marginBottom: 2, textTransform: 'uppercase' as const },
+  bubbleRoleUser: { color: 'rgba(255,255,255,0.7)' },
   bubbleText: { fontSize: 14, fontWeight: '500' as const, color: B.questionColor, lineHeight: 20 },
+  bubbleTextUser: { color: '#fff' },
 
+  // Silence nudge
+  silenceNudge: {
+    marginHorizontal: 16, marginBottom: 8,
+    backgroundColor: ORANGE,
+    borderRadius: 12, paddingVertical: 8, paddingHorizontal: 16,
+    alignItems: 'center',
+  },
+  silenceNudgeText: { color: '#fff', fontSize: 14, fontWeight: '700' as const },
+
+  // Footer
   convFooter: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
-    padding: 16, backgroundColor: B.card, borderTopWidth: 1, borderTopColor: B.border,
+    padding: 16, backgroundColor: B.card,
+    borderTopWidth: 1, borderTopColor: B.border,
   },
   recordBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
@@ -677,34 +745,8 @@ const styles = StyleSheet.create({
   },
   countdownCircle: {
     width: 120, height: 120, borderRadius: 60,
-    backgroundColor: '#fff',
-    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center',
   },
   countdownNumber: { fontSize: 56, fontWeight: '800' as const, color: '#EF4444' },
   countdownMessage: { fontSize: 16, fontWeight: '700' as const, color: '#fff', textAlign: 'center', paddingHorizontal: 32 },
-  timerProgressTrack: {
-    height: 4,
-    backgroundColor: 'rgba(0,0,0,0.08)',
-    borderRadius: 2,
-    overflow: 'hidden',
-    marginTop: 8,
-  },
-  timerProgressFill: {
-    height: 4,
-    borderRadius: 2,
-  },
-  silenceNudge: {
-    marginHorizontal: 16,
-    marginBottom: 8,
-    backgroundColor: B.primary,
-    borderRadius: 12,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    alignItems: 'center',
-  },
-  silenceNudgeText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600' as const,
-  },
 });

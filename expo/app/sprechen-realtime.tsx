@@ -1,11 +1,11 @@
 import { Audio } from 'expo-av';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
-import { AlertCircle, Mic, MicOff, PhoneOff, RefreshCw, Star, Timer } from 'lucide-react-native';
+import { AlertCircle, ChevronLeft, Mic, MicOff, PhoneOff, RefreshCw, Star, Timer } from 'lucide-react-native';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const CTA_BUTTON_HEIGHT = 56;    // primary CTA / footer height
-const BOTTOM_CONTENT_BUFFER = 24; // breathing room below last content item
+const CTA_BUTTON_HEIGHT = 56;
+const BOTTOM_CONTENT_BUFFER = 24;
 import {
   ActivityIndicator,
   Alert,
@@ -166,8 +166,6 @@ export default function SprechenRealtimeScreen() {
     timerRef.current = setInterval(() => {
       const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
       setElapsedSeconds(elapsed);
-      // Don't auto-end here — the grace countdown effect handles it
-      // after the 5-second grace period expires.
     }, 1000);
   }, []);
 
@@ -228,15 +226,11 @@ export default function SprechenRealtimeScreen() {
           console.log('[SprechenRealtime] Conv state:', state);
           if (isMountedRef.current) setConvState(state);
           if (state === 'connected') {
-            // Trigger AI to speak first after session.update is queued by configureSession.
-            // For dialogue: AI starts the conversation. For monologue: AI says "Bitte fahren Sie fort."
             setTimeout(() => {
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               (sessionRef.current as any).sendEvent?.({ type: 'response.create' });
             }, 0);
           }
-          // For monologue: start timer only after AI finishes its opening ("Bitte fahren Sie fort").
-          // The 'listening' state fires when the AI's response.done is processed.
           if (state === 'listening' && isMonologue && !monologueTimerStartedRef.current) {
             monologueTimerStartedRef.current = true;
             startTimer();
@@ -274,8 +268,6 @@ export default function SprechenRealtimeScreen() {
       await realtimeSession.connect(client_secret);
 
       setScreenState('conversation');
-      // Dialogue: start timer immediately (AI is already speaking, user speaks after).
-      // Monologue: timer starts only after AI finishes opening — handled in onStateChange above.
       if (!isMonologue) {
         startTimer();
       }
@@ -342,7 +334,6 @@ export default function SprechenRealtimeScreen() {
     handleStartConversationRef.current = handleStartConversation;
   }, [handleStartConversation]);
 
-  // Tick countdown down 3→2→1→0 then auto-start for monologue
   useEffect(() => {
     if (countdownValue === null) return;
     if (countdownValue <= 0) {
@@ -354,15 +345,6 @@ export default function SprechenRealtimeScreen() {
     return () => clearTimeout(t);
   }, [countdownValue]);
 
-  // Trigger countdown automatically for monologue once moderator audio finishes.
-  // DISABLED for monologue: the AI now says "Bitte fahren Sie fort" as the verbal cue,
-  // so the 3-2-1 countdown is redundant. Keeping the effect for dialogue-with-countdown
-  // flows if ever needed, but currently only monologue used this path.
-  // useEffect(() => { ... }, [screenState, isMonologue, moderatorAudioUrl, moderatorFinished]);
-
-  // ── Final 5-4-3-2-1 grace period AFTER time limit expires ─────────────────
-  // When the main timer hits 0, instead of auto-ending, start 5s grace countdown.
-  // Auto-end fires only when grace countdown reaches 0.
   useEffect(() => {
     if (screenState !== 'conversation') {
       finalCountdownTriggeredRef.current = false;
@@ -378,16 +360,13 @@ export default function SprechenRealtimeScreen() {
     }
   }, [screenState, elapsedSeconds, isMonologue, recordingTimeLimitSec]);
 
-  // Tick the grace countdown and animate each number
   useEffect(() => {
     if (finalCountdown === null) return;
     if (finalCountdown <= 0) {
       setFinalCountdown(null);
-      // Grace period over — auto-end the conversation
       void handleEndRef.current?.();
       return;
     }
-    // Animate: scale up from 0.5→1 + fade in per tick
     finalCountdownScaleAnim.setValue(0.5);
     finalCountdownOpacityAnim.setValue(0);
     Animated.parallel([
@@ -400,7 +379,6 @@ export default function SprechenRealtimeScreen() {
   }, [finalCountdown, finalCountdownScaleAnim, finalCountdownOpacityAnim]);
 
   // ── 7-second silence nudge ─────────────────────────────────────────────────
-  // Show "Bitte sprechen Sie jetzt" if user hasn't spoken for 7s while it's their turn.
   useEffect(() => {
     if (convState === 'listening') {
       silenceNudgeTimerRef.current = setTimeout(() => setShowSilenceNudge(true), 7000);
@@ -458,7 +436,7 @@ export default function SprechenRealtimeScreen() {
     switch (convState) {
       case 'connecting': return 'Connecting...';
       case 'connected': return 'Connected';
-      case 'ai_speaking': return 'Partner speaking...';
+      case 'ai_speaking': return 'Alex is speaking...';
       case 'listening': return isMonologue ? 'Recording in progress...' : 'Listening...';
       default: return '';
     }
@@ -474,32 +452,43 @@ export default function SprechenRealtimeScreen() {
     }
   };
 
+  // ─── Helper: Alex avatar ──────────────────────────────────────────────────
+  const renderAlexAvatar = () => (
+    <View style={styles.alexSection}>
+      <View style={styles.alexAvatar} />
+      <Text style={styles.alexName}>Alex</Text>
+      <Text style={styles.alexRole}>Your conversation partner - AI</Text>
+      <Text style={styles.alexSubRole}>Always where you are</Text>
+    </View>
+  );
+
+  // ─── Helper: Thema card ───────────────────────────────────────────────────
   const renderTaskCard = () => {
     if (!question) return null;
 
-    const stimulusText = question.stimulus_text ?? '';
+    const st = question.stimulus_text ?? '';
     let stimulusHeadline = '';
     let stimulusChips: string[] = [];
 
-    if (stimulusText.startsWith('Thema:') || stimulusText.startsWith('Situation:')) {
-      const colonIdx = stimulusText.indexOf(':');
-      stimulusHeadline = stimulusText.slice(colonIdx + 1).trim();
+    if (st.startsWith('Thema:') || st.startsWith('Situation:')) {
+      const colonIdx = st.indexOf(':');
+      stimulusHeadline = st.slice(colonIdx + 1).trim();
       const opts = question.options as Array<{ key?: string; text: string }> | null;
       stimulusChips = (opts ?? []).map(o => o.text);
-    } else if (stimulusText.includes(' · ')) {
-      const parts = stimulusText.split(' · ');
+    } else if (st.includes(' · ')) {
+      const parts = st.split(' · ');
       stimulusHeadline = parts[0] ?? '';
       stimulusChips = parts.slice(1);
-    } else if (stimulusText) {
-      stimulusHeadline = stimulusText;
+    } else if (st) {
+      stimulusHeadline = st;
     }
 
     return (
-      <View style={[styles.taskCard, shadows.card]}>
-        <Text style={styles.taskCardTitle}>Thema</Text>
-        <Text style={styles.taskCardText}>{question.question_text}</Text>
+      <View style={[styles.themaCard, shadows.card]}>
+        <Text style={styles.sectionLabel}>THEMA</Text>
+        <Text style={styles.themaText}>{question.question_text}</Text>
         {stimulusHeadline ? (
-          <Text style={styles.taskCardStimulus}>{stimulusHeadline}</Text>
+          <Text style={styles.themaStimulus}>{stimulusHeadline}</Text>
         ) : null}
         {stimulusChips.length > 0 ? (
           <View style={styles.stimulusChipsRow}>
@@ -514,12 +503,13 @@ export default function SprechenRealtimeScreen() {
     );
   };
 
+  // ─── Helper: Gesprächspunkte card ─────────────────────────────────────────
   const renderOptions = () => {
     if (!question?.options || question.options.length === 0) return null;
     const opts = question.options as Array<{ key: string; text: string }>;
     return (
-      <View style={[styles.optionsCard, shadows.card]}>
-        <Text style={styles.optionsHeader}>Gesprächspunkte</Text>
+      <View style={[styles.gesprachCard, shadows.card]}>
+        <Text style={styles.sectionLabel}>GESPRÄCHSPUNKTE</Text>
         {opts.map((opt, idx) => (
           <View key={opt.key ?? String(idx)} style={styles.optionRow}>
             <View style={styles.optionDot} />
@@ -530,6 +520,7 @@ export default function SprechenRealtimeScreen() {
     );
   };
 
+  // ─── Loading ──────────────────────────────────────────────────────────────
   if (screenState === 'loading') {
     return (
       <View style={[styles.screen, { paddingTop: insets.top }]}>
@@ -543,6 +534,7 @@ export default function SprechenRealtimeScreen() {
     );
   }
 
+  // ─── Error ────────────────────────────────────────────────────────────────
   if (screenState === 'error') {
     return (
       <View style={[styles.screen, { paddingTop: insets.top }]}>
@@ -565,20 +557,38 @@ export default function SprechenRealtimeScreen() {
     );
   }
 
+  // ─── Instruction ──────────────────────────────────────────────────────────
   if (screenState === 'instruction') {
     return (
       <View style={[styles.screen, { paddingTop: insets.top }]}>
         <Stack.Screen options={{ headerShown: false }} />
         <AppHeader />
-        <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + CTA_BUTTON_HEIGHT + BOTTOM_CONTENT_BUFFER }]} showsVerticalScrollIndicator={false}>
-          <View style={styles.instructionHeader}>
-            <View style={styles.sectionPill}>
-              <Mic color={colors.white} size={12} />
-              <Text style={styles.sectionPillText}>Live Conversation</Text>
-            </View>
-            <Text style={styles.instructionSubtitle}>{taskLabel}</Text>
-          </View>
 
+        {/* Sub-header: back arrow + breadcrumb */}
+        <View style={styles.subHeader}>
+          <Pressable onPress={() => router.back()} style={styles.subHeaderBack} testID="realtime-back-btn">
+            <ChevronLeft color={colors.navy} size={22} />
+          </Pressable>
+          <Text style={styles.subHeaderTitle} numberOfLines={1}>
+            {level} · Sprechen · Teil {teil}
+          </Text>
+          <View style={{ width: 44 }} />
+        </View>
+
+        {/* Mode tabs */}
+        <View style={styles.modeTabs}>
+          <View style={styles.modeTabActive}>
+            <Mic color={colors.white} size={12} />
+            <Text style={styles.modeTabActiveText}>Live Conversation</Text>
+          </View>
+          <Text style={styles.modeTabInactive}>Voice Note</Text>
+        </View>
+
+        <ScrollView
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + CTA_BUTTON_HEIGHT + 80 }]}
+          showsVerticalScrollIndicator={false}
+        >
+          {renderAlexAvatar()}
           {renderTaskCard()}
           {!optionsInTaskCard && renderOptions()}
 
@@ -586,14 +596,6 @@ export default function SprechenRealtimeScreen() {
             <View style={styles.moderatorWrap}>
               <Text style={styles.moderatorLabel}>Listen to task</Text>
               <AudioPlayer audioUrl={moderatorAudioUrl} onPlaybackComplete={() => setModeratorFinished(true)} />
-            </View>
-          ) : null}
-
-          {!isMonologue && !moderatorAudioUrl ? (
-            <View style={styles.noModeratorNote}>
-              <Text style={styles.noModeratorText}>
-                Press below to start the live conversation with the AI partner.
-              </Text>
             </View>
           ) : null}
 
@@ -608,30 +610,35 @@ export default function SprechenRealtimeScreen() {
         {!isMonologue ? (
           <View style={[styles.footer, { bottom: insets.bottom }]}>
             <CTAButton
-              label="Start conversation"
+              label="Start Conversation"
               onPress={handleStartConversation}
               disabled={moderatorAudioUrl != null && !moderatorFinished}
               testID="realtime-start"
             />
+            <Text style={styles.footerTagline}>Speak naturally — this is practice, not a test.</Text>
           </View>
         ) : null}
       </View>
     );
   }
 
+  // ─── Connecting ───────────────────────────────────────────────────────────
   if (screenState === 'connecting') {
     return (
       <View style={[styles.screen, { paddingTop: insets.top }]}>
         <Stack.Screen options={{ headerShown: false }} />
         <AppHeader />
         <View style={styles.center}>
-          <ActivityIndicator color={colors.blue} size="large" />
+          <View style={styles.connectingAvatar}>
+            <ActivityIndicator color={colors.white} size="large" />
+          </View>
           <Text style={styles.loadingText}>Connecting AI partner...</Text>
         </View>
       </View>
     );
   }
 
+  // ─── Conversation ─────────────────────────────────────────────────────────
   if (screenState === 'conversation') {
     const statusLabel = getStatusLabel();
     const statusColor = getStatusColor();
@@ -640,53 +647,48 @@ export default function SprechenRealtimeScreen() {
       : elapsedSeconds;
     const timeRemaining = isMonologue ? displaySeconds : (MAX_DURATION - elapsedSeconds);
     const isTimeLow = timeRemaining <= 30;
+    const progressPct = Math.min(100, (elapsedSeconds / (isMonologue ? recordingTimeLimitSec : MAX_DURATION)) * 100);
 
     return (
       <View style={[styles.screen, { paddingTop: insets.top }]}>
-        <Stack.Screen
-          options={{ headerShown: false }}
-        />
+        <Stack.Screen options={{ headerShown: false }} />
         <AppHeader />
 
+        {/* Compact header with timer */}
         <View style={styles.convHeader}>
-          <Text style={styles.convTitle}>{level} Sprechen · Teil {teil}</Text>
-          <Text style={styles.convSubtitle}>{question?.question_text?.slice(0, 60) ?? ''}</Text>
-          <View style={styles.timerProgressTrack}>
-            <View style={[
-              styles.timerProgressFill,
-              {
-                width: `${Math.min(100, (elapsedSeconds / (isMonologue ? recordingTimeLimitSec : MAX_DURATION)) * 100)}%` as `${number}%`,
-                backgroundColor: isTimeLow ? colors.red : colors.blue,
-              },
-            ]} />
-          </View>
-        </View>
-
-        <View style={styles.statusBar}>
-          <View style={styles.statusLeft}>
-            <Animated.View
-              style={[
-                styles.statusDot,
-                { backgroundColor: statusColor, opacity: pulseAnim },
-              ]}
-            />
-            <Text style={[styles.statusText, { color: statusColor }]}>{statusLabel}</Text>
-          </View>
-          <View style={styles.timerWrap}>
-            <Timer color={isTimeLow ? colors.red : colors.navy} size={14} />
-            <Text style={[styles.timerText, isTimeLow && styles.timerTextRed]}>
+          <Text style={styles.convTitle}>{level} · Sprechen · Teil {teil}</Text>
+          <View style={[styles.timerBadge, isTimeLow && styles.timerBadgeRed]}>
+            <Timer color={isTimeLow ? colors.white : colors.navy} size={12} />
+            <Text style={[styles.timerText, isTimeLow && styles.timerTextWhite]}>
               {formatTime(displaySeconds)}
             </Text>
           </View>
         </View>
 
+        {/* Progress bar */}
+        <View style={styles.timerProgressTrack}>
+          <View style={[
+            styles.timerProgressFill,
+            {
+              width: `${progressPct}%` as `${number}%`,
+              backgroundColor: isTimeLow ? colors.red : colors.blue,
+            },
+          ]} />
+        </View>
+
+        {/* Avatar section */}
+        <View style={styles.avatarSection}>
+          <Animated.View style={[styles.avatarCircle, { opacity: pulseAnim }]} />
+          <Text style={styles.avatarName}>Alex</Text>
+          <Text style={[styles.avatarStatus, { color: statusColor }]}>{statusLabel}</Text>
+        </View>
+
+        {/* Transcript */}
         <ScrollView
           style={styles.transcriptScroll}
           contentContainerStyle={styles.transcriptContent}
           showsVerticalScrollIndicator={false}
         >
-          {renderTaskCard()}
-
           {transcriptEntries.map((entry, idx) => (
             <View
               key={String(idx)}
@@ -695,10 +697,12 @@ export default function SprechenRealtimeScreen() {
                 entry.role === 'assistant' ? styles.bubbleAi : styles.bubbleUser,
               ]}
             >
-              <Text style={styles.bubbleRole}>
-                {entry.role === 'assistant' ? 'Partner' : 'You'}
+              <Text style={[styles.bubbleRole, entry.role === 'user' && styles.bubbleRoleUser]}>
+                {entry.role === 'assistant' ? 'Partner' : 'Sie'}
               </Text>
-              <Text style={styles.bubbleText}>{entry.text}</Text>
+              <Text style={[styles.bubbleText, entry.role === 'user' && styles.bubbleTextUser]}>
+                {entry.text}
+              </Text>
             </View>
           ))}
 
@@ -720,10 +724,7 @@ export default function SprechenRealtimeScreen() {
           {!isWebRTC && (
             <Pressable
               onPress={handleNativeRecord}
-              style={[
-                styles.recordBtn,
-                isNativeRecording && styles.recordBtnActive,
-              ]}
+              style={[styles.recordBtn, isNativeRecording && styles.recordBtnActive]}
               testID="realtime-native-record"
             >
               {isNativeRecording ? (
@@ -756,7 +757,7 @@ export default function SprechenRealtimeScreen() {
           </Pressable>
         </View>
 
-        {/* Final countdown overlay — 5 4 3 2 1 */}
+        {/* Final countdown overlay */}
         {finalCountdown !== null && finalCountdown > 0 ? (
           <View style={styles.finalCountdownOverlay} pointerEvents="none">
             <Animated.View
@@ -771,7 +772,7 @@ export default function SprechenRealtimeScreen() {
               <Text style={styles.finalCountdownNumber}>{finalCountdown}</Text>
             </Animated.View>
             <Animated.Text style={[styles.finalCountdownMessage, { opacity: finalCountdownOpacityAnim }]}>
-              Your speaking time is ending soon
+              Ihre Sprechzeit endet gleich
             </Animated.Text>
             <Animated.Text style={[styles.finalCountdownMessageEn, { opacity: finalCountdownOpacityAnim }]}>
               Your speaking time is ending
@@ -782,19 +783,23 @@ export default function SprechenRealtimeScreen() {
     );
   }
 
+  // ─── Scoring ──────────────────────────────────────────────────────────────
   if (screenState === 'scoring') {
     return (
       <View style={[styles.screen, { paddingTop: insets.top }]}>
         <Stack.Screen options={{ headerShown: false }} />
         <AppHeader />
         <View style={styles.center}>
-          <ActivityIndicator color={colors.blue} size="large" />
+          <View style={styles.connectingAvatar}>
+            <ActivityIndicator color={colors.white} size="large" />
+          </View>
           <Text style={styles.loadingText}>Your answer is being evaluated...</Text>
         </View>
       </View>
     );
   }
 
+  // ─── Results ──────────────────────────────────────────────────────────────
   if (screenState === 'results' && scores) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const s = scores as any;
@@ -812,19 +817,20 @@ export default function SprechenRealtimeScreen() {
         <Stack.Screen options={{ headerShown: false }} />
         <AppHeader />
         <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + CTA_BUTTON_HEIGHT + BOTTOM_CONTENT_BUFFER }]} showsVerticalScrollIndicator={false}>
+
+          {/* Results hero */}
           <View style={[styles.resultsHero, shadows.card]}>
             <View style={styles.resultsIconWrap}>
               <Mic color={colors.white} size={24} />
             </View>
             <Text style={styles.resultsTitle}>Sprechen · Teil {teil}</Text>
             <Text style={styles.resultsSubtitle}>{level} · {taskLabel}</Text>
-
             <View style={styles.starsRow}>
-              {[1, 2, 3, 4, 5].map(s => (
+              {[1, 2, 3, 4, 5].map(n => (
                 <Star
-                  key={s}
-                  color={s <= starCount ? '#FFD700' : 'rgba(255,255,255,0.3)'}
-                  fill={s <= starCount ? '#FFD700' : 'transparent'}
+                  key={n}
+                  color={n <= starCount ? '#FFD700' : 'rgba(255,255,255,0.3)'}
+                  fill={n <= starCount ? '#FFD700' : 'transparent'}
                   size={28}
                 />
               ))}
@@ -832,6 +838,7 @@ export default function SprechenRealtimeScreen() {
             <Text style={styles.resultsScoreLabel}>{overallNum} / 5</Text>
           </View>
 
+          {/* Detailed scores */}
           <View style={[styles.scoresCard, shadows.card]}>
             <Text style={styles.scoresHeader}>Detailed Assessment</Text>
             {[
@@ -849,6 +856,7 @@ export default function SprechenRealtimeScreen() {
             ))}
           </View>
 
+          {/* Task completion badge */}
           {taskCompletion === 'full' ? (
             <View style={[styles.badgeCard, shadows.card, { borderColor: colors.green }]}>
               <Text style={styles.badgeEmoji}>✅</Text>
@@ -866,6 +874,7 @@ export default function SprechenRealtimeScreen() {
             </View>
           ) : null}
 
+          {/* Feedback */}
           {noSpeechDetected ? (
             <View style={[styles.feedbackCard, shadows.card]}>
               <Text style={styles.feedbackLabel}>Hinweis</Text>
@@ -875,6 +884,12 @@ export default function SprechenRealtimeScreen() {
             </View>
           ) : (
             <>
+              {scores.encouragement_note ? (
+                <View style={[styles.feedbackCard, shadows.card]}>
+                  <Text style={styles.feedbackLabel}>Feedback</Text>
+                  <Text style={styles.feedbackText}>{scores.encouragement_note}</Text>
+                </View>
+              ) : null}
               {scores.improvement_tip ? (
                 <View style={[styles.tipCard, shadows.card]}>
                   <Text style={styles.tipLabel}>Improvement tip</Text>
@@ -900,6 +915,7 @@ export default function SprechenRealtimeScreen() {
     );
   }
 
+  // ─── Fallback ─────────────────────────────────────────────────────────────
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
       <Stack.Screen options={{ headerShown: false }} />
@@ -914,7 +930,11 @@ export default function SprechenRealtimeScreen() {
   );
 }
 
+// ─── Orange accent for live conversation + bullet dots ────────────────────
+const ORANGE = '#F97316';
+
 const styles = StyleSheet.create({
+  // ── Structural ──────────────────────────────────────────────────────────
   screen: {
     flex: 1,
     backgroundColor: colors.surface,
@@ -926,168 +946,41 @@ const styles = StyleSheet.create({
     gap: spacing.lg,
     padding: spacing.xxl,
   },
-  loadingText: {
-    fontSize: fontSize.bodyMd,
-    color: colors.muted,
-    fontWeight: '600' as const,
-  },
   scrollContent: {
     padding: spacing.xl,
     gap: spacing.lg,
-    paddingBottom: 140,
   },
   footer: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
-    padding: spacing.xl,
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.lg,
     backgroundColor: colors.surface,
+    gap: spacing.sm,
   },
-  instructionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-  },
-  sectionPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-    borderRadius: 99,
-    backgroundColor: '#00897B',
-  },
-  sectionPillText: {
-    color: colors.white,
-    fontSize: fontSize.micro,
-    fontWeight: '700' as const,
-  },
-  instructionSubtitle: {
-    color: colors.muted,
-    fontSize: fontSize.bodySm,
-    fontWeight: '600' as const,
-  },
-  taskCard: {
-    backgroundColor: colors.navy,
-    borderRadius: radius.lg,
-    padding: spacing.lg,
-  },
-  taskCardTitle: {
-    color: 'rgba(255,255,255,0.5)',
-    fontSize: fontSize.label,
-    fontWeight: '600' as const,
-    textTransform: 'uppercase' as const,
-    letterSpacing: 0.5,
-    marginBottom: spacing.xs,
-  },
-  taskCardText: {
-    color: colors.white,
-    fontSize: fontSize.bodyLg,
-    fontWeight: '600' as const,
-    lineHeight: 24,
-  },
-  taskCardStimulus: {
-    color: 'rgba(255,255,255,0.7)',
+
+  // ── Loading / Error ──────────────────────────────────────────────────────
+  loadingText: {
     fontSize: fontSize.bodyMd,
-    fontWeight: '500' as const,
-    marginTop: spacing.sm,
-    lineHeight: 22,
-  },
-  stimulusChipsRow: {
-    flexDirection: 'row' as const,
-    flexWrap: 'wrap' as const,
-    gap: 6,
-    marginTop: spacing.sm,
-  },
-  stimulusChip: {
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    borderRadius: 99,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 3,
-  },
-  stimulusChipText: {
-    color: 'rgba(255,255,255,0.85)',
-    fontSize: fontSize.bodySm,
-    fontWeight: '500' as const,
-  },
-  optionsCard: {
-    backgroundColor: colors.white,
-    borderRadius: radius.lg,
-    padding: spacing.lg,
-    gap: spacing.sm,
-  },
-  optionsHeader: {
     color: colors.muted,
-    fontSize: fontSize.label,
     fontWeight: '600' as const,
-    textTransform: 'uppercase' as const,
-    letterSpacing: 0.5,
-    marginBottom: spacing.xs,
   },
-  optionRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.sm,
-    paddingVertical: spacing.xs,
-  },
-  optionDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+  connectingAvatar: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
     backgroundColor: colors.blue,
-    marginTop: 7,
-  },
-  optionText: {
-    color: colors.text,
-    fontSize: fontSize.bodyMd,
-    fontWeight: '500' as const,
-    flex: 1,
-    lineHeight: 22,
-  },
-  moderatorWrap: {
-    gap: spacing.sm,
-  },
-  moderatorLabel: {
-    color: colors.muted,
-    fontSize: fontSize.label,
-    fontWeight: '600' as const,
-    paddingHorizontal: spacing.xs,
-  },
-  noModeratorNote: {
-    backgroundColor: colors.white,
-    borderRadius: radius.lg,
-    padding: spacing.lg,
-  },
-  noModeratorText: {
-    color: colors.muted,
-    fontSize: fontSize.bodyMd,
-    fontWeight: '500' as const,
-    lineHeight: 22,
-    textAlign: 'center',
-  },
-  countdownWrap: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: spacing.xxl,
-    gap: spacing.md,
-  },
-  countdownText: {
-    fontSize: 72,
-    fontWeight: '800' as const,
-    color: colors.navy,
-    lineHeight: 80,
-  },
-  countdownLabel: {
-    fontSize: fontSize.bodyMd,
-    fontWeight: '600' as const,
-    color: colors.muted,
   },
   errorIcon: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: 'rgba(226,77,77,0.1)',
+    backgroundColor: 'rgba(239,68,68,0.1)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1118,71 +1011,277 @@ const styles = StyleSheet.create({
     fontSize: fontSize.bodyMd,
     fontWeight: '700' as const,
   },
-  convHeader: {
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.sm,
-    gap: 2,
+
+  // ── Instruction — Sub-header ─────────────────────────────────────────────
+  subHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
   },
-  convTitle: {
+  subHeaderBack: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  subHeaderTitle: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: fontSize.bodyMd,
+    fontWeight: '700' as const,
     color: colors.navy,
-    fontSize: fontSize.bodyLg,
-    fontWeight: '800' as const,
   },
-  convSubtitle: {
+
+  // ── Instruction — Mode tabs ───────────────────────────────────────────────
+  modeTabs: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.md,
+  },
+  modeTabActive: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: ORANGE,
+    borderRadius: 99,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
+  },
+  modeTabActiveText: {
+    color: colors.white,
+    fontSize: fontSize.bodySm,
+    fontWeight: '700' as const,
+  },
+  modeTabInactive: {
     color: colors.muted,
     fontSize: fontSize.bodySm,
-    fontWeight: '500' as const,
+    fontWeight: '600' as const,
   },
-  statusBar: {
+
+  // ── Instruction — Alex avatar ─────────────────────────────────────────────
+  alexSection: {
+    alignItems: 'center',
+    paddingVertical: spacing.lg,
+    gap: 4,
+  },
+  alexAvatar: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: colors.blue,
+    marginBottom: spacing.sm,
+  },
+  alexName: {
+    fontSize: fontSize.bodyLg,
+    fontWeight: '800' as const,
+    color: colors.navy,
+  },
+  alexRole: {
+    fontSize: fontSize.bodySm,
+    fontWeight: '500' as const,
+    color: colors.muted,
+  },
+  alexSubRole: {
+    fontSize: fontSize.bodySm,
+    fontWeight: '400' as const,
+    color: colors.muted,
+  },
+
+  // ── Instruction — Thema card ──────────────────────────────────────────────
+  themaCard: {
+    backgroundColor: colors.white,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    gap: 6,
+  },
+  sectionLabel: {
+    fontSize: fontSize.label,
+    fontWeight: '700' as const,
+    color: colors.muted,
+    letterSpacing: 0.8,
+    marginBottom: spacing.xs,
+  },
+  themaText: {
+    fontSize: fontSize.bodyLg,
+    fontWeight: '700' as const,
+    color: colors.navy,
+    lineHeight: 26,
+  },
+  themaStimulus: {
+    fontSize: fontSize.bodyMd,
+    fontWeight: '500' as const,
+    color: colors.muted,
+    lineHeight: 22,
+  },
+  stimulusChipsRow: {
+    flexDirection: 'row' as const,
+    flexWrap: 'wrap' as const,
+    gap: 8,
+    marginTop: spacing.xs,
+  },
+  stimulusChip: {
+    borderRadius: 99,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 4,
+  },
+  stimulusChipText: {
+    fontSize: fontSize.bodySm,
+    fontWeight: '500' as const,
+    color: colors.text,
+  },
+
+  // ── Instruction — Gesprächspunkte card ────────────────────────────────────
+  gesprachCard: {
+    backgroundColor: colors.white,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    gap: spacing.xs,
+  },
+  optionRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  optionDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: ORANGE,
+    marginTop: 7,
+  },
+  optionText: {
+    color: colors.bodyText,
+    fontSize: fontSize.bodyMd,
+    fontWeight: '500' as const,
+    flex: 1,
+    lineHeight: 22,
+  },
+
+  // ── Instruction — Footer tagline ──────────────────────────────────────────
+  footerTagline: {
+    textAlign: 'center',
+    fontSize: fontSize.bodySm,
+    fontWeight: '500' as const,
+    color: colors.muted,
+  },
+
+  // ── Instruction — Moderator audio ─────────────────────────────────────────
+  moderatorWrap: {
+    gap: spacing.sm,
+  },
+  moderatorLabel: {
+    color: colors.muted,
+    fontSize: fontSize.label,
+    fontWeight: '600' as const,
+    paddingHorizontal: spacing.xs,
+  },
+
+  // ── Instruction — Countdown ───────────────────────────────────────────────
+  countdownWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.xxl,
+    gap: spacing.md,
+  },
+  countdownText: {
+    fontSize: 72,
+    fontWeight: '800' as const,
+    color: colors.navy,
+    lineHeight: 80,
+  },
+  countdownLabel: {
+    fontSize: fontSize.bodyMd,
+    fontWeight: '600' as const,
+    color: colors.muted,
+  },
+
+  // ── Conversation — Header ─────────────────────────────────────────────────
+  convHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.sm,
-    borderBottomWidth: 0.5,
-    borderBottomColor: colors.border,
+    paddingVertical: spacing.md,
   },
-  statusLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  statusDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
-  statusText: {
+  convTitle: {
     fontSize: fontSize.bodyMd,
-    fontWeight: '600' as const,
+    fontWeight: '700' as const,
+    color: colors.navy,
   },
-  timerWrap: {
+  timerBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: 99,
+    backgroundColor: colors.surfaceContainerLow,
+  },
+  timerBadgeRed: {
+    backgroundColor: colors.red,
   },
   timerText: {
     color: colors.navy,
-    fontSize: fontSize.bodyMd,
+    fontSize: fontSize.bodySm,
     fontWeight: '800' as const,
     fontVariant: ['tabular-nums'],
   },
-  timerTextRed: {
-    color: colors.red,
+  timerTextWhite: {
+    color: colors.white,
   },
+
+  // ── Conversation — Progress bar ───────────────────────────────────────────
+  timerProgressTrack: {
+    height: 4,
+    backgroundColor: 'rgba(0,0,0,0.06)',
+    overflow: 'hidden',
+  },
+  timerProgressFill: {
+    height: 4,
+  },
+
+  // ── Conversation — Avatar ─────────────────────────────────────────────────
+  avatarSection: {
+    alignItems: 'center',
+    paddingVertical: spacing.xl,
+    gap: spacing.sm,
+  },
+  avatarCircle: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: colors.blue,
+    marginBottom: 4,
+  },
+  avatarName: {
+    fontSize: fontSize.bodyLg,
+    fontWeight: '800' as const,
+    color: colors.navy,
+  },
+  avatarStatus: {
+    fontSize: fontSize.bodySm,
+    fontWeight: '600' as const,
+  },
+
+  // ── Conversation — Transcript ─────────────────────────────────────────────
   transcriptScroll: {
     flex: 1,
   },
   transcriptContent: {
-    padding: spacing.xl,
-    gap: spacing.md,
-    paddingBottom: 160,
+    paddingHorizontal: spacing.xl,
+    paddingBottom: 120,
+    gap: spacing.sm,
   },
   bubble: {
     borderRadius: radius.lg,
     padding: spacing.md,
-    maxWidth: '85%',
+    maxWidth: '82%',
   },
   bubbleAi: {
     backgroundColor: colors.white,
@@ -1200,20 +1299,44 @@ const styles = StyleSheet.create({
     color: colors.muted,
     marginBottom: 2,
   },
+  bubbleRoleUser: {
+    color: 'rgba(255,255,255,0.7)',
+  },
   bubbleText: {
     fontSize: fontSize.bodyMd,
     fontWeight: '500' as const,
-    color: colors.text,
+    color: colors.bodyText,
     lineHeight: 22,
   },
+  bubbleTextUser: {
+    color: colors.white,
+  },
+
+  // ── Conversation — Silence nudge ──────────────────────────────────────────
+  silenceNudge: {
+    marginHorizontal: spacing.xl,
+    marginBottom: spacing.sm,
+    backgroundColor: ORANGE,
+    borderRadius: radius.md,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    alignItems: 'center',
+  },
+  silenceNudgeText: {
+    color: colors.white,
+    fontSize: fontSize.bodySm,
+    fontWeight: '700' as const,
+  },
+
+  // ── Conversation — Footer ─────────────────────────────────────────────────
   convFooter: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.md,
     paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.lg,
-    borderTopWidth: 0.5,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
     borderTopColor: colors.border,
     backgroundColor: colors.surface,
   },
@@ -1249,6 +1372,50 @@ const styles = StyleSheet.create({
     fontSize: fontSize.bodyMd,
     fontWeight: '700' as const,
   },
+
+  // ── Final countdown overlay ───────────────────────────────────────────────
+  finalCountdownOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 100,
+    gap: 16,
+  },
+  finalCountdownCircle: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Platform.select({
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.15, shadowRadius: 24 },
+      android: { elevation: 12 },
+    }),
+  },
+  finalCountdownNumber: {
+    fontSize: 56,
+    fontWeight: '800' as const,
+    color: colors.red,
+    lineHeight: 64,
+  },
+  finalCountdownMessage: {
+    fontSize: 16,
+    fontWeight: '600' as const,
+    color: colors.white,
+    textAlign: 'center',
+    paddingHorizontal: 32,
+  },
+  finalCountdownMessageEn: {
+    fontSize: 14,
+    fontWeight: '400' as const,
+    color: 'rgba(255,255,255,0.65)',
+    textAlign: 'center',
+    paddingHorizontal: 32,
+  },
+
+  // ── Results ───────────────────────────────────────────────────────────────
   resultsHero: {
     backgroundColor: colors.navy,
     borderRadius: radius.lg,
@@ -1257,13 +1424,13 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   resultsIconWrap: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
-    backgroundColor: '#00897B',
+    width: 52,
+    height: 52,
+    borderRadius: 16,
+    backgroundColor: ORANGE,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.sm,
+    marginBottom: spacing.xs,
   },
   resultsTitle: {
     fontSize: fontSize.displaySm,
@@ -1334,12 +1501,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
+    borderWidth: 1.5,
   },
   badgeEmoji: {
-    fontSize: 24,
+    fontSize: 22,
   },
   badgeText: {
-    color: colors.green,
     fontSize: fontSize.bodyMd,
     fontWeight: '700' as const,
   },
@@ -1352,12 +1519,11 @@ const styles = StyleSheet.create({
   feedbackLabel: {
     color: colors.muted,
     fontSize: fontSize.label,
-    fontWeight: '600' as const,
-    textTransform: 'uppercase' as const,
+    fontWeight: '700' as const,
     letterSpacing: 0.5,
   },
   feedbackText: {
-    color: colors.text,
+    color: colors.bodyText,
     fontSize: fontSize.bodyMd,
     fontWeight: '500' as const,
     lineHeight: 22,
@@ -1371,12 +1537,11 @@ const styles = StyleSheet.create({
   tipLabel: {
     color: colors.amber,
     fontSize: fontSize.label,
-    fontWeight: '600' as const,
-    textTransform: 'uppercase' as const,
+    fontWeight: '700' as const,
     letterSpacing: 0.5,
   },
   tipText: {
-    color: colors.text,
+    color: colors.bodyText,
     fontSize: fontSize.bodyMd,
     fontWeight: '500' as const,
     lineHeight: 22,
@@ -1387,72 +1552,5 @@ const styles = StyleSheet.create({
     fontWeight: '500' as const,
     textAlign: 'center',
     marginTop: spacing.sm,
-  },
-
-  // ─── Final countdown overlay ─────────────────────────────────────────────
-  finalCountdownOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 100,
-    gap: 16,
-  },
-  finalCountdownCircle: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: colors.white,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...Platform.select({
-      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.15, shadowRadius: 24 },
-      android: { elevation: 12 },
-    }),
-  },
-  finalCountdownNumber: {
-    fontSize: 56,
-    fontWeight: '800' as const,
-    color: colors.red,
-    lineHeight: 64,
-  },
-  finalCountdownMessage: {
-    fontSize: 16,
-    fontWeight: '600' as const,
-    color: colors.white,
-    textAlign: 'center',
-    paddingHorizontal: 32,
-  },
-  finalCountdownMessageEn: {
-    fontSize: 14,
-    fontWeight: '400' as const,
-    color: 'rgba(255,255,255,0.65)',
-    textAlign: 'center',
-    paddingHorizontal: 32,
-  },
-  timerProgressTrack: {
-    height: 4,
-    backgroundColor: 'rgba(0,0,0,0.08)',
-    borderRadius: 2,
-    overflow: 'hidden',
-    marginTop: spacing.sm,
-  },
-  timerProgressFill: {
-    height: 4,
-    borderRadius: 2,
-  },
-  silenceNudge: {
-    marginHorizontal: spacing.xl,
-    marginBottom: spacing.sm,
-    backgroundColor: colors.blue,
-    borderRadius: radius.md,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    alignItems: 'center',
-  },
-  silenceNudgeText: {
-    color: colors.white,
-    fontSize: fontSize.bodySm,
-    fontWeight: '600' as const,
   },
 });
