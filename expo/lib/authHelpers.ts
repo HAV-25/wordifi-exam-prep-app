@@ -205,9 +205,7 @@ async function signInWithGoogleNative() {
 }
 
 export async function resetPassword(email: string) {
-  const origin = getWebOrigin();
-  const redirectTo = `${origin}/reset-password`;
-  console.log('[Auth] Reset password origin:', origin);
+  const redirectTo = 'https://auth.wordifi.com/auth-confirm.html';
   console.log('[Auth] Reset password redirectTo:', redirectTo);
 
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
