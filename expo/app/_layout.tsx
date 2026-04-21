@@ -66,9 +66,12 @@ function RouteGate() {
   const isAuthRoute = topSegment === 'auth' || topSegment === 'check-email';
   const isOnboardingRoute =
     topSegment === 'onboarding_prelaunch' || topSegment === 'onboarding_launch';
+  // Password reset arrives via deep link — session is set inside AuthProvider
+  // after the route renders, so don't redirect away while that's happening
+  const isResetPasswordRoute = topSegment === 'reset-password';
 
   // No session → returning user goes to sign-in, new user goes to onboarding
-  if (!session && !isAuthRoute && !isOnboardingRoute) {
+  if (!session && !isAuthRoute && !isOnboardingRoute && !isResetPasswordRoute) {
     return <Redirect href={hasKnownAccount ? '/auth' : '/onboarding_launch'} />;
   }
 
@@ -111,6 +114,7 @@ function RootLayoutNav() {
         <Stack.Screen name="review-mistakes" options={{ headerShown: false }} />
         <Stack.Screen name="desktop-code" options={{ headerShown: false, presentation: 'modal' }} />
         <Stack.Screen name="desktop-active" options={{ headerShown: false }} />
+        <Stack.Screen name="reset-password" options={{ headerShown: false }} />
         <Stack.Screen name="+not-found" options={{ title: 'Not found' }} />
       </Stack>
     </>
