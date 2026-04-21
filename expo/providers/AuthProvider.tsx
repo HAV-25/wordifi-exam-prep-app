@@ -26,6 +26,7 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
   const [session, setSession] = useState<Session | null>(null);
   const [isSessionLoading, setIsSessionLoading] = useState<boolean>(true);
   const [hasKnownAccount, setHasKnownAccount] = useState<boolean>(false);
+  const [pendingRecovery, setPendingRecovery] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -112,6 +113,14 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       if (!accessToken || !refreshToken) return;
 
       console.log('[Auth] Deep link received, setting session... type:', type);
+
+      // Mark recovery intent BEFORE setSession so the useEffect below can
+      // navigate once the session lands — avoids a cold-start race where
+      // router.replace fires before the navigation container is ready.
+      if (type === 'recovery') {
+        setPendingRecovery(true);
+      }
+
       const { error } = await supabase.auth.setSession({
         access_token: accessToken,
         refresh_token: refreshToken,
@@ -120,13 +129,8 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       if (error) {
         console.error('[Auth] Deep link session error:', error.message);
         Sentry.captureException(error, { tags: { context: 'deep_link_auth' } });
+        setPendingRecovery(false);
         return;
-      }
-
-      // Password reset flow — navigate to the set-new-password screen
-      if (type === 'recovery') {
-        console.log('[Auth] Recovery session established, navigating to reset-password');
-        router.replace('/reset-password');
       }
     }
 
@@ -138,6 +142,17 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
 
     return () => subscription.remove();
   }, []);
+
+  // Navigate to reset-password once the session is established from a recovery
+  // deep link. Using a separate effect avoids the cold-start race where
+  // router.replace fires before the navigation container is mounted.
+  useEffect(() => {
+    if (pendingRecovery && session) {
+      console.log('[Auth] Recovery session ready, navigating to reset-password');
+      setPendingRecovery(false);
+      router.replace('/reset-password');
+    }
+  }, [pendingRecovery, session]);
 
   const user = useMemo<User | null>(() => session?.user ?? null, [session]);
 
