@@ -613,17 +613,15 @@ export default function SprechenRealtimeScreen() {
           ) : null}
         </ScrollView>
 
-        {!isMonologue ? (
-          <View style={[styles.footer, { bottom: insets.bottom }]}>
-            <CTAButton
-              label="Start Conversation"
-              onPress={handleStartConversation}
-              disabled={moderatorAudioUrl != null && !moderatorFinished}
-              testID="realtime-start"
-            />
-            <Text style={styles.footerTagline}>Speak naturally — this is practice, not a test.</Text>
-          </View>
-        ) : null}
+        <View style={[styles.footer, { bottom: insets.bottom }]}>
+          <CTAButton
+            label={isMonologue ? 'Start Recording' : 'Start Conversation'}
+            onPress={handleStartConversation}
+            disabled={moderatorAudioUrl != null && !moderatorFinished}
+            testID="realtime-start"
+          />
+          <Text style={styles.footerTagline}>Speak naturally — this is practice, not a test.</Text>
+        </View>
       </View>
     );
   }
@@ -682,7 +680,7 @@ export default function SprechenRealtimeScreen() {
           ]} />
         </View>
 
-        {/* Dual-circle avatar section */}
+        {/* Dual-circle avatar section — vertical stack */}
         <View style={styles.avatarSection}>
           {/* AI partner circle — pulses when AI speaks */}
           <View style={styles.avatarItem}>
@@ -693,6 +691,9 @@ export default function SprechenRealtimeScreen() {
             ]} />
             <Text style={styles.avatarName}>{aiPartnerNameRef.current}</Text>
           </View>
+
+          {/* Status text sits between the two circles */}
+          <Text style={[styles.avatarStatus, { color: statusColor }]}>{statusLabel}</Text>
 
           {/* User circle — pulses when user speaks */}
           <View style={styles.avatarItem}>
@@ -705,10 +706,7 @@ export default function SprechenRealtimeScreen() {
           </View>
         </View>
 
-        {/* Status text */}
-        <Text style={[styles.avatarStatus, { color: statusColor }]}>{statusLabel}</Text>
-
-        {/* Monologue: show topic card so user can reference it while presenting */}
+        {/* Monologue: keep topic visible for reference while presenting */}
         {isMonologue ? (
           <View style={styles.monologueTopicCard}>
             <Text style={styles.monologueTopicLabel}>THEMA</Text>
@@ -757,8 +755,9 @@ export default function SprechenRealtimeScreen() {
             style={styles.endBtn}
             testID="realtime-end"
           >
-            <PhoneOff color={colors.red} size={16} />
-            <Text style={styles.endBtnText}>{isMonologue ? 'End recording' : 'End conversation'}</Text>
+            <Text style={styles.endBtnText}>
+              {isMonologue ? 'End recording' : 'End Conversation'}
+            </Text>
           </Pressable>
         </View>
 
@@ -1250,13 +1249,14 @@ const styles = StyleSheet.create({
     height: 4,
   },
 
-  // ── Conversation — Dual-circle avatar ────────────────────────────────────
+  // ── Conversation — Dual-circle avatar (vertical) ─────────────────────────
   avatarSection: {
-    flexDirection: 'row',
+    flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: spacing.xxl,
-    gap: 48,
+    paddingTop: spacing.xxl,
+    paddingBottom: spacing.lg,
+    gap: spacing.lg,
   },
   avatarItem: {
     alignItems: 'center',
@@ -1353,14 +1353,8 @@ const styles = StyleSheet.create({
     fontWeight: '700' as const,
   },
   endBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
     paddingHorizontal: spacing.xl,
     paddingVertical: spacing.md,
-    borderRadius: radius.pill,
-    borderWidth: 1.5,
-    borderColor: colors.red,
   },
   endBtnText: {
     color: colors.red,

@@ -528,7 +528,7 @@ export function MockSprechenTeil({
         ]} />
       </View>
 
-      {/* Dual-circle avatar */}
+      {/* Dual-circle avatar — vertical stack */}
       <View style={styles.avatarSection}>
         {/* AI partner circle — pulses when AI speaks */}
         <View style={styles.avatarItem}>
@@ -540,6 +540,9 @@ export function MockSprechenTeil({
           <Text style={styles.avatarName}>{partnerName}</Text>
         </View>
 
+        {/* Status text sits between the two circles */}
+        <Text style={[styles.avatarStatus, { color: statusColor }]}>{statusLabel}</Text>
+
         {/* User circle — pulses when user speaks */}
         <View style={styles.avatarItem}>
           <Animated.View style={[
@@ -550,9 +553,6 @@ export function MockSprechenTeil({
           <Text style={styles.avatarName}>Sie</Text>
         </View>
       </View>
-
-      {/* Status text */}
-      <Text style={[styles.avatarStatus, { color: statusColor }]}>{statusLabel}</Text>
 
       {/* Monologue: keep topic visible for reference */}
       {isMonologue ? (
@@ -596,8 +596,7 @@ export function MockSprechenTeil({
           style={styles.endBtn}
           testID="mock-sprechen-end"
         >
-          <PhoneOff color="#EF4444" size={16} />
-          <Text style={styles.endBtnText}>End conversation</Text>
+          <Text style={styles.endBtnText}>End Conversation</Text>
         </Pressable>
       </View>
 
@@ -696,13 +695,14 @@ const styles = StyleSheet.create({
   },
   timerProgressFill: { height: 4 },
 
-  // ── Dual-circle avatar ─────────────────────────────────────────────────
+  // ── Dual-circle avatar (vertical) ─────────────────────────────────────
   avatarSection: {
-    flexDirection: 'row',
+    flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 32,
-    gap: 48,
+    paddingTop: 28,
+    paddingBottom: 16,
+    gap: 16,
   },
   avatarItem: { alignItems: 'center', gap: 8 },
   avatarCircle: { width: 100, height: 100, borderRadius: 50 },
@@ -744,9 +744,8 @@ const styles = StyleSheet.create({
   recordBtnActive: { backgroundColor: '#EF4444' },
   recordBtnText: { color: '#fff', fontSize: 14, fontWeight: '800' as const },
   endBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    paddingHorizontal: 18, paddingVertical: 12,
-    borderRadius: 999, borderWidth: 1.5, borderColor: '#EF4444',
+    paddingHorizontal: 18,
+    paddingVertical: 12,
   },
   endBtnText: { color: '#EF4444', fontSize: 14, fontWeight: '700' as const },
 
