@@ -24,6 +24,7 @@ import { QuestionTypeMetaProvider, useQuestionTypeMetaContext } from '@/lib/useQ
 import * as Sentry from '@sentry/react-native';
 import { adapty } from 'react-native-adapty';
 import { initPostHog } from '@/lib/posthog';
+import { initOneSignal } from '@/lib/onesignal';
 Sentry.init({
   dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
   enabled: !!process.env.EXPO_PUBLIC_SENTRY_DSN,
@@ -141,6 +142,7 @@ export default Sentry.wrap(function RootLayout() {
     } catch (e) {
       console.warn('[PostHog] init failed', e);
     }
+    initOneSignal();
   }, []);
 
   const [fontsLoaded] = useFonts({

@@ -120,6 +120,8 @@ export type UserProfile = {
   walkthrough_completed: boolean;
   walkthrough_completed_at: string | null;
   avatar_url: string | null;
+  notifications_permission: 'not_asked' | 'allowed' | 'denied' | null;
+  notifications_enabled: boolean | null;
 };
 
 export type LeaderboardEntry = {

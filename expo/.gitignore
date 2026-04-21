@@ -45,3 +45,7 @@ node_modules
 .expo
 
 .env.local
+
+# Firebase
+google-services.json
+GoogleService-Info.plist

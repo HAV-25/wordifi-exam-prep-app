@@ -19,6 +19,8 @@ import type { UserProfile } from '@/types/database';
 import { useAppConfig } from '@/providers/AppConfigProvider';
 import { identifyUser, resetUser } from '@/lib/identity';
 import { track } from '@/lib/track';
+import { linkOneSignalIdentity, unlinkOneSignalIdentity, setOneSignalTags } from '@/lib/onesignal';
+import { syncPushToken } from '@/lib/pushTokens';
 
 export const [AuthProvider, useAuth] = createContextHook(() => {
   const queryClient = useQueryClient();
@@ -80,12 +82,15 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
           console.warn('[Adapty] identify failed:', err)
         );
         identifyUser(nextSession.user.id);
+        linkOneSignalIdentity(nextSession.user.id);
+        syncPushToken(nextSession.user.id).catch(() => {});
         if (event === 'INITIAL_SESSION') {
           track('user_signed_in', { method: 'session_restore' });
         }
       } else {
         Sentry.setUser(null);
         adapty.logout().catch(() => {});
+        unlinkOneSignalIdentity();
         resetUser();
       }
     });
@@ -166,6 +171,18 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       return ensureUserProfile(user);
     },
   });
+
+  // Sync OneSignal tags once user profile is available
+  useEffect(() => {
+    const uid = session?.user?.id;
+    const profile = profileQuery.data;
+    if (!uid || !profile) return;
+
+    const tags: Record<string, string> = {};
+    if (profile.target_level) tags.cefr_level = profile.target_level;
+    if (profile.subscription_tier) tags.subscription_status = profile.subscription_tier;
+    if (Object.keys(tags).length > 0) setOneSignalTags(tags);
+  }, [session?.user?.id, profileQuery.data?.target_level, profileQuery.data?.subscription_tier]);
 
   // Reconcile pending onboarding answers once an authenticated session exists.
   // Handles email confirmation handoff, app restarts, and retries after failed writes.

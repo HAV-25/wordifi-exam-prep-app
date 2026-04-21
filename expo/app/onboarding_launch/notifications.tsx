@@ -1,7 +1,6 @@
 /**
  * Onboarding Launch — Screen 10: Notification Buy-In
  * Source: Banani flow FtXTL2Xb5WF4 / screen yyu-oL5xHH2h
- * Triggers real expo-notifications permission request on primary CTA tap
  */
 import React, { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -11,6 +10,11 @@ import { CheckCircle2 } from 'lucide-react-native';
 import { colors } from '@/theme';
 import { ScreenLayout } from '@/components/ScreenLayout';
 import { GlowOrb } from '@/components/GlowOrb';
+import { useAuth } from '@/providers/AuthProvider';
+import { requestPushPermission } from '@/lib/onesignal';
+import { syncPushToken } from '@/lib/pushTokens';
+import { supabase } from '@/lib/supabaseClient';
+import { track } from '@/lib/track';
 
 const BENEFITS = [
   { title: 'One notification per day',               sub: 'Only when your streak is at risk' },
@@ -20,18 +24,42 @@ const BENEFITS = [
 
 export default function NotificationsScreen() {
   const [loading, setLoading] = useState(false);
+  const { user } = useAuth();
+
+  const recordPermission = async (permission: 'allowed' | 'denied') => {
+    if (!user?.id) return;
+    try {
+      await supabase
+        .from('user_profiles')
+        .update({ notifications_permission: permission })
+        .eq('id', user.id);
+    } catch {
+      // non-critical
+    }
+  };
 
   const handleYes = async () => {
     setLoading(true);
     try {
-      const Notifications = await import('expo-notifications');
-      await Notifications.requestPermissionsAsync();
+      const granted = await requestPushPermission();
+      const permission = granted ? 'allowed' : 'denied';
+      track('push_permission_response', { granted });
+      await recordPermission(permission);
+      if (granted && user?.id) {
+        syncPushToken(user.id).catch(() => {});
+      }
     } catch {
-      // expo-notifications not available in Expo Go — continue anyway
+      // permission request failure must not block onboarding
     } finally {
       setLoading(false);
       router.push('/onboarding_launch/plan-summary');
     }
+  };
+
+  const handleNo = async () => {
+    track('push_permission_response', { granted: false });
+    await recordPermission('denied');
+    router.push('/onboarding_launch/plan-summary');
   };
 
   const ctaFooter = (
@@ -57,7 +85,7 @@ export default function NotificationsScreen() {
       </Pressable>
 
       <Pressable
-        onPress={() => router.push('/onboarding_launch/plan-summary')}
+        onPress={handleNo}
         style={styles.ctaSecondary}
         accessibilityRole="button"
         accessibilityLabel="I will remember myself"
