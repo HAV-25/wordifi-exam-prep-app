@@ -4,6 +4,7 @@ import type { Session, User } from '@supabase/supabase-js';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as Linking from 'expo-linking';
+import { router } from 'expo-router';
 import * as Sentry from '@sentry/react-native';
 
 import { adapty } from 'react-native-adapty';
@@ -106,10 +107,11 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       const params = new URLSearchParams(hashPart);
       const accessToken = params.get('access_token');
       const refreshToken = params.get('refresh_token');
+      const type = params.get('type');
 
       if (!accessToken || !refreshToken) return;
 
-      console.log('[Auth] Deep link received, setting session...');
+      console.log('[Auth] Deep link received, setting session... type:', type);
       const { error } = await supabase.auth.setSession({
         access_token: accessToken,
         refresh_token: refreshToken,
@@ -118,6 +120,13 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       if (error) {
         console.error('[Auth] Deep link session error:', error.message);
         Sentry.captureException(error, { tags: { context: 'deep_link_auth' } });
+        return;
+      }
+
+      // Password reset flow — navigate to the set-new-password screen
+      if (type === 'recovery') {
+        console.log('[Auth] Recovery session established, navigating to reset-password');
+        router.replace('/reset-password');
       }
     }
 

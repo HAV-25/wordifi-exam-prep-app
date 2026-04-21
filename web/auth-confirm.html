@@ -152,7 +152,7 @@
         <p>Hang tight, we're setting things up.</p>
       </div>
 
-      <!-- Mobile retry -->
+      <!-- Mobile: account confirmed -->
       <div id="state-mobile" class="section">
         <div class="icon icon-success">&#10003;</div>
         <h1>Account confirmed!</h1>
@@ -164,6 +164,14 @@
         </div>
       </div>
 
+      <!-- Mobile: password reset -->
+      <div id="state-recovery-mobile" class="section">
+        <div class="icon icon-success">&#128273;</div>
+        <h1>Ready to reset!</h1>
+        <p>Tap the button below to open Wordifi and set your new password.</p>
+        <a id="open-recovery-btn" class="btn btn-primary" href="#">Set new password</a>
+      </div>
+
       <!-- Desktop message -->
       <div id="state-desktop" class="section">
         <div class="icon icon-success">&#10003;</div>
@@ -173,6 +181,16 @@
           Open the Wordifi app on your phone to sign in and start learning.
         </p>
         <p style="margin-top: 8px;">Wordifi is a mobile app — sign in on your phone with the email and password you just created.</p>
+      </div>
+
+      <!-- Desktop: password reset -->
+      <div id="state-recovery-desktop" class="section">
+        <div class="icon icon-success">&#128273;</div>
+        <h1>Reset your password</h1>
+        <p style="margin-top: 8px; color: #374151; font-weight: 600;">
+          Open the Wordifi app on your phone to set your new password.
+        </p>
+        <p style="margin-top: 8px;">The password reset link has been opened — switch to the Wordifi app to complete the process.</p>
       </div>
 
       <!-- Error state -->
@@ -212,19 +230,25 @@
       if (refreshToken) deepLink += '&refresh_token=' + encodeURIComponent(refreshToken);
       if (type) deepLink += '&type=' + encodeURIComponent(type);
 
+      var isRecovery = type === 'recovery';
+
       // Set the retry button href
-      document.getElementById('open-app-btn').href = deepLink;
+      if (isRecovery) {
+        document.getElementById('open-recovery-btn').href = deepLink;
+      } else {
+        document.getElementById('open-app-btn').href = deepLink;
+      }
 
       // Attempt to open the app immediately
       window.location.href = deepLink;
 
-      // Fallback after 2 seconds
+      // Fallback after 2 seconds — show appropriate state based on flow
       setTimeout(function() {
         var isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-        if (isMobile) {
-          showState('state-mobile');
+        if (isRecovery) {
+          showState(isMobile ? 'state-recovery-mobile' : 'state-recovery-desktop');
         } else {
-          showState('state-desktop');
+          showState(isMobile ? 'state-mobile' : 'state-desktop');
         }
       }, 2000);
     })();
