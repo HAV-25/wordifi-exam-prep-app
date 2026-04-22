@@ -178,6 +178,17 @@ export default function TestStreamScreen() {
     }
   }, [userId]);
 
+  // ── Auto-open PaywallBottomSheet when stream limit already reached ─────────
+  // Fires on mount (user navigates to tab with limit reached) — shows the
+  // "Don't stop now." sheet over the question instead of the full-page gate.
+  useEffect(() => {
+    if (isStreamLimited && !isPaidUser && !showPaywallSheet && !showPaywall) {
+      setPaywallSheetTrigger('stream_limit_free');
+      setShowPaywallSheet(true);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isStreamLimited]);
+
   // ── Session init ───────────────────────────────────────────────────────────
   useEffect(() => {
     if (!userId || !targetLevel) return;
@@ -317,16 +328,17 @@ export default function TestStreamScreen() {
         setPaywallSheetTrigger('streak_req_exceeds_free');
         setShowPaywallSheet(true);
       } else {
-        // Trigger #4 — mid-session hard block → direct Adapty
-        setShowPaywall(true);
+        // Trigger #4 — mid-session hard block → show limit sheet (consistent with gate)
+        setPaywallSheetTrigger('stream_limit_free');
+        setShowPaywallSheet(true);
       }
       return;
     }
 
     // Soft warning: 80% of daily cap used (fire once per session)
+    // NOTE: access.stream_questions_remaining is in deps to prevent stale closure
     const remaining = access.stream_questions_remaining ?? 0;
     if (!warned80Ref.current && !isPaidUser) {
-      const dailyCap = access.stream_questions_per_day ?? 5;
       if (!isTrial && remaining === 1) {
         // Trigger #1 — free user, 1 question left
         warned80Ref.current = true;
@@ -348,7 +360,10 @@ export default function TestStreamScreen() {
     if (sessionId) advanceSession(sessionId, newIndex, totalQuestions).catch((err) => console.error('[Stream] Advance error:', err));
     if (isNowComplete) { setIsComplete(true); return; }
     setIsAnswered(false); setSelectedAnswer(null); setAudioUnlockedMap({}); setCurrentIndex(newIndex);
-  }, [currentIndex, totalQuestions, sessionId, isStreamLimited]);
+  // access.stream_questions_remaining, isPaidUser, isTrial added to fix stale closure:
+  // without them, the remaining === 1/4 check reads the value captured at mount.
+  }, [currentIndex, totalQuestions, sessionId, isStreamLimited, isStreakReqExceedsFree,
+      access.stream_questions_remaining, isPaidUser, isTrial]);
 
   const handleAudioPlayed = useCallback((questionId: string) => {
     setAudioUnlockedMap((prev) => ({ ...prev, [questionId]: true }));
@@ -400,57 +415,8 @@ export default function TestStreamScreen() {
     );
   }
 
-  // ── Render: Daily limit reached ────────────────────────────────────────────
-  if (isStreamLimited && !isAnswered) {
-    const dailyLimit = access.stream_questions_per_day ?? 0;
-    return (
-      <SafeAreaView style={s.safeArea}>
-        <AppHeader />
-        <View style={s.emptyWrap}>
-          <Text style={s.emptyEmoji}>⏰</Text>
-          <Text style={s.emptyTitle}>
-            {isStreakReqExceedsFree ? 'Streak requirement not met' : 'Daily limit reached'}
-          </Text>
-          <Text style={s.emptyDesc}>
-            {isStreakReqExceedsFree
-              ? `Today's streak requires ${todayRequirement} questions. You've used your ${dailyLimit} free.`
-              : `You've answered ${dailyLimit} question${dailyLimit !== 1 ? 's' : ''} today — your daily allowance.\nUpgrade to practise unlimited questions every day.`}
-          </Text>
-          <View style={s.emptyCtas}>
-            <Pressable
-              style={s.ctaPrimary}
-              onPress={() => {
-                if (isStreakReqExceedsFree) {
-                  setPaywallSheetTrigger('streak_req_exceeds_free');
-                  setShowPaywallSheet(true);
-                } else {
-                  // Trigger #3 — direct Adapty
-                  setShowPaywall(true);
-                }
-              }}
-            >
-              <Text style={s.ctaPrimaryText}>Unlock Unlimited</Text>
-            </Pressable>
-            <Pressable style={s.ctaSecondary} onPress={() => router.push('/(tabs)/tests' as never)}>
-              <Text style={s.ctaSecondaryText}>Try a Sectional Test</Text>
-            </Pressable>
-          </View>
-        </View>
-        <PaywallModal visible={showPaywall} variant="stream_limit" onUpgrade={() => setShowPaywall(false)} onDismiss={() => setShowPaywall(false)} />
-        <PaywallBottomSheet
-          visible={showPaywallSheet}
-          triggerContext={paywallSheetTrigger}
-          streamUsed={dailyLimit}
-          streamTotal={access.stream_questions_per_day ?? 5}
-          streakDays={streakDays}
-          streakRequirement={todayRequirement}
-          badgeName={badgeName}
-          onUnlock={() => { setShowPaywallSheet(false); setShowPaywall(true); }}
-          onDismiss={() => setShowPaywallSheet(false)}
-        />
-      </SafeAreaView>
-    );
-  }
+  // Daily limit reached — the auto-open useEffect handles this by showing
+  // PaywallBottomSheet over the main render (Banani design: question visible behind overlay)
 
   // ── Render: No questions ───────────────────────────────────────────────────
   if (questions.length === 0) {
@@ -610,7 +576,11 @@ export default function TestStreamScreen() {
       <PaywallBottomSheet
         visible={showPaywallSheet}
         triggerContext={paywallSheetTrigger}
-        streamUsed={(access.stream_questions_per_day ?? 5) - (access.stream_questions_remaining ?? 0)}
+        streamUsed={
+          paywallSheetTrigger === 'stream_limit_free'
+            ? (access.stream_questions_per_day ?? 5)   // all bars filled: used === total
+            : (access.stream_questions_per_day ?? 5) - (access.stream_questions_remaining ?? 0)
+        }
         streamTotal={paywallSheetTrigger === 'stream_80_trial' ? 20 : (access.stream_questions_per_day ?? 5)}
         streakDays={streakDays}
         streakRequirement={todayRequirement}

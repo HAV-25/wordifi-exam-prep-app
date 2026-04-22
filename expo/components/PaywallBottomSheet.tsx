@@ -28,6 +28,7 @@ import { useAccess } from '@/providers/AccessProvider';
 export type PaywallTriggerContext =
   | 'stream_80_free'
   | 'stream_80_trial'
+  | 'stream_limit_free'
   | 'schreiben_locked'
   | 'sprechen_locked'
   | 'mock_locked'
@@ -66,7 +67,16 @@ const PAYWALL_COPY: Record<
   stream_80_free: {
     headline: '1 question left today',
     subline: ({ badge = '' }) =>
-      `Unlock unlimited practice and keep your ${badge} streak going.`,
+      badge
+        ? `Unlock unlimited practice and keep your ${badge} streak going.`
+        : 'Unlock unlimited practice and keep your streak going.',
+    indicator: 'stream_progress',
+    show_badge: true,
+  },
+  stream_limit_free: {
+    headline: "Don't stop now.",
+    subline: () =>
+      "You've used all your free questions for today. Upgrade to practise unlimited questions and keep your streak alive.",
     indicator: 'stream_progress',
     show_badge: true,
   },
@@ -272,14 +282,16 @@ export function PaywallBottomSheet({
         {/* Subline */}
         <Text style={s.subline}>{subline}</Text>
 
-        {/* Streak nudge */}
-        {copy.show_badge && badgeName ? (
+        {/* Streak nudge — shown for all show_badge contexts */}
+        {copy.show_badge ? (
           <View style={s.streakNudge}>
             <Flame color={C.streakText} size={20} />
             <Text style={s.streakNudgeText}>
               {triggerContext === 'streak_req_exceeds_free'
-                ? `Upgrade to keep your ${badgeName} streak alive.`
-                : `Your streak is safe — upgrade before midnight to keep ${badgeName}.`}
+                ? `Upgrade to keep your ${badgeName || 'streak'} alive.`
+                : badgeName
+                ? `Your streak is safe — upgrade before midnight to keep ${badgeName}.`
+                : 'Your streak is safe — upgrade before midnight to keep it alive.'}
             </Text>
           </View>
         ) : null}
@@ -363,10 +375,10 @@ const s = StyleSheet.create({
 
   headline: {
     fontFamily: 'Outfit_800ExtraBold',
-    fontSize: 30,
+    fontSize: 32,
     color: C.fg,
     textAlign: 'center',
-    letterSpacing: -0.6,
+    letterSpacing: -1,
     marginBottom: 10,
   },
 
