@@ -10,8 +10,8 @@ type AppConfig = {
 };
 
 const DEFAULTS: AppConfig = {
-  terms_url: 'https://wordifi.com/terms',
-  privacy_url: 'https://wordifi.com/privacy',
+  terms_url: 'https://www.wordifi.com/terms/',
+  privacy_url: 'https://www.wordifi.com/privacy/',
   tc_version: '1.0',
 };
 

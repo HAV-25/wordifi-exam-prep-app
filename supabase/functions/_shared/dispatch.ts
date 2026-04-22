@@ -131,7 +131,7 @@ export async function dispatchChannel(
     // Dispatch
     if (channel === 'push') {
       const r = rendered as RenderedPush;
-      const result = await sendPush(userId, r.headings, r.contents, r.deep_link, payload);
+      const result = await sendPush(gateResult.token!, r.headings, r.contents, r.deep_link, payload);
       const status = result.ok ? 'sent' : 'failed';
       await logEvent(supabase, userId, eventKey, channel, category, status, {
         provider_message_id: result.messageId,

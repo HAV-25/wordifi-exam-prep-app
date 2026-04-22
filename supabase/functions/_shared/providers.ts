@@ -15,7 +15,7 @@ export type ProviderResult = {
 };
 
 export async function sendPush(
-  userId: string,
+  playerToken: string,
   headings: { en: string },
   contents: { en: string },
   deepLink: string,
@@ -31,11 +31,12 @@ export async function sendPush(
   try {
     const body = {
       app_id: appId,
-      include_aliases: { external_id: [userId] },
-      target_channel: 'push',
+      include_subscription_ids: [playerToken],
       headings,
       contents,
       data: { deep_link: deepLink, ...payload },
+      priority: 10,
+      android_visibility: 1,
     };
     const res = await fetchWithTimeout('https://api.onesignal.com/notifications', {
       method: 'POST',
@@ -46,9 +47,38 @@ export async function sendPush(
       body: JSON.stringify(body),
     });
     const json = await res.json().catch(() => ({}));
+
+    // Log full response for diagnostics
+    console.log('[providers] OneSignal response status:', res.status);
+    console.log('[providers] OneSignal response body:', JSON.stringify(json));
+
     if (!res.ok) {
-      return { ok: false, error: json?.errors?.[0] ?? `http_${res.status}` };
+      const errMsg = json?.errors?.[0] ?? `http_${res.status}`;
+      console.warn('[providers] OneSignal HTTP error:', errMsg);
+      return { ok: false, error: errMsg };
     }
+
+    // errors can be an array OR an object (e.g. {invalid_player_ids:[...]}) — both mean failure
+    if (json?.errors) {
+      const hasErrors = Array.isArray(json.errors)
+        ? json.errors.length > 0
+        : typeof json.errors === 'object' && Object.keys(json.errors).length > 0;
+      if (hasErrors) {
+        const errMsg = Array.isArray(json.errors)
+          ? json.errors[0]
+          : JSON.stringify(json.errors);
+        console.warn('[providers] OneSignal returned errors on 200:', json.errors);
+        return { ok: false, error: errMsg };
+      }
+    }
+
+    // recipients:0 means no device was reached
+    if (json?.recipients === 0) {
+      console.warn('[providers] OneSignal recipients=0 — device not subscribed or player_id invalid');
+      return { ok: false, error: 'no_recipients' };
+    }
+
+    console.log('[providers] OneSignal push sent, id:', json?.id, 'recipients:', json?.recipients);
     return { ok: true, messageId: json?.id };
   } catch (e) {
     console.warn('[providers] sendPush error', e);

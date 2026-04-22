@@ -5,12 +5,6 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const ADAPTY_SECRET = Deno.env.get('ADAPTY_WEBHOOK_SECRET');
 
-const TRIAL_EVENT_KEYS = [
-  'notif.trial_ending_t3',
-  'notif.trial_ending_t1',
-  'notif.trial_ending_t0',
-];
-
 // deno-lint-ignore no-explicit-any
 type Row = Record<string, any>;
 
@@ -21,32 +15,55 @@ Deno.serve(async (req: Request) => {
     return Response.json({ status: 'ok' });
   }
 
-  // Auth check
+  if (req.method !== 'POST') {
+    return Response.json({ error: 'method_not_allowed' }, { status: 405 });
+  }
+
+  // Read body first — needed to detect validation pings before enforcing auth.
+  const rawBody = await req.text();
+
+  let event: Row | null = null;
+  try {
+    if (rawBody.trim().length > 0) {
+      event = JSON.parse(rawBody);
+    }
+  } catch {
+    // not valid JSON — treat as ping
+  }
+
+  const eventType: string = event?.event_type ?? event?.type ?? '';
+
+  // Treat as a validation ping if there is no recognisable event payload.
+  if (!eventType) {
+    console.log('[adapty-webhook] validation ping received');
+    return Response.json({ received: true, ping: true });
+  }
+
+  // Real event — enforce auth.
   const auth = req.headers.get('Authorization') ?? '';
   if (ADAPTY_SECRET) {
     if (auth !== `Bearer ${ADAPTY_SECRET}`) {
       return Response.json({ error: 'unauthorized' }, { status: 401 });
     }
   } else {
-    console.warn('[adapty-webhook] ADAPTY_WEBHOOK_SECRET not set — skipping auth check (TODO: set this secret)');
+    console.warn('[adapty-webhook] ADAPTY_WEBHOOK_SECRET not set — skipping auth check');
   }
 
-  if (req.method !== 'POST') {
-    return Response.json({ error: 'method_not_allowed' }, { status: 405 });
-  }
+  // Diagnostics: log top-level shape so we can map the real Adapty payload.
+  console.log('[adapty-webhook] event_type:', eventType);
+  console.log('[adapty-webhook] top-level keys:', Object.keys(event ?? {}).join(', '));
+  console.log('[adapty-webhook] event.profile:', JSON.stringify(event?.profile ?? null));
+  console.log('[adapty-webhook] event.paid_access_level:', JSON.stringify(event?.paid_access_level ?? null));
+  console.log('[adapty-webhook] event.access_level:', JSON.stringify(event?.access_level ?? null));
+  console.log('[adapty-webhook] event.event_properties:', JSON.stringify(event?.event_properties ?? null));
 
-  let event: Row;
-  try {
-    event = await req.json();
-  } catch {
-    return Response.json({ error: 'invalid_json' }, { status: 400 });
-  }
-
-  const eventType: string = event?.event_type ?? event?.type ?? '';
+  // user_id: Adapty sends profile.customer_user_id (must be the Supabase UUID).
+  // Falls back to top-level user_id for manual test curls.
   const userId: string = event?.profile?.customer_user_id ?? event?.user_id ?? '';
+  console.log('[adapty-webhook] resolved user_id:', userId || '(empty)');
 
   if (!userId) {
-    console.warn('[adapty-webhook] no user_id in event', eventType);
+    console.warn('[adapty-webhook] no user_id — checked event.profile.customer_user_id and event.user_id');
     return Response.json({ received: true, processed: 0 });
   }
 
@@ -57,45 +74,65 @@ Deno.serve(async (req: Request) => {
 
   switch (eventType) {
     case 'subscription_started':
+      console.log('[adapty-webhook] branch: subscription_started');
       snapshotUpdate.subscription_status = 'active';
       break;
+
     case 'trial_started': {
+      console.log('[adapty-webhook] branch: trial_started');
       snapshotUpdate.subscription_status = 'trial';
+
+      // Check all known locations Adapty may place the expiry date.
       const trialEndsAt: string =
         event?.paid_access_level?.expires_at ??
-        event?.trial_ends_at ??
         event?.access_level?.expires_at ??
+        event?.trial_ends_at ??
+        event?.event_properties?.expires_at ??
+        event?.event_properties?.trial_expires_at ??
         '';
+
+      console.log('[adapty-webhook] trial_ends_at resolved:', trialEndsAt || '(empty)');
+
       if (trialEndsAt) {
         snapshotUpdate.trial_ends_at = trialEndsAt;
         await scheduleTrialNotifications(supabase, userId, trialEndsAt);
         processed += 6;
+      } else {
+        console.warn('[adapty-webhook] trial_ends_at not found in any known field — snapshot updated but no notifications scheduled');
       }
       break;
     }
+
     case 'subscription_renewed':
+      console.log('[adapty-webhook] branch: subscription_renewed');
       snapshotUpdate.subscription_status = 'active';
       break;
+
     case 'subscription_cancelled':
+      console.log('[adapty-webhook] branch: subscription_cancelled');
       snapshotUpdate.subscription_status = 'cancelled';
       break;
+
     case 'subscription_expired':
+      console.log('[adapty-webhook] branch: subscription_expired');
       snapshotUpdate.subscription_status = 'expired';
       break;
+
     default:
-      // Ignore all other event types
+      console.warn('[adapty-webhook] unhandled event_type:', eventType);
       return Response.json({ received: true, processed: 0 });
   }
 
-  // Update user_activity_snapshot
+  console.log('[adapty-webhook] upserting snapshot:', snapshotUpdate);
   const { error: snapErr } = await supabase
     .from('user_activity_snapshot')
     .upsert({ user_id: userId, ...snapshotUpdate }, { onConflict: 'user_id' });
 
   if (snapErr) {
-    console.warn('[adapty-webhook] snapshot upsert failed', snapErr.message);
+    console.warn('[adapty-webhook] snapshot upsert failed:', snapErr.message);
   } else {
     processed += 1;
+    console.log('[adapty-webhook] snapshot ok, total processed:', processed);
   }
 
   return Response.json({ received: true, processed });
@@ -106,7 +143,6 @@ async function scheduleTrialNotifications(
   userId: string,
   trialEndsAt: string,
 ) {
-  // Resolve user timezone
   const { data: profile } = await supabase
     .from('user_profiles')
     .select('timezone')
@@ -117,20 +153,14 @@ async function scheduleTrialNotifications(
   const trialEnd = new Date(trialEndsAt);
 
   const scheduled: Row[] = [
-    // T-3: push + email at 09:00 local
     { event_key: 'notif.trial_ending_t3', channel: 'push',  scheduled_at: localTimeToUTC(trialEnd, -3, 9, 0, tz).toISOString() },
     { event_key: 'notif.trial_ending_t3', channel: 'email', scheduled_at: localTimeToUTC(trialEnd, -3, 9, 0, tz).toISOString() },
-    // T-1: push + email at 09:00 local
     { event_key: 'notif.trial_ending_t1', channel: 'push',  scheduled_at: localTimeToUTC(trialEnd, -1, 9, 0, tz).toISOString() },
     { event_key: 'notif.trial_ending_t1', channel: 'email', scheduled_at: localTimeToUTC(trialEnd, -1, 9, 0, tz).toISOString() },
-    // T-0: push + email at trial_end - 4h
     { event_key: 'notif.trial_ending_t0', channel: 'push',  scheduled_at: new Date(trialEnd.getTime() - 4 * 3600 * 1000).toISOString() },
     { event_key: 'notif.trial_ending_t0', channel: 'email', scheduled_at: new Date(trialEnd.getTime() - 4 * 3600 * 1000).toISOString() },
   ];
 
-  // Idempotency: for each scheduled row, update scheduled_at if a queued row
-  // already exists (trial date shifted), otherwise insert fresh. This avoids a
-  // delete→insert gap where the processor could see missing rows mid-operation.
   for (const s of scheduled) {
     const { data: existing } = await supabase
       .from('notification_events')

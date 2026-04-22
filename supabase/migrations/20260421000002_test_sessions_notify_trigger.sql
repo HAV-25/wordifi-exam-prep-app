@@ -1,12 +1,7 @@
 -- Trigger: fires notify-user when a sectional test session is completed.
--- Requires pg_net extension and two database-level settings (see MANUAL SETUP below).
---
--- MANUAL SETUP — run once in Supabase SQL Editor after deploying:
---
---   ALTER DATABASE postgres SET app.supabase_url = 'https://wwfiauhsbssjowaxmqyn.supabase.co';
---   ALTER DATABASE postgres SET app.service_role_key = '<paste_service_role_key>';
---
--- The service_role_key is in Supabase Dashboard → Settings → API.
+-- Requires pg_net extension and secrets stored in Supabase Vault:
+--   name = 'supabase_url'      → project URL
+--   name = 'service_role_key'  → service role key
 
 CREATE OR REPLACE FUNCTION public.trg_notify_section_completed()
 RETURNS TRIGGER
@@ -21,11 +16,11 @@ BEGIN
   -- Only fire when completed_at transitions NULL → value for sectional sessions
   IF NEW.completed_at IS NOT NULL AND OLD.completed_at IS NULL THEN
     IF NEW.session_type = 'sectional' THEN
-      v_supabase_url := current_setting('app.supabase_url', true);
-      v_service_key  := current_setting('app.service_role_key', true);
+      v_supabase_url := (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'supabase_url');
+      v_service_key  := (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'service_role_key');
 
       IF v_supabase_url IS NULL OR v_service_key IS NULL THEN
-        RAISE WARNING 'trg_notify_section_completed: app.supabase_url or app.service_role_key not set — skipping notify';
+        RAISE WARNING 'trg_notify_section_completed: vault secrets supabase_url or service_role_key not found — skipping notify';
         RETURN NEW;
       END IF;
 
