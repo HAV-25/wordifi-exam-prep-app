@@ -470,7 +470,7 @@ export function MockSprechenTeil({
         {/* AI disclosure — bottom */}
         <View style={styles.connectingDisclosure}>
           <Text style={styles.connectingDisclosureText}>
-            🤖  {isMonologue ? 'Your examiner' : 'Your testing partner'} is AI-enabled
+            {isMonologue ? 'Your examiner' : 'Your testing partner'} is AI-enabled
           </Text>
         </View>
       </View>
