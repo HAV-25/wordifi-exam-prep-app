@@ -57,7 +57,7 @@ import type { AppQuestion } from '@/types/database';
 const SUPABASE_URL = 'https://wwfiauhsbssjowaxmqyn.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind3ZmlhdWhzYnNzam93YXhtcXluIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE0MTQxMzUsImV4cCI6MjA4Njk5MDEzNX0.lSPPEQCtdigdXpwB2X5hUTrC2dThil6qleQtqcUEKAE';
 
-const AI_PARTNER_NAMES = ['Anna', 'Felix', 'Laura', 'Markus', 'Sophie', 'Thomas', 'Lena', 'Klaus', 'Marie', 'Jan'];
+const AI_PARTNER_NAMES = ['Anna', 'Laura', 'Sophie', 'Lena', 'Marie', 'Julia', 'Hannah', 'Lisa', 'Mia', 'Sara'];
 
 export type MockSprechenTeilResult = {
   scores: SprechenScores;
