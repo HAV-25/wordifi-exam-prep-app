@@ -391,7 +391,7 @@ export function MockSprechenTeil({
           ) : null}
           <View style={styles.readyDivider} />
           <Text style={styles.readyHint}>
-            Find a quiet space. You'll have a short conversation with the AI partner — speak naturally in German.
+            Find a quiet space and speak naturally in German. Your testing partner will guide the conversation.
           </Text>
           <Text style={styles.readyMicNote}>🎤 Mic access required</Text>
 
@@ -440,10 +440,39 @@ export function MockSprechenTeil({
 
   // PHASE: connecting
   if (phase === 'connecting') {
+    const partnerName = aiPartnerNameRef.current;
     return (
-      <View style={styles.center}>
-        <ActivityIndicator color={B.primary} size="large" />
-        <Text style={styles.statusText}>Connecting to AI partner...</Text>
+      <View style={styles.connectingScreen}>
+        <View style={styles.connectingCard}>
+          {/* Avatar with spinner */}
+          <View style={styles.connectingAvatarWrap}>
+            <View style={styles.connectingAvatar}>
+              <ActivityIndicator color="#fff" size="large" />
+            </View>
+            {!isMonologue && (
+              <Text style={styles.connectingPartnerName}>{partnerName}</Text>
+            )}
+          </View>
+
+          {/* Main message */}
+          <Text style={styles.connectingHeading}>
+            {isMonologue
+              ? 'Your speaking assessment is about to begin'
+              : `Your conversation with ${partnerName} is about to begin`}
+          </Text>
+          <Text style={styles.connectingSubtext}>
+            {isMonologue
+              ? 'When your examiner speaks, listen carefully — then present your topic in German.'
+              : 'Speak naturally in German. Your testing partner will guide the conversation.'}
+          </Text>
+        </View>
+
+        {/* AI disclosure — bottom */}
+        <View style={styles.connectingDisclosure}>
+          <Text style={styles.connectingDisclosureText}>
+            🤖  {isMonologue ? 'Your examiner' : 'Your testing partner'} is AI-enabled
+          </Text>
+        </View>
       </View>
     );
   }
@@ -761,4 +790,60 @@ const styles = StyleSheet.create({
   },
   countdownNumber: { fontSize: 56, fontWeight: '800' as const, color: '#EF4444' },
   countdownMessage: { fontSize: 16, fontWeight: '700' as const, color: '#fff', textAlign: 'center', paddingHorizontal: 32 },
+
+  // ── Connecting screen ───────────────────────────────────────────────────
+  connectingScreen: {
+    flex: 1,
+    justifyContent: 'space-between' as const,
+    paddingHorizontal: 24,
+    paddingTop: 40,
+    paddingBottom: 40,
+  },
+  connectingCard: {
+    alignItems: 'center' as const,
+    gap: 20,
+    paddingTop: 40,
+  },
+  connectingAvatarWrap: {
+    alignItems: 'center' as const,
+    gap: 12,
+    marginBottom: 12,
+  },
+  connectingAvatar: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: B.primary,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  connectingPartnerName: {
+    fontSize: 18,
+    fontWeight: '800' as const,
+    color: B.questionColor,
+  },
+  connectingHeading: {
+    fontSize: 24,
+    fontWeight: '800' as const,
+    color: B.questionColor,
+    textAlign: 'center' as const,
+    lineHeight: 32,
+  },
+  connectingSubtext: {
+    fontSize: 15,
+    fontWeight: '500' as const,
+    color: B.muted,
+    textAlign: 'center' as const,
+    lineHeight: 24,
+    paddingHorizontal: 8,
+  },
+  connectingDisclosure: {
+    alignItems: 'center' as const,
+    paddingVertical: 12,
+  },
+  connectingDisclosureText: {
+    fontSize: 13,
+    fontWeight: '500' as const,
+    color: B.muted,
+  },
 });

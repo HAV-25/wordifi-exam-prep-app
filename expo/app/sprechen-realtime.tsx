@@ -628,15 +628,42 @@ export default function SprechenRealtimeScreen() {
 
   // ─── Connecting ───────────────────────────────────────────────────────────
   if (screenState === 'connecting') {
+    const partnerName = aiPartnerNameRef.current;
     return (
       <View style={[styles.screen, { paddingTop: insets.top }]}>
         <Stack.Screen options={{ headerShown: false }} />
         <AppHeader />
-        <View style={styles.center}>
-          <View style={styles.connectingAvatar}>
-            <ActivityIndicator color={colors.white} size="large" />
+        <View style={styles.connectingScreen}>
+          <View style={styles.connectingCard}>
+            {/* Avatar with spinner */}
+            <View style={styles.connectingAvatarWrap}>
+              <View style={styles.connectingAvatar}>
+                <ActivityIndicator color={colors.white} size="large" />
+              </View>
+              {!isMonologue && (
+                <Text style={styles.connectingPartnerName}>{partnerName}</Text>
+              )}
+            </View>
+
+            {/* Main message */}
+            <Text style={styles.connectingHeading}>
+              {isMonologue
+                ? 'Your speaking assessment is about to begin'
+                : `Your conversation with ${partnerName} is about to begin`}
+            </Text>
+            <Text style={styles.connectingSubtext}>
+              {isMonologue
+                ? 'When your examiner speaks, listen carefully — then present your topic in German.'
+                : 'Speak naturally in German. Your testing partner will guide the conversation.'}
+            </Text>
           </View>
-          <Text style={styles.loadingText}>Connecting AI partner...</Text>
+
+          {/* AI disclosure — bottom of screen */}
+          <View style={styles.connectingDisclosure}>
+            <Text style={styles.connectingDisclosureText}>
+              🤖  {isMonologue ? 'Your examiner' : 'Your testing partner'} is AI-enabled
+            </Text>
+          </View>
         </View>
       </View>
     );
@@ -1052,6 +1079,25 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontWeight: '600' as const,
   },
+
+  // ── Connecting screen ─────────────────────────────────────────────────────
+  connectingScreen: {
+    flex: 1,
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.xxl,
+    paddingBottom: spacing.xxl,
+  },
+  connectingCard: {
+    alignItems: 'center',
+    gap: spacing.lg,
+    paddingTop: spacing.xxl,
+  },
+  connectingAvatarWrap: {
+    alignItems: 'center',
+    gap: spacing.md,
+    marginBottom: spacing.md,
+  },
   connectingAvatar: {
     width: 96,
     height: 96,
@@ -1059,6 +1105,35 @@ const styles = StyleSheet.create({
     backgroundColor: colors.blue,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  connectingPartnerName: {
+    fontSize: fontSize.bodyLg,
+    fontWeight: '800' as const,
+    color: colors.navy,
+  },
+  connectingHeading: {
+    fontSize: fontSize.displaySm,
+    fontWeight: '800' as const,
+    color: colors.navy,
+    textAlign: 'center' as const,
+    lineHeight: 34,
+  },
+  connectingSubtext: {
+    fontSize: fontSize.bodyMd,
+    fontWeight: '500' as const,
+    color: colors.muted,
+    textAlign: 'center' as const,
+    lineHeight: 24,
+    paddingHorizontal: spacing.md,
+  },
+  connectingDisclosure: {
+    alignItems: 'center',
+    paddingVertical: spacing.md,
+  },
+  connectingDisclosureText: {
+    fontSize: fontSize.bodySm,
+    fontWeight: '500' as const,
+    color: colors.muted,
   },
   errorIcon: {
     width: 80,
