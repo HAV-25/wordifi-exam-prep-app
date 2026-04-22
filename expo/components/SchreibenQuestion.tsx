@@ -137,6 +137,20 @@ function SubmitCTA({ canSubmit, onPress, isLoading }: { canSubmit: boolean; onPr
   );
 }
 
+// ── Pulsing cursor hint ───────────────────────────────────────────────────
+function PulsingCursor() {
+  const blink = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(blink, { toValue: 0, duration: 530, useNativeDriver: true }),
+        Animated.timing(blink, { toValue: 1, duration: 530, useNativeDriver: true }),
+      ]),
+    ).start();
+  }, [blink]);
+  return <Animated.Text style={[s.pulsingCursor, { opacity: blink }]}>|</Animated.Text>;
+}
+
 // ── Form Fill Variant ─────────────────────────────────────────────────────
 function FormFillVariant({ question, onSubmit, isSubmitted, isLoading }: VariantProps) {
   const fields = useMemo<FormFillOption[]>(() => {
@@ -210,6 +224,7 @@ function SMSVariant({ question, onSubmit, isSubmitted, isLoading }: VariantProps
   const wc = useMemo(() => countWords(text), [text]);
   const limits = WORD_LIMITS.sms!;
   const [showWarning, setShowWarning] = useState(false);
+  const [focused, setFocused] = useState(false);
 
   const bulletPoints = useMemo(
     () => (question.options as Array<{ text?: string }>).map((o) => o.text ?? ''),
@@ -236,17 +251,22 @@ function SMSVariant({ question, onSubmit, isSubmitted, isLoading }: VariantProps
           <Text style={s.writingHeaderRight}>{wc} / {limits.max} Wörter</Text>
         </View>
         <View style={s.textAreaZone}>
-          <TextInput
-            style={s.textArea}
-            multiline
-            value={text}
-            onChangeText={setText}
-            placeholder="Schreiben Sie hier Ihre SMS..."
-            placeholderTextColor={B.muted}
-            editable={!isSubmitted}
-            testID="sms-input"
-            textAlignVertical="top"
-          />
+          <View style={s.cursorWrap}>
+            {text === '' && !focused && !isSubmitted && <PulsingCursor />}
+            <TextInput
+              style={s.textArea}
+              multiline
+              value={text}
+              onChangeText={setText}
+              placeholder="Schreiben Sie hier Ihre SMS..."
+              placeholderTextColor={B.muted}
+              editable={!isSubmitted}
+              testID="sms-input"
+              textAlignVertical="top"
+              onFocus={() => setFocused(true)}
+              onBlur={() => setFocused(false)}
+            />
+          </View>
         </View>
       </View>
 
@@ -269,6 +289,8 @@ function FormalEmailVariant({ question, onSubmit, isSubmitted, isLoading }: Vari
   const limits = WORD_LIMITS.formal_email!;
   const wc = useMemo(() => countWords(body), [body]);
   const [showWarning, setShowWarning] = useState(false);
+  const [subjectFocused, setSubjectFocused] = useState(false);
+  const [bodyFocused, setBodyFocused] = useState(false);
 
   const fullText = useMemo(
     () => `${subject}\n\nSehr geehrte Damen und Herren,\n\n${body}\n\nMit freundlichen Grüßen,\n${name}`,
@@ -303,31 +325,41 @@ function FormalEmailVariant({ question, onSubmit, isSubmitted, isLoading }: Vari
         <View style={s.betreffArea}>
           <Text style={s.betreffLabel}>Betreff:</Text>
           <View style={s.betreffInputContainer}>
-            <TextInput
-              style={s.betreffInput}
-              value={subject}
-              onChangeText={setSubject}
-              placeholder="Schreiben Sie hier den Betreff..."
-              placeholderTextColor={B.muted}
-              editable={!isSubmitted}
-              testID="email-subject"
-            />
+            <View style={s.cursorWrap}>
+              {subject === '' && !subjectFocused && !isSubmitted && <PulsingCursor />}
+              <TextInput
+                style={s.betreffInput}
+                value={subject}
+                onChangeText={setSubject}
+                placeholder="Schreiben Sie hier den Betreff..."
+                placeholderTextColor={B.muted}
+                editable={!isSubmitted}
+                testID="email-subject"
+                onFocus={() => setSubjectFocused(true)}
+                onBlur={() => setSubjectFocused(false)}
+              />
+            </View>
           </View>
         </View>
 
         <View style={s.bodyArea}>
           <Text style={s.scaffold}>Sehr geehrte Damen und Herren,</Text>
-          <TextInput
-            style={s.bodyTextArea}
-            multiline
-            value={body}
-            onChangeText={setBody}
-            placeholder="Schreiben Sie hier Ihre E-Mail..."
-            placeholderTextColor={B.muted}
-            editable={!isSubmitted}
-            testID="email-body"
-            textAlignVertical="top"
-          />
+          <View style={s.cursorWrap}>
+            {body === '' && !bodyFocused && !isSubmitted && <PulsingCursor />}
+            <TextInput
+              style={s.bodyTextArea}
+              multiline
+              value={body}
+              onChangeText={setBody}
+              placeholder="Schreiben Sie hier Ihre E-Mail..."
+              placeholderTextColor={B.muted}
+              editable={!isSubmitted}
+              testID="email-body"
+              textAlignVertical="top"
+              onFocus={() => setBodyFocused(true)}
+              onBlur={() => setBodyFocused(false)}
+            />
+          </View>
           <Text style={s.scaffold}>Mit freundlichen Grüßen,</Text>
           <TextInput
             style={s.nameInput}
@@ -360,6 +392,7 @@ function InformalLetterVariant({ question, onSubmit, isSubmitted, isLoading }: V
   const limits = WORD_LIMITS.informal_letter!;
   const wc = useMemo(() => countWords(body), [body]);
   const [showWarning, setShowWarning] = useState(false);
+  const [bodyFocused, setBodyFocused] = useState(false);
 
   const fullText = useMemo(
     () => `${salutation},\n\n${body}\n\nViele Grüße,\n${name}`,
@@ -401,17 +434,22 @@ function InformalLetterVariant({ question, onSubmit, isSubmitted, isLoading }: V
             testID="letter-salutation"
           />
           <View style={s.salutationDivider} />
-          <TextInput
-            style={s.bodyTextArea}
-            multiline
-            value={body}
-            onChangeText={setBody}
-            placeholder="Schreiben Sie hier Ihren Brief..."
-            placeholderTextColor={B.muted}
-            editable={!isSubmitted}
-            testID="letter-body"
-            textAlignVertical="top"
-          />
+          <View style={s.cursorWrap}>
+            {body === '' && !bodyFocused && !isSubmitted && <PulsingCursor />}
+            <TextInput
+              style={s.bodyTextArea}
+              multiline
+              value={body}
+              onChangeText={setBody}
+              placeholder="Schreiben Sie hier Ihren Brief..."
+              placeholderTextColor={B.muted}
+              editable={!isSubmitted}
+              testID="letter-body"
+              textAlignVertical="top"
+              onFocus={() => setBodyFocused(true)}
+              onBlur={() => setBodyFocused(false)}
+            />
+          </View>
           <Text style={s.scaffold}>Viele Grüße,</Text>
           <TextInput
             style={s.nameInput}
@@ -442,6 +480,7 @@ function OpinionVariant({ question, onSubmit, isSubmitted, isLoading }: VariantP
   const limits = WORD_LIMITS.opinion!;
   const wc = useMemo(() => countWords(text), [text]);
   const [showWarning, setShowWarning] = useState(false);
+  const [focused, setFocused] = useState(false);
 
   const bulletPoints = useMemo(
     () => (question.options as Array<{ text?: string }>).map((o) => o.text ?? ''),
@@ -470,17 +509,22 @@ function OpinionVariant({ question, onSubmit, isSubmitted, isLoading }: VariantP
           <Text style={s.writingHeaderRight}>{wc} / {limits.max} Wörter</Text>
         </View>
         <View style={s.textAreaZone}>
-          <TextInput
-            style={[s.textArea, { minHeight: 200 }]}
-            multiline
-            value={text}
-            onChangeText={setText}
-            placeholder="Schreiben Sie hier Ihre Meinung..."
-            placeholderTextColor={B.muted}
-            editable={!isSubmitted}
-            testID="opinion-input"
-            textAlignVertical="top"
-          />
+          <View style={s.cursorWrap}>
+            {text === '' && !focused && !isSubmitted && <PulsingCursor />}
+            <TextInput
+              style={[s.textArea, { minHeight: 200 }]}
+              multiline
+              value={text}
+              onChangeText={setText}
+              placeholder="Schreiben Sie hier Ihre Meinung..."
+              placeholderTextColor={B.muted}
+              editable={!isSubmitted}
+              testID="opinion-input"
+              textAlignVertical="top"
+              onFocus={() => setFocused(true)}
+              onBlur={() => setFocused(false)}
+            />
+          </View>
         </View>
       </View>
 
@@ -791,6 +835,21 @@ const s = StyleSheet.create({
   wcFill: {
     height: '100%',
     borderRadius: 999,
+  },
+
+  // Pulsing cursor
+  cursorWrap: {
+    position: 'relative',
+  },
+  pulsingCursor: {
+    position: 'absolute',
+    top: 2,
+    left: 0,
+    fontSize: 16,
+    lineHeight: 24,
+    color: '#2B70EF',
+    fontFamily: fontFamily.bodyRegular,
+    pointerEvents: 'none',
   },
 
   // Form fill
