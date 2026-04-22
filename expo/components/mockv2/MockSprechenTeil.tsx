@@ -697,15 +697,15 @@ const styles = StyleSheet.create({
 
   // ── Dual-circle avatar (vertical) ─────────────────────────────────────
   avatarSection: {
+    flex: 1,
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingTop: 28,
-    paddingBottom: 16,
-    gap: 16,
+    paddingHorizontal: 24,
+    gap: 56,
   },
   avatarItem: { alignItems: 'center', gap: 8 },
-  avatarCircle: { width: 100, height: 100, borderRadius: 50 },
+  avatarCircle: { width: 110, height: 110, borderRadius: 55 },
   avatarCircleAi: { backgroundColor: B.primary },
   avatarCircleUser: { backgroundColor: ORANGE },
   avatarName: { fontSize: 14, fontWeight: '700' as const, color: B.questionColor },

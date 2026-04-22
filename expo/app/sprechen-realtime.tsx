@@ -1332,21 +1332,21 @@ const styles = StyleSheet.create({
 
   // ── Conversation — Dual-circle avatar (vertical) ─────────────────────────
   avatarSection: {
+    flex: 1,
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingTop: spacing.xxl,
-    paddingBottom: spacing.lg,
-    gap: spacing.lg,
+    paddingHorizontal: spacing.xl,
+    gap: 56,
   },
   avatarItem: {
     alignItems: 'center',
     gap: spacing.sm,
   },
   avatarCircle: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: 110,
+    height: 110,
+    borderRadius: 55,
   },
   avatarCircleAi: {
     backgroundColor: colors.blue,
