@@ -881,23 +881,104 @@ export default function SprechenRealtimeScreen() {
           {/* Feedback */}
           {noSpeechDetected ? (
             <View style={[styles.feedbackCard, shadows.card]}>
-              <Text style={styles.feedbackLabel}>Hinweis</Text>
+              <Text style={styles.feedbackLabel}>NOTICE</Text>
               <Text style={styles.feedbackText}>
-                Es wurde keine Sprache erkannt. Bitte überprüfen Sie Ihr Mikrofon und versuchen Sie es erneut.
+                No speech was detected. Please check your microphone and try again.
               </Text>
             </View>
           ) : (
             <>
               {scores.encouragement_note ? (
                 <View style={[styles.feedbackCard, shadows.card]}>
-                  <Text style={styles.feedbackLabel}>Feedback</Text>
+                  <Text style={styles.feedbackLabel}>OVERALL FEEDBACK</Text>
                   <Text style={styles.feedbackText}>{scores.encouragement_note}</Text>
                 </View>
               ) : null}
+
               {scores.improvement_tip ? (
                 <View style={[styles.tipCard, shadows.card]}>
-                  <Text style={styles.tipLabel}>Improvement tip</Text>
+                  <Text style={styles.tipLabel}>💡 KEY IMPROVEMENT</Text>
                   <Text style={styles.tipText}>{scores.improvement_tip}</Text>
+                </View>
+              ) : null}
+
+              {/* Grammar + Vocabulary observations */}
+              {(s.grammar_observations || s.vocabulary_observations) ? (
+                <View style={[styles.observationsCard, shadows.card]}>
+                  <Text style={styles.observationsHeader}>Language Observations</Text>
+                  {s.grammar_observations ? (
+                    <View style={styles.observationRow}>
+                      <Text style={styles.observationTag}>Grammar</Text>
+                      <Text style={styles.observationText}>{s.grammar_observations}</Text>
+                    </View>
+                  ) : null}
+                  {s.vocabulary_observations ? (
+                    <View style={styles.observationRow}>
+                      <Text style={styles.observationTag}>Vocabulary</Text>
+                      <Text style={styles.observationText}>{s.vocabulary_observations}</Text>
+                    </View>
+                  ) : null}
+                </View>
+              ) : null}
+
+              {/* Corrections */}
+              {Array.isArray(s.correction_examples) && s.correction_examples.length > 0 ? (
+                <View style={[styles.correctionsCard, shadows.card]}>
+                  <Text style={styles.correctionsHeader}>✏️ Specific Corrections</Text>
+                  {s.correction_examples.map((c: any, i: number) => (
+                    <View key={i} style={styles.correctionItem}>
+                      <Text style={styles.correctionOriginal}>✗  {c.original}</Text>
+                      <Text style={styles.correctionFixed}>✓  {c.corrected}</Text>
+                      {c.explanation ? (
+                        <Text style={styles.correctionExplanation}>{c.explanation}</Text>
+                      ) : null}
+                    </View>
+                  ))}
+                </View>
+              ) : null}
+
+              {/* What you could have said */}
+              {(s.opening_suggestion || s.closing_suggestion) ? (
+                <View style={[styles.suggestionsCard, shadows.card]}>
+                  <Text style={styles.suggestionsHeader}>💬 What You Could Have Said</Text>
+                  {s.opening_suggestion ? (
+                    <View style={styles.suggestionBlock}>
+                      <Text style={styles.suggestionTag}>Opening</Text>
+                      <Text style={styles.suggestionText}>{s.opening_suggestion}</Text>
+                    </View>
+                  ) : null}
+                  {s.closing_suggestion ? (
+                    <View style={styles.suggestionBlock}>
+                      <Text style={styles.suggestionTag}>Closing</Text>
+                      <Text style={styles.suggestionText}>{s.closing_suggestion}</Text>
+                    </View>
+                  ) : null}
+                </View>
+              ) : null}
+
+              {/* Connectors */}
+              {Array.isArray(s.connector_examples) && s.connector_examples.length > 0 ? (
+                <View style={[styles.phrasesCard, shadows.card]}>
+                  <Text style={styles.phrasesHeader}>🔗 Connectors to Use</Text>
+                  {s.connector_examples.map((c: string, i: number) => (
+                    <View key={i} style={styles.phraseRow}>
+                      <View style={styles.phraseDot} />
+                      <Text style={styles.phraseText}>{c}</Text>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
+
+              {/* Useful phrases */}
+              {Array.isArray(s.example_phrases) && s.example_phrases.length > 0 ? (
+                <View style={[styles.phrasesCard, shadows.card]}>
+                  <Text style={styles.phrasesHeader}>📝 Useful Phrases for This Topic</Text>
+                  {s.example_phrases.map((p: string, i: number) => (
+                    <View key={i} style={styles.phraseRow}>
+                      <View style={styles.phraseDot} />
+                      <Text style={styles.phraseText}>{p}</Text>
+                    </View>
+                  ))}
                 </View>
               ) : null}
             </>
@@ -1541,5 +1622,136 @@ const styles = StyleSheet.create({
     fontWeight: '500' as const,
     textAlign: 'center',
     marginTop: spacing.sm,
+  },
+
+  // ── Results — Language Observations ──────────────────────────────────────
+  observationsCard: {
+    backgroundColor: colors.white,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    gap: spacing.md,
+  },
+  observationsHeader: {
+    color: colors.navy,
+    fontSize: fontSize.bodyLg,
+    fontWeight: '800' as const,
+    marginBottom: spacing.xs,
+  },
+  observationRow: {
+    gap: 4,
+  },
+  observationTag: {
+    color: colors.blue,
+    fontSize: fontSize.label,
+    fontWeight: '700' as const,
+    letterSpacing: 0.5,
+  },
+  observationText: {
+    color: colors.bodyText,
+    fontSize: fontSize.bodyMd,
+    fontWeight: '500' as const,
+    lineHeight: 22,
+  },
+
+  // ── Results — Corrections ─────────────────────────────────────────────────
+  correctionsCard: {
+    backgroundColor: colors.white,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    gap: spacing.md,
+  },
+  correctionsHeader: {
+    color: colors.navy,
+    fontSize: fontSize.bodyLg,
+    fontWeight: '800' as const,
+    marginBottom: spacing.xs,
+  },
+  correctionItem: {
+    backgroundColor: colors.surfaceContainerLow,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    gap: 4,
+  },
+  correctionOriginal: {
+    color: colors.red,
+    fontSize: fontSize.bodyMd,
+    fontWeight: '500' as const,
+    lineHeight: 22,
+  },
+  correctionFixed: {
+    color: colors.green,
+    fontSize: fontSize.bodyMd,
+    fontWeight: '600' as const,
+    lineHeight: 22,
+  },
+  correctionExplanation: {
+    color: colors.muted,
+    fontSize: fontSize.bodySm,
+    fontWeight: '500' as const,
+    lineHeight: 20,
+    marginTop: 2,
+  },
+
+  // ── Results — What you could have said ────────────────────────────────────
+  suggestionsCard: {
+    backgroundColor: colors.white,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    gap: spacing.md,
+  },
+  suggestionsHeader: {
+    color: colors.navy,
+    fontSize: fontSize.bodyLg,
+    fontWeight: '800' as const,
+    marginBottom: spacing.xs,
+  },
+  suggestionBlock: {
+    gap: 4,
+  },
+  suggestionTag: {
+    color: colors.muted,
+    fontSize: fontSize.label,
+    fontWeight: '700' as const,
+    letterSpacing: 0.5,
+  },
+  suggestionText: {
+    color: colors.bodyText,
+    fontSize: fontSize.bodyMd,
+    fontWeight: '500' as const,
+    lineHeight: 22,
+  },
+
+  // ── Results — Phrases / Connectors ────────────────────────────────────────
+  phrasesCard: {
+    backgroundColor: colors.white,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    gap: spacing.sm,
+  },
+  phrasesHeader: {
+    color: colors.navy,
+    fontSize: fontSize.bodyLg,
+    fontWeight: '800' as const,
+    marginBottom: spacing.xs,
+  },
+  phraseRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'flex-start' as const,
+    gap: spacing.sm,
+  },
+  phraseDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.blue,
+    marginTop: 8,
+    flexShrink: 0,
+  },
+  phraseText: {
+    flex: 1,
+    color: colors.bodyText,
+    fontSize: fontSize.bodyMd,
+    fontWeight: '500' as const,
+    lineHeight: 22,
   },
 });
