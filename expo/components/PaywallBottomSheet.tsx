@@ -17,6 +17,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Flame, Zap } from 'lucide-react-native';
 
 import { track } from '@/lib/track';
@@ -143,6 +144,7 @@ export function PaywallBottomSheet({
 }: PaywallBottomSheetProps) {
   const { profile } = useAuth();
   const { access } = useAccess();
+  const insets = useSafeAreaInsets();
 
   const [modalVisible, setModalVisible] = useState(false);
   const slideAnim  = useRef(new Animated.Value(600)).current;
@@ -258,7 +260,10 @@ export function PaywallBottomSheet({
 
       {/* Sheet */}
       <Animated.View
-        style={[s.sheet, { transform: [{ translateY: slideAnim }] }]}
+        style={[
+          s.sheet,
+          { transform: [{ translateY: slideAnim }], paddingBottom: Math.max(insets.bottom, 16) + 24 },
+        ]}
         pointerEvents="box-none"
       >
         {/* Drag handle */}
@@ -331,7 +336,6 @@ const s = StyleSheet.create({
     borderTopRightRadius: 24,
     paddingTop: 12,
     paddingHorizontal: 24,
-    paddingBottom: Platform.OS === 'ios' ? 40 : 32,
     alignItems: 'center',
     ...Platform.select({
       ios: {

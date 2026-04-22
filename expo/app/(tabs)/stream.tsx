@@ -439,13 +439,7 @@ export default function TestStreamScreen() {
   return (
     <SafeAreaView style={s.safeArea}>
       {/* Brand header */}
-      <AppHeader
-        rightElement={
-          <View style={s.headerCounter}>
-            <Text style={s.headerCounterText}>{currentIndex + 1}/{totalQuestions}</Text>
-          </View>
-        }
-      />
+      <AppHeader />
 
       {/* Upgrade nudge / trial banner */}
       {!isPaidUser ? (

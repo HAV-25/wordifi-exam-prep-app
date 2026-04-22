@@ -127,6 +127,7 @@ export default function HomeScreen() {
   const [showBottomSheet, setShowBottomSheet] = React.useState(false);
   const [showPaywall, setShowPaywall] = React.useState(false);
   const [showStreakPaywallSheet, setShowStreakPaywallSheet] = React.useState(false);
+  const [showUpgradePaywallSheet, setShowUpgradePaywallSheet] = React.useState(false);
 
   const isPaidUser = PAID_TIERS.has(data.subscriptionTier);
   const showUpgradeBanner = !isPaidUser;
@@ -237,7 +238,7 @@ export default function HomeScreen() {
         {showUpgradeBanner ? (
           <View style={s.upgradeRow}>
             <GlowBorderCard>
-              <Pressable style={s.upgradeCard} onPress={() => setShowPaywall(true)}>
+              <Pressable style={s.upgradeCard} onPress={() => setShowUpgradePaywallSheet(true)}>
                 <View style={s.upgradeIcon}>
                   <Sparkles color={BANANI.accentFg} size={14} />
                 </View>
@@ -473,6 +474,14 @@ export default function HomeScreen() {
         badgeName={badgeName}
         onUnlock={() => { setShowStreakPaywallSheet(false); setShowPaywall(true); }}
         onDismiss={() => setShowStreakPaywallSheet(false)}
+      />
+
+      {/* Home upgrade banner soft nudge */}
+      <PaywallBottomSheet
+        visible={showUpgradePaywallSheet}
+        triggerContext="mock_locked"
+        onUnlock={() => { setShowUpgradePaywallSheet(false); setShowPaywall(true); }}
+        onDismiss={() => setShowUpgradePaywallSheet(false)}
       />
 
       <PaywallModal
