@@ -3,6 +3,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import {
+  ArrowLeft,
   Calendar,
   Camera,
   ChevronRight,
@@ -23,6 +24,7 @@ import {
 import React, { useCallback, useMemo, useState } from 'react';
 import {
   Alert,
+  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -156,6 +158,7 @@ export default function ProfileScreen() {
   // Avatar edit state
   const [avatarSheetVisible, setAvatarSheetVisible] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
+  const [pendingImageUri, setPendingImageUri] = useState<string | null>(null);
 
   // Player identity edit sheet state
   const [editSheetVisible, setEditSheetVisible] = useState(false);
@@ -274,14 +277,14 @@ export default function ProfileScreen() {
     }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [1, 1],
+      allowsEditing: false,
       quality: 0.8,
     });
     if (!result.canceled && result.assets[0]) {
-      await uploadAvatar(result.assets[0].uri);
+      setAvatarSheetVisible(false);
+      setPendingImageUri(result.assets[0].uri);
     }
-  }, [uploadAvatar]);
+  }, []);
 
   const handleTakePhoto = useCallback(async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
@@ -290,14 +293,14 @@ export default function ProfileScreen() {
       return;
     }
     const result = await ImagePicker.launchCameraAsync({
-      allowsEditing: true,
-      aspect: [1, 1],
+      allowsEditing: false,
       quality: 0.8,
     });
     if (!result.canceled && result.assets[0]) {
-      await uploadAvatar(result.assets[0].uri);
+      setAvatarSheetVisible(false);
+      setPendingImageUri(result.assets[0].uri);
     }
-  }, [uploadAvatar]);
+  }, []);
 
   const handleRemoveAvatar = useCallback(async () => {
     if (!user?.id) return;
@@ -520,7 +523,7 @@ export default function ProfileScreen() {
             showDivider={false}
             onPress={() => router.push('/notification-settings' as never)}
           >
-            <ChevronRight size={14} color={Colors.textMuted} />
+            <Pencil size={14} color={Colors.textMuted} />
           </InfoRow>
         </View>
 
@@ -667,6 +670,63 @@ export default function ProfileScreen() {
               </Pressable>
             </>
           ) : null}
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Crop Preview Modal ─────────────────────────────────────── */}
+      <Modal
+        visible={!!pendingImageUri}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={() => setPendingImageUri(null)}
+      >
+        <View style={[styles.cropScreen, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+          {/* Top bar */}
+          <View style={styles.cropTopBar}>
+            <Pressable
+              onPress={() => setPendingImageUri(null)}
+              style={styles.cropBackBtn}
+              hitSlop={8}
+              accessibilityLabel="Back"
+            >
+              <ArrowLeft size={22} color={Colors.textBody} />
+            </Pressable>
+            <Text style={styles.cropTitle}>
+              Crop <Text style={styles.cropOptional}>(Optional)</Text>
+            </Text>
+            <Pressable
+              onPress={async () => {
+                if (pendingImageUri) {
+                  setPendingImageUri(null);
+                  await uploadAvatar(pendingImageUri);
+                }
+              }}
+              style={styles.cropDoneBtn}
+              disabled={avatarUploading}
+              hitSlop={8}
+              accessibilityLabel="Done"
+            >
+              <Text style={[styles.cropDoneText, avatarUploading && { opacity: 0.4 }]}>
+                {avatarUploading ? 'Saving…' : 'Done'}
+              </Text>
+            </Pressable>
+          </View>
+
+          {/* Instruction */}
+          <Text style={styles.cropHint}>
+            Your photo will be used as-is. Adjust the frame as needed.
+          </Text>
+
+          {/* Image preview */}
+          <View style={styles.cropImageWrap}>
+            {pendingImageUri ? (
+              <Image
+                source={{ uri: pendingImageUri }}
+                style={styles.cropImage}
+                resizeMode="cover"
+              />
+            ) : null}
           </View>
         </View>
       </Modal>
@@ -894,10 +954,10 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   sectionLabel: {
-    fontFamily: 'NunitoSans_600SemiBold',
+    fontFamily: 'Outfit_800ExtraBold',
     fontSize: 12,
     color: Colors.textMuted,
-    letterSpacing: 0.5,
+    letterSpacing: 1,
     textTransform: 'uppercase',
     marginBottom: 24,
   },
@@ -1212,5 +1272,62 @@ const styles = StyleSheet.create({
     fontFamily: 'Outfit_800ExtraBold',
     fontSize: 17,
     color: '#FFFFFF',
+  },
+
+  // Crop preview screen
+  cropScreen: {
+    flex: 1,
+    backgroundColor: '#000',
+  },
+  cropTopBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#000',
+  },
+  cropBackBtn: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cropTitle: {
+    fontFamily: 'Outfit_800ExtraBold',
+    fontSize: 18,
+    color: '#FFFFFF',
+  },
+  cropOptional: {
+    fontFamily: 'NunitoSans_400Regular',
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.55)',
+  },
+  cropDoneBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  cropDoneText: {
+    fontFamily: 'Outfit_800ExtraBold',
+    fontSize: 16,
+    color: Colors.primary,
+  },
+  cropHint: {
+    fontFamily: 'NunitoSans_400Regular',
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.5)',
+    textAlign: 'center',
+    paddingHorizontal: 24,
+    paddingBottom: 16,
+  },
+  cropImageWrap: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#111',
+  },
+  cropImage: {
+    width: '100%',
+    height: '100%',
   },
 });
