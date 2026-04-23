@@ -464,7 +464,7 @@ export const TEMPLATES: Record<string, Template> = {
   'notif.no_activity_48h': {
     push: {
       headings: { en: 'Two days quiet.' },
-      contents: { en: 'One question tonight keeps your Readiness Score bonus. That\'s all.' },
+      contents: { en: 'One question tonight keeps your Readiness Score honest. That\'s all.' },
       deep_link: '/stream?source=push_inactive',
     },
   },
