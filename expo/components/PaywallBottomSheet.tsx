@@ -88,22 +88,22 @@ const PAYWALL_COPY: Record<
     show_badge: false,
   },
   schreiben_locked: {
-    headline: 'Write to pass the exam',
-    subline: () => 'Most candidates lose marks on Schreiben. Unlock full access.',
+    headline: 'Most marks are dropped on Schreiben',
+    subline: () => 'Structured writing practice is the fastest way to close the gap. Unlock all Teile.',
     indicator: 'none',
-    show_badge: false,
+    show_badge: true,
   },
   sprechen_locked: {
-    headline: 'Practice speaking aloud',
-    subline: () => 'The exam section most candidates fear. Unlock full access.',
+    headline: 'Sprechen is where exams are won or lost',
+    subline: () => 'The speaking section trips up the most candidates. Unlimited reps before exam day.',
     indicator: 'none',
-    show_badge: false,
+    show_badge: true,
   },
   mock_locked: {
-    headline: 'Full mock tests mirror the real exam',
-    subline: () => 'Unlimited mocks + detailed Readiness tracking.',
+    headline: "You can't pass what you haven't practised",
+    subline: () => 'Full approx. 150-minute mock. Exact exam conditions. Readiness Score updates after every attempt.',
     indicator: 'none',
-    show_badge: false,
+    show_badge: true,
   },
   streak_req_exceeds_free: {
     headline: ({ n = 0 }) => `Today's streak requirement: ${n} questions`,
@@ -294,6 +294,12 @@ export function PaywallBottomSheet({
             <Text style={s.streakNudgeText}>
               {triggerContext === 'streak_req_exceeds_free'
                 ? `Upgrade to keep your ${badgeName || 'streak'} alive.`
+                : triggerContext === 'sprechen_locked'
+                ? `${badgeName ? `${badgeName} streak` : 'Your streak'} counts speaking sessions — unlock to keep it active.`
+                : triggerContext === 'schreiben_locked'
+                ? `${badgeName ? `${badgeName} streak` : 'Your streak'} counts Schreiben sessions — unlock to keep it going.`
+                : triggerContext === 'mock_locked'
+                ? `Mock exams count toward your ${badgeName || 'streak'}. Unlock to keep it active.`
                 : badgeName
                 ? `Your streak is safe — upgrade before midnight to keep ${badgeName}.`
                 : 'Your streak is safe — upgrade before midnight to keep it alive.'}
