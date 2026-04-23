@@ -20,6 +20,20 @@ export type TemplateContext = {
   section?: string;
   level?: string;
   score_pct?: number;
+  // Readiness / score variables
+  score_previous?: number;
+  score_current?: number;
+  score_target?: number;
+  points_to_target?: number;
+  top_skill_de?: string;
+  weak_skill_de?: string;
+  weak_skill_slug?: string;
+  weak_skill_score?: number;
+  avg_skill_score?: number;
+  projected_gain?: number;
+  // Exam countdown variables
+  days_to_exam?: number;
+  exam_name?: string;
   [key: string]: unknown;
 };
 
@@ -48,9 +62,41 @@ type Template = {
 export const TEMPLATES: Record<string, Template> = {
   'notif.streak_at_risk': {
     push: {
-      headings: { en: 'Your streak needs you' },
-      contents: { en: 'Your {streak_days}-day streak needs {questions_remaining} more questions today to keep {badge_name}. 🔥' },
-      deep_link: '/stream',
+      headings: { en: '{streak_days} days. 90 minutes.' },
+      contents: { en: '{questions_remaining} questions keep the streak. Less time than a coffee run.' },
+      deep_link: '/stream?source=push_streak',
+    },
+  },
+
+  'notif.score_moved': {
+    push: {
+      headings: { en: 'Readiness {score_previous} → {score_current}' },
+      contents: { en: '{top_skill_de} carried you. {weak_skill_de} is still {weak_skill_score}. That\'s where the next {points_to_target} points live.' },
+      deep_link: '/home?source=push_score&focus={weak_skill_slug}',
+    },
+  },
+
+  'notif.exam_countdown': {
+    push: {
+      headings: { en: '{days_to_exam} days to {exam_name}' },
+      contents: { en: 'Current Readiness {score_current}. Target {score_target}. That\'s one mock exam away.' },
+      deep_link: '/home?source=push_countdown',
+    },
+  },
+
+  'notif.mock_ready': {
+    push: {
+      headings: { en: 'Ready for a full mock.' },
+      contents: { en: '150 minutes. Sits like the real thing. Best time for it: this morning.' },
+      deep_link: '/mock?source=push_mock',
+    },
+  },
+
+  'notif.weak_skill': {
+    push: {
+      headings: { en: '{weak_skill_de} is the ceiling.' },
+      contents: { en: '{weak_skill_score} vs an {avg_skill_score} average. Twelve minutes of {weak_skill_de} tonight lifts overall Readiness by an estimated {projected_gain} points.' },
+      deep_link: '/tests?skill={weak_skill_slug}&source=push_weak',
     },
   },
   'notif.streak_broken': {
