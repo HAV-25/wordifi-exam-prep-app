@@ -461,6 +461,14 @@ export const TEMPLATES: Record<string, Template> = {
     },
   },
 
+  'notif.no_activity_48h': {
+    push: {
+      headings: { en: 'Two days quiet.' },
+      contents: { en: 'One question tonight keeps your Readiness Score bonus. That\'s all.' },
+      deep_link: '/stream?source=push_inactive',
+    },
+  },
+
   'notif.streak_broken': {
     email: {
       subject: 'Streak reset, {first_name}. The work isn\'t.',
