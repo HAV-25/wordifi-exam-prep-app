@@ -54,6 +54,8 @@ export type TemplateContext = {
   color_hoeren?: string;
   color_schreiben?: string;
   color_sprechen?: string;
+  // Section completed
+  teil?: string;
   [key: string]: unknown;
 };
 
@@ -69,7 +71,8 @@ type EmailTemplate = {
 };
 
 type InAppTemplate = {
-  body: string;
+  headings: { en: string };
+  contents: { en: string };
   deep_link?: string;
 };
 
@@ -465,11 +468,16 @@ export const TEMPLATES: Record<string, Template> = {
     push: {
       headings: { en: 'Two days quiet.' },
       contents: { en: 'One question tonight keeps your Readiness Score honest. That\'s all.' },
-      deep_link: '/stream?source=push_inactive',
+      deep_link: '/stream?source=push_reengage',
     },
   },
 
   'notif.streak_broken': {
+    push: {
+      headings: { en: 'Streak reset · {previous_streak_days} days.' },
+      contents: { en: '{previous_badge_name} → {dropped_to_badge_name}. {rebuild_days_required} days of practice restores the rank. The Readiness Score didn\'t move.' },
+      deep_link: '/stream?source=push_streak_broken',
+    },
     email: {
       subject: 'Streak reset, {first_name}. The work isn\'t.',
       html: `<!DOCTYPE html>
@@ -604,6 +612,11 @@ export const TEMPLATES: Record<string, Template> = {
   },
 
   'notif.trial_ending_t3': {
+    push: {
+      headings: { en: '{first_name}, {streak_days} days of work.' },
+      contents: { en: '{badge_name}. A {streak_days}-day streak. Trial ends {trial_ends_at_formatted} — keep building on the same account.' },
+      deep_link: '/paywall?source=push_trial_t3',
+    },
     email: {
       subject: 'Look what you\'ve built, {first_name}. Three days to keep it.',
       html: `<!DOCTYPE html>
@@ -734,6 +747,11 @@ export const TEMPLATES: Record<string, Template> = {
   },
 
   'notif.trial_ending_t1': {
+    push: {
+      headings: { en: 'Tomorrow: pause.' },
+      contents: { en: '{first_name}, your streak keeps counting or it doesn\'t. {badge_name} rank, {streak_days} days, one tap away.' },
+      deep_link: '/paywall?source=push_trial_t1',
+    },
     email: {
       subject: 'Tomorrow, {first_name}. Everything pauses.',
       html: `<!DOCTYPE html>
@@ -850,6 +868,11 @@ export const TEMPLATES: Record<string, Template> = {
   },
 
   'notif.trial_ending_t0': {
+    push: {
+      headings: { en: '4 hours.' },
+      contents: { en: '{streak_days}-day streak. {badge_name}. Keep it.' },
+      deep_link: '/paywall?source=push_trial_t0',
+    },
     email: {
       subject: 'Four hours, {first_name}. Then it\'s over.',
       html: `<!DOCTYPE html>
@@ -960,6 +983,31 @@ export const TEMPLATES: Record<string, Template> = {
 </html>`,
     },
   },
+  'notif.badge_rank_up': {
+    push: {
+      headings: { en: '{new_badge_translation}.' },
+      contents: { en: 'You crossed the line three days ago; the data just caught up. {next_badge_name} is {days_to_next_badge} days out.' },
+      deep_link: '/home?source=push_badge',
+    },
+    in_app: {
+      headings: { en: 'Rank up · {new_badge_translation}' },
+      contents: { en: 'Next: {next_badge_name} · {days_to_next_badge} days.' },
+    },
+  },
+
+  'notif.score_shield_used': {
+    in_app: {
+      headings: { en: 'Shield caught it.' },
+      contents: { en: 'Streak held at {current_streak_days} days. No shields left.' },
+    },
+  },
+
+  'notif.section_completed': {
+    in_app: {
+      headings: { en: '{section} {level} · {score_pct}' },
+      contents: { en: 'Teil {teil} complete. The next Teil builds on this one — take it while the rhythm\'s there.' },
+    },
+  },
 };
 
 function htmlEscape(str: string): string {
@@ -985,7 +1033,7 @@ function interpolate(template: string, ctx: TemplateContext, escapeHtml = false)
 
 export type RenderedPush = { headings: { en: string }; contents: { en: string }; deep_link: string };
 export type RenderedEmail = { subject: string; html: string };
-export type RenderedInApp = { body: string; deep_link?: string };
+export type RenderedInApp = { headings: { en: string }; contents: { en: string }; deep_link?: string };
 
 export function renderTemplate(
   eventKey: string,
@@ -1015,7 +1063,8 @@ export function renderTemplate(
 
   if (channel === 'in_app' && tmpl.in_app) {
     return {
-      body: interpolate(tmpl.in_app.body, ctx),
+      headings: { en: interpolate(tmpl.in_app.headings.en, ctx) },
+      contents: { en: interpolate(tmpl.in_app.contents.en, ctx) },
       deep_link: tmpl.in_app.deep_link,
     };
   }
