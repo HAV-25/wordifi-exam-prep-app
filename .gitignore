@@ -5,3 +5,13 @@ node_modules
 ios/
 android/
 core
+
+# Supabase CLI temp files
+supabase/.temp/
+
+# Large binary / reference files
+*.mp4
+*.docx
+
+# Claude Code session data
+.claude/

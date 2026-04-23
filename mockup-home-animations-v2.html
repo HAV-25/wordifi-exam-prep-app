@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wordifi Home – Animation Mockup v2</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;600;700;800&family=Outfit:wght@800&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #F1F5F9;
+    font-family: 'Nunito Sans', sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 40px 24px;
+    gap: 40px;
+    flex-wrap: wrap;
+    min-height: 100vh;
+  }
+
+  /* ── Phone shell ── */
+  .phone {
+    width: 390px;
+    background: #F8FAFC;
+    border-radius: 48px;
+    padding: 52px 0 36px;
+    box-shadow: 0 40px 80px rgba(15,31,61,0.16), 0 0 0 1px rgba(15,31,61,0.06);
+    overflow: hidden;
+    position: relative;
+    flex-shrink: 0;
+  }
+
+  /* ── Greeting ── */
+  .greeting-row {
+    padding: 10px 20px 2px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .greeting-text {
+    font-family: 'Nunito Sans', sans-serif;
+    font-weight: 600;
+    font-size: 14px;
+    color: #94A3B8;
+    line-height: 18px;
+  }
+  .quote-text {
+    font-family: 'Nunito Sans', sans-serif;
+    font-weight: 400;
+    font-size: 13px;
+    color: #94A3B8;
+    opacity: 0.8;
+    line-height: 16px;
+  }
+
+  /* ── CTA bar ── */
+  .cta-row {
+    padding: 14px 20px 0;
+  }
+  .glow-border-wrap {
+    position: relative;
+    border-radius: 18px;
+  }
+  .glow-border-wrap svg.border-svg {
+    position: absolute;
+    top: 0; left: 0;
+    pointer-events: none;
+    overflow: visible;
+    z-index: 2;
+  }
+  .cta-card {
+    position: relative;
+    background: #FFFFFF;
+    border-radius: 18px;
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    box-shadow: 0 10px 24px rgba(15,31,61,0.04);
+    z-index: 1;
+    border: 1px solid rgba(226,232,240,0.7);
+  }
+  .cta-icon {
+    width: 24px; height: 24px;
+    border-radius: 999px;
+    background: rgba(43,112,239,0.14);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .cta-icon svg { width: 14px; height: 14px; }
+  .cta-label {
+    flex: 1;
+    font-family: 'Nunito Sans', sans-serif;
+    font-weight: 600;
+    font-size: 14px;
+    color: #374151;
+  }
+  .cta-arrow { color: #94A3B8; font-size: 18px; font-weight: 300; }
+
+  /* ── Level badge placeholder ── */
+  .level-gap { height: 24px; }
+
+  /* ── Hero card ── */
+  .hero-section { margin: 0 20px; }
+  .hero-card {
+    background: #2B70EF;
+    border-radius: 32px;
+    padding: 20px 20px 18px;
+    box-shadow: 0 24px 44px rgba(43,112,239,0.26);
+    position: relative;
+    overflow: hidden;
+  }
+  .hero-glow1 {
+    position: absolute;
+    width: 200px; height: 200px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 70%);
+    top: -60px; right: -40px;
+    pointer-events: none;
+  }
+  .hero-glow2 {
+    position: absolute;
+    width: 160px; height: 160px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,255,255,0.05) 0%, transparent 70%);
+    bottom: -40px; left: -30px;
+    pointer-events: none;
+  }
+  .hero-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    position: relative; z-index: 1;
+  }
+  .hero-label {
+    font-family: 'Nunito Sans', sans-serif;
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 1px;
+    color: rgba(255,255,255,0.8);
+    text-transform: uppercase;
+  }
+  .hero-countdown {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 8px 12px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.14);
+    font-size: 12px;
+    color: rgba(255,255,255,0.9);
+    font-family: 'Nunito Sans', sans-serif;
+  }
+
+  /* ── Ring ── */
+  .score-zone {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 0;
+    position: relative; z-index: 1;
+  }
+  .ring-wrap {
+    position: relative;
+    width: 214px;
+    height: 214px;
+  }
+  .ring-svg {
+    position: absolute;
+    top: 0; left: 0;
+  }
+  .score-core {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .score-number-row {
+    display: flex;
+    align-items: flex-end;
+  }
+  .score-number {
+    font-family: 'Outfit', sans-serif;
+    font-weight: 800;
+    font-size: 86px;
+    color: #22C55E;
+    line-height: 0.9;
+    letter-spacing: -4px;
+  }
+  .score-pct {
+    font-family: 'Outfit', sans-serif;
+    font-weight: 800;
+    font-size: 34px;
+    color: #22C55E;
+    padding-bottom: 10px;
+    margin-left: 4px;
+  }
+  .score-caption {
+    font-family: 'Nunito Sans', sans-serif;
+    font-size: 14px;
+    color: rgba(255,255,255,0.74);
+    text-align: center;
+    margin-top: 4px;
+    position: relative; z-index: 1;
+  }
+  .label-strip {
+    display: flex;
+    gap: 8px;
+    margin-top: 16px;
+    position: relative; z-index: 1;
+  }
+  .label-pill {
+    background: rgba(255,255,255,0.12);
+    border-radius: 999px;
+    padding: 6px 14px;
+    font-size: 12px;
+    color: rgba(255,255,255,0.75);
+    font-family: 'Nunito Sans', sans-serif;
+  }
+
+  /* ── Replay button ── */
+  .replay-btn {
+    display: block;
+    margin: 20px auto 0;
+    background: #2B70EF;
+    color: white;
+    border: none;
+    border-radius: 999px;
+    padding: 10px 24px;
+    font-family: 'Nunito Sans', sans-serif;
+    font-weight: 700;
+    font-size: 13px;
+    cursor: pointer;
+    letter-spacing: 0.3px;
+    transition: opacity 0.15s;
+  }
+  .replay-btn:hover { opacity: 0.85; }
+
+  /* ── Annotation panel ── */
+  .annotation-panel {
+    width: 240px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    padding-top: 52px;
+  }
+  .annotation {
+    background: white;
+    border-radius: 16px;
+    padding: 16px;
+    box-shadow: 0 4px 16px rgba(15,31,61,0.07);
+  }
+  .annotation h3 {
+    font-family: 'Nunito Sans', sans-serif;
+    font-weight: 700;
+    font-size: 13px;
+    color: #1E293B;
+    margin-bottom: 8px;
+  }
+  .annotation p {
+    font-family: 'Nunito Sans', sans-serif;
+    font-size: 12px;
+    color: #64748B;
+    line-height: 1.6;
+  }
+  .tag {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 4px;
+    margin-bottom: 8px;
+    letter-spacing: 0.5px;
+    font-family: 'Nunito Sans', sans-serif;
+  }
+  .tag.blue  { background: #EFF6FF; color: #2B70EF; }
+  .tag.green { background: #F0FDF4; color: #16A34A; }
+
+  /* dot variant selector */
+  .variant-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+  }
+  .var-btn {
+    border: 1.5px solid #E2E8F0;
+    background: white;
+    border-radius: 8px;
+    padding: 5px 10px;
+    font-size: 11px;
+    font-family: 'Nunito Sans', sans-serif;
+    font-weight: 600;
+    color: #64748B;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .var-btn.active {
+    border-color: #2B70EF;
+    color: #2B70EF;
+    background: #EFF6FF;
+  }
+</style>
+</head>
+<body>
+
+<!-- ── Phone ── -->
+<div>
+  <div class="phone" id="phone">
+
+    <!-- Greeting -->
+    <div class="greeting-row">
+      <span class="greeting-text">Good evening, Arun</span>
+      <span class="quote-text">The final stretch — you've got it.</span>
+    </div>
+
+    <!-- CTA with dot/line border -->
+    <div class="cta-row">
+      <div class="glow-border-wrap" id="glowWrap">
+        <div class="cta-card">
+          <div class="cta-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#2B70EF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+            </svg>
+          </div>
+          <span class="cta-label">Continue your daily stream</span>
+          <span class="cta-arrow">›</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="level-gap"></div>
+
+    <!-- Hero card -->
+    <div class="hero-section">
+      <div class="hero-card">
+        <div class="hero-glow1"></div>
+        <div class="hero-glow2"></div>
+
+        <div class="hero-top">
+          <span class="hero-label">Exam Readiness</span>
+          <div class="hero-countdown">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.8)" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+            </svg>
+            <span>38 days left</span>
+          </div>
+        </div>
+
+        <div class="score-zone">
+          <div class="ring-wrap">
+            <svg class="ring-svg" width="214" height="214" viewBox="0 0 214 214" id="ringSvg">
+              <!-- bg ring -->
+              <circle cx="107" cy="107" r="102" fill="none"
+                stroke="rgba(255,255,255,0.12)" stroke-width="10"/>
+              <!-- progress ring -->
+              <circle id="ringProgress" cx="107" cy="107" r="102" fill="none"
+                stroke="#22C55E" stroke-width="10"
+                stroke-linecap="round"
+                stroke-dasharray="640.9"
+                stroke-dashoffset="640.9"
+                transform="rotate(-90 107 107)"/>
+            </svg>
+            <div class="score-core">
+              <div class="score-number-row">
+                <span class="score-number" id="scoreNum">0</span>
+                <span class="score-pct">%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="score-caption">You're exam ready — stay sharp</div>
+
+        <div class="label-strip">
+          <div class="label-pill">🔥 12 day streak</div>
+          <div class="label-pill">⚡ 340 XP</div>
+        </div>
+      </div>
+    </div>
+
+    <button class="replay-btn" id="replayBtn">↺ Replay ring animation</button>
+
+  </div>
+</div>
+
+<!-- ── Annotations ── -->
+<div class="annotation-panel">
+
+  <div class="annotation">
+    <div class="tag blue">CHANGE 2 — CTA BORDER</div>
+    <h3>Choose a style</h3>
+    <div class="variant-row">
+      <button class="var-btn active" onclick="setVariant('dot')">● Dot</button>
+      <button class="var-btn" onclick="setVariant('short')">— Short line</button>
+      <button class="var-btn" onclick="setVariant('long')">—— Long line</button>
+    </div>
+    <p>
+      A single <strong>Wordifi blue (#2B70EF)</strong> dot or short line travels around the border of the CTA rectangle — no glow, no blur. Clean and subtle.<br><br>
+      Speed: ~2.4s per loop. Runs continuously. Pick whichever size feels right.
+    </p>
+  </div>
+
+  <div class="annotation">
+    <div class="tag green">CHANGE 3 — RING + SCORE</div>
+    <h3>Animated on mount</h3>
+    <p>
+      When the home screen loads, the green ring fills from <strong>0% → 93%</strong> and the score counts up from <strong>0 → 93</strong> simultaneously over ~1.2s with an ease-out curve.<br><br>
+      Hit <strong>↺ Replay</strong> below the phone to watch it again.
+    </p>
+  </div>
+
+</div>
+
+<script>
+  /* ─────────────────────────────────────────
+     CHANGE 2 — dot / line travelling border
+  ───────────────────────────────────────── */
+  const wrap = document.getElementById('glowWrap');
+
+  // Build the rounded-rect SVG path string for a given w, h, r
+  function rrPath(w, h, r) {
+    // Start at top-left corner, go clockwise: right → down → left → up
+    return [
+      `M ${r} 0`,
+      `L ${w - r} 0`,
+      `Q ${w} 0 ${w} ${r}`,
+      `L ${w} ${h - r}`,
+      `Q ${w} ${h} ${w - r} ${h}`,
+      `L ${r} ${h}`,
+      `Q 0 ${h} 0 ${h - r}`,
+      `L 0 ${r}`,
+      `Q 0 0 ${r} 0`,
+      `Z`
+    ].join(' ');
+  }
+
+  let currentSvg = null;
+  let currentVariant = 'dot';
+
+  function buildBorder(variant) {
+    if (currentSvg) currentSvg.remove();
+
+    const w = wrap.offsetWidth;
+    const h = wrap.offsetHeight;
+    const r = 18;
+
+    // Approximate perimeter of the rounded rect
+    const perim = 2 * (w - 2*r) + 2 * (h - 2*r) + 2 * Math.PI * r;
+
+    const segLen = variant === 'dot'   ? 5
+                 : variant === 'short' ? 22
+                 :                       44; // long
+
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('width', w);
+    svg.setAttribute('height', h);
+    svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+    svg.classList.add('border-svg');
+
+    const path = rrPath(w, h, r);
+
+    // Faint track
+    const track = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    track.setAttribute('d', path);
+    track.setAttribute('fill', 'none');
+    track.setAttribute('stroke', 'rgba(43,112,239,0.1)');
+    track.setAttribute('stroke-width', '1.5');
+    svg.appendChild(track);
+
+    // Travelling segment
+    const beam = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    beam.setAttribute('d', path);
+    beam.setAttribute('fill', 'none');
+    beam.setAttribute('stroke', '#2B70EF');
+    beam.setAttribute('stroke-width', variant === 'dot' ? '3' : '2');
+    beam.setAttribute('stroke-linecap', 'round');
+    beam.setAttribute('stroke-dasharray', `${segLen} ${perim - segLen}`);
+    beam.setAttribute('stroke-dashoffset', '0');
+
+    const styleEl = document.createElementNS('http://www.w3.org/2000/svg', 'style');
+    styleEl.textContent = `
+      @keyframes travel_${variant} {
+        from { stroke-dashoffset: 0; }
+        to   { stroke-dashoffset: -${perim.toFixed(1)}; }
+      }
+    `;
+    svg.appendChild(styleEl);
+    beam.style.animation = `travel_${variant} 2.4s linear infinite`;
+
+    svg.appendChild(beam);
+    wrap.insertBefore(svg, wrap.firstChild);
+    currentSvg = svg;
+  }
+
+  function setVariant(v) {
+    currentVariant = v;
+    document.querySelectorAll('.var-btn').forEach(b => {
+      b.classList.toggle('active', b.textContent.toLowerCase().includes(v));
+    });
+    buildBorder(v);
+  }
+
+  requestAnimationFrame(() => requestAnimationFrame(() => buildBorder('dot')));
+
+  /* ─────────────────────────────────────────
+     CHANGE 3 — ring fill + score count-up
+  ───────────────────────────────────────── */
+  const TARGET   = 93;
+  const CIRCUM   = 640.9;          // 2π × 102
+  const ring     = document.getElementById('ringProgress');
+  const numEl    = document.getElementById('scoreNum');
+  let   animRaf  = null;
+  let   animStart = null;
+  const DURATION = 1200;
+
+  function easeOut(t) { return 1 - Math.pow(1 - t, 3); }
+
+  function runAnimation(ts) {
+    if (!animStart) animStart = ts;
+    const t = Math.min((ts - animStart) / DURATION, 1);
+    const e = easeOut(t);
+
+    // Ring: offset goes from CIRCUM → CIRCUM*(1-pct/100)
+    const offset = CIRCUM - e * (TARGET / 100) * CIRCUM;
+    ring.setAttribute('stroke-dashoffset', offset.toFixed(2));
+
+    // Number
+    numEl.textContent = Math.round(e * TARGET);
+
+    if (t < 1) {
+      animRaf = requestAnimationFrame(runAnimation);
+    }
+  }
+
+  function startAnimation() {
+    if (animRaf) cancelAnimationFrame(animRaf);
+    animStart = null;
+    ring.setAttribute('stroke-dashoffset', CIRCUM);
+    numEl.textContent = '0';
+    // Small pause so user sees the 0 state
+    setTimeout(() => { animRaf = requestAnimationFrame(runAnimation); }, 120);
+  }
+
+  document.getElementById('replayBtn').addEventListener('click', startAnimation);
+
+  // Auto-start after fonts load
+  setTimeout(startAnimation, 400);
+</script>
+</body>
+</html>

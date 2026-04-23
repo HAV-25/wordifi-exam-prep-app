@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #000; display: flex; justify-content: center; padding: 20px; gap: 40px; }
+
+  .phone { width: 390px; height: 844px; background: #F8FAFF; border-radius: 40px; overflow: hidden; position: relative; border: 2px solid #ddd; }
+  .label { color: #fff; text-align: center; font-size: 14px; font-weight: 700; margin-bottom: 8px; letter-spacing: 1px; }
+  .wrapper { display: flex; gap: 60px; }
+
+  /* Scrim overlay */
+  .scrim { position: absolute; inset: 0; background: rgba(0,0,0,0.45); z-index: 5; }
+
+  /* Background content (dimmed) */
+  .bg-content { padding: 60px 20px 20px; }
+  .bg-title { font-size: 28px; font-weight: 800; color: #2B70EF; }
+  .bg-sub { font-size: 14px; color: #94A3B8; margin-top: 4px; }
+  .bg-card { background: #fff; border-radius: 20px; margin-top: 16px; padding: 16px; border: 1px solid #E2E8F0; }
+  .bg-row { display: flex; align-items: center; gap: 8px; padding: 8px 0; color: #94A3B8; font-size: 14px; }
+
+  /* ====== CURRENT (cramped) ====== */
+  .modal-current {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    background: #fff; border-radius: 28px 28px 0 0;
+    padding: 24px; z-index: 10;
+    max-height: 50%; /* This is the problem */
+  }
+
+  /* ====== PROPOSED (spacious) ====== */
+  .modal-proposed {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    background: #fff; border-radius: 28px 28px 0 0;
+    padding: 28px 24px 32px; z-index: 10;
+    max-height: 72%; /* Much taller */
+    display: flex; flex-direction: column; gap: 20px;
+  }
+
+  /* Shared modal elements */
+  .handle { width: 40px; height: 5px; border-radius: 3px; background: #E2E8F0; margin: 0 auto 4px; }
+
+  .modal-header { display: flex; align-items: center; gap: 14px; }
+  .modal-icon { width: 44px; height: 44px; border-radius: 14px; background: rgba(0,229,182,0.12); display: flex; align-items: center; justify-content: center; font-size: 24px; }
+  .modal-title { font-size: 20px; font-weight: 800; color: #0F1F3D; }
+  .modal-subtitle { font-size: 14px; color: #94A3B8; margin-top: 2px; }
+  .modal-close { margin-left: auto; color: #94A3B8; font-size: 20px; cursor: pointer; }
+
+  .timing-card { background: #F1F5F9; border-radius: 16px; padding: 20px; display: flex; gap: 0; }
+  .timing-section { flex: 1; text-align: center; }
+  .timing-icon { font-size: 20px; color: #2B70EF; margin-bottom: 6px; }
+  .timing-label { font-size: 13px; color: #64748B; font-weight: 600; }
+  .timing-value { font-size: 18px; font-weight: 800; color: #2B70EF; margin-top: 2px; }
+  .timing-divider { width: 1px; background: #CBD5E1; margin: 4px 16px; }
+
+  .sections-list { display: flex; flex-direction: column; gap: 6px; }
+  .section-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; }
+  .section-dot { width: 8px; height: 8px; border-radius: 4px; }
+  .section-name { font-size: 14px; font-weight: 600; color: #374151; flex: 1; }
+  .section-count { font-size: 13px; font-weight: 700; color: #2B70EF; }
+  .coming-pill { background: #FEF3C7; border-radius: 999px; padding: 3px 10px; font-size: 11px; font-weight: 700; color: #92400E; }
+
+  .timed-row { display: flex; align-items: center; justify-content: space-between; background: #F1F5F9; border-radius: 14px; padding: 14px 16px; }
+  .timed-left { display: flex; align-items: center; gap: 10px; }
+  .timed-icon { font-size: 18px; color: #2B70EF; }
+  .timed-label { font-size: 15px; font-weight: 700; color: #2B70EF; }
+  .timed-sub { font-size: 12px; color: #94A3B8; }
+  .toggle { width: 48px; height: 28px; border-radius: 14px; background: #00E5B6; position: relative; }
+  .toggle-dot { width: 22px; height: 22px; border-radius: 11px; background: #fff; position: absolute; right: 3px; top: 3px; }
+
+  .warning { background: #FEF2F2; border-radius: 12px; padding: 12px 16px; text-align: center; }
+  .warning-text { font-size: 13px; font-weight: 600; color: #EF4444; line-height: 1.4; }
+
+  .cta-primary { background: #2B70EF; border-radius: 999px; padding: 18px; text-align: center; color: #fff; font-size: 17px; font-weight: 800; display: flex; align-items: center; justify-content: center; gap: 8px; }
+  .cta-icon { font-size: 14px; }
+
+  .cta-secondary { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 10px; opacity: 0.55; }
+  .cta-secondary-text { font-size: 14px; color: #94A3B8; font-weight: 600; }
+
+  /* Annotations */
+  .annotation { position: absolute; right: -200px; font-size: 12px; color: #22C55E; font-weight: 600; line-height: 1.4; width: 180px; }
+  .annotation::before { content: '←'; margin-right: 4px; }
+  .diff { color: #EF4444; font-weight: 700; }
+</style>
+</head>
+<body>
+
+<div class="wrapper">
+  <!-- CURRENT -->
+  <div>
+    <div class="label">❌ CURRENT — Cramped</div>
+    <div class="phone">
+      <div class="bg-content">
+        <div class="bg-title">Full Mock Test</div>
+        <div class="bg-sub">Complete exam simulation — Hören + Lesen</div>
+        <div class="bg-card">
+          <div class="bg-row">🔒 Schreiben — Coming soon</div>
+          <div class="bg-row">🔒 Sprechen — Coming soon</div>
+        </div>
+        <div class="bg-card" style="margin-top:12px;">
+          <div style="font-weight:800;font-size:18px;color:#2B70EF;">B1</div>
+          <div class="bg-row">🎧 Hören — 30 Q</div>
+        </div>
+      </div>
+      <div class="scrim"></div>
+      <div class="modal-current">
+        <div class="handle"></div>
+        <div class="modal-header" style="margin-top:8px;">
+          <div class="modal-icon">🏆</div>
+          <div>
+            <div class="modal-title" style="font-size:17px;">Mock Exam — B1</div>
+            <div class="modal-subtitle" style="font-size:12px;">Hören + Lesen</div>
+          </div>
+          <div class="modal-close">✕</div>
+        </div>
+        <div class="timing-card" style="margin-top:10px; padding:12px;">
+          <div class="timing-section">
+            <div class="timing-label" style="font-size:11px;">🎧 Hören</div>
+            <div class="timing-value" style="font-size:15px;">40 min</div>
+          </div>
+          <div class="timing-divider"></div>
+          <div class="timing-section">
+            <div class="timing-label" style="font-size:11px;">📖 Lesen</div>
+            <div class="timing-value" style="font-size:15px;">60 min</div>
+          </div>
+        </div>
+        <div class="timed-row" style="margin-top:8px; padding:10px 14px;">
+          <div class="timed-left">
+            <div class="timed-icon">⏱</div>
+            <div>
+              <div class="timed-label" style="font-size:13px;">Timed Mode</div>
+              <div class="timed-sub" style="font-size:10px;">Simulates real exam</div>
+            </div>
+          </div>
+          <div class="toggle"><div class="toggle-dot"></div></div>
+        </div>
+        <div class="warning" style="margin-top:6px; padding:8px 12px;">
+          <div class="warning-text" style="font-size:11px;">You cannot go back between sections once you move forward.</div>
+        </div>
+        <div class="cta-primary" style="margin-top:8px; padding:14px; font-size:15px;">▶ Start Mock Test</div>
+        <div class="cta-secondary" style="margin-top:2px; padding:4px; font-size:12px;">
+          <span class="cta-secondary-text" style="font-size:12px;">💻 Continue on Computer</span>
+          <span class="coming-pill" style="font-size:9px;">Coming Soon</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PROPOSED -->
+  <div>
+    <div class="label">✅ PROPOSED — Spacious</div>
+    <div class="phone">
+      <div class="bg-content">
+        <div class="bg-title">Full Mock Test</div>
+        <div class="bg-sub">Complete exam simulation — Hören + Lesen</div>
+        <div class="bg-card">
+          <div class="bg-row">🔒 Schreiben — Coming soon</div>
+          <div class="bg-row">🔒 Sprechen — Coming soon</div>
+        </div>
+      </div>
+      <div class="scrim"></div>
+      <div class="modal-proposed">
+        <div class="handle"></div>
+
+        <!-- Header -->
+        <div class="modal-header">
+          <div class="modal-icon">🏆</div>
+          <div>
+            <div class="modal-title">Mock Exam — B1</div>
+            <div class="modal-subtitle">Hören + Lesen</div>
+          </div>
+          <div class="modal-close">✕</div>
+        </div>
+
+        <!-- Section breakdown -->
+        <div class="sections-list">
+          <div class="section-row">
+            <div class="section-dot" style="background:#2B70EF;"></div>
+            <span class="section-name">🎧 Hören</span>
+            <span class="section-count">30 Q</span>
+          </div>
+          <div class="section-row">
+            <div class="section-dot" style="background:#22C55E;"></div>
+            <span class="section-name">📖 Lesen</span>
+            <span class="section-count">30 Q</span>
+          </div>
+          <div class="section-row">
+            <div class="section-dot" style="background:#94A3B8;"></div>
+            <span class="section-name" style="color:#94A3B8;">✍️ Schreiben</span>
+            <span class="coming-pill">Coming Soon</span>
+          </div>
+          <div class="section-row">
+            <div class="section-dot" style="background:#94A3B8;"></div>
+            <span class="section-name" style="color:#94A3B8;">🎤 Sprechen</span>
+            <span class="coming-pill">Coming Soon</span>
+          </div>
+        </div>
+
+        <!-- Timing card -->
+        <div class="timing-card">
+          <div class="timing-section">
+            <div class="timing-icon">🎧</div>
+            <div class="timing-label">Hören</div>
+            <div class="timing-value">40 min</div>
+          </div>
+          <div class="timing-divider"></div>
+          <div class="timing-section">
+            <div class="timing-icon">📖</div>
+            <div class="timing-label">Lesen</div>
+            <div class="timing-value">60 min</div>
+          </div>
+        </div>
+
+        <!-- Timed toggle -->
+        <div class="timed-row">
+          <div class="timed-left">
+            <div class="timed-icon">⏱</div>
+            <div>
+              <div class="timed-label">Timed Mode</div>
+              <div class="timed-sub">Simulates real exam conditions</div>
+            </div>
+          </div>
+          <div class="toggle"><div class="toggle-dot"></div></div>
+        </div>
+
+        <!-- Warning -->
+        <div class="warning">
+          <div class="warning-text">You cannot go back between sections once you move forward.</div>
+        </div>
+
+        <!-- CTAs -->
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          <div class="cta-primary">
+            <span class="cta-icon">▶</span> Start Mock Test
+          </div>
+          <div class="cta-secondary">
+            <span>💻</span>
+            <span class="cta-secondary-text">Continue on Computer</span>
+            <span class="coming-pill">Coming Soon</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

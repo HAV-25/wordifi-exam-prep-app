@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wordifi Home – Animation Mockup</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #F8FAFC;
+    font-family: 'Nunito Sans', sans-serif;
+    display: flex;
+    justify-content: center;
+    padding: 40px 16px;
+    gap: 48px;
+    flex-wrap: wrap;
+  }
+
+  @import url('https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;600;700;800&family=Outfit:wght@800&display=swap');
+
+  /* ── Phone shell ── */
+  .phone {
+    width: 390px;
+    background: #F1F5F9;
+    border-radius: 44px;
+    padding: 48px 0 32px;
+    box-shadow: 0 32px 80px rgba(15,31,61,0.18);
+    overflow: hidden;
+    position: relative;
+  }
+
+  .phone-label {
+    text-align: center;
+    font-family: 'Nunito Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    color: #94A3B8;
+    letter-spacing: 1px;
+    margin-bottom: 12px;
+    text-transform: uppercase;
+  }
+
+  /* ── Greeting ── */
+  .greeting-row {
+    padding: 10px 20px 2px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .greeting-text {
+    font-family: 'Nunito Sans', sans-serif;
+    font-weight: 600;
+    font-size: 14px;        /* was 12, now +2 */
+    color: #94A3B8;
+    line-height: 18px;
+  }
+  .quote-text {
+    font-family: 'Nunito Sans', sans-serif;
+    font-weight: 400;
+    font-size: 13px;        /* was 12, now +1 */
+    color: #94A3B8;
+    opacity: 0.8;
+    line-height: 16px;
+  }
+
+  /* ── CTA bar ── */
+  .cta-row {
+    padding: 14px 20px 0;
+  }
+
+  /* Glow border wrapper */
+  .glow-border-wrap {
+    position: relative;
+    border-radius: 18px;
+  }
+
+  /* The animated glow SVG sits behind the card */
+  .glow-border-wrap svg {
+    position: absolute;
+    top: 0; left: 0;
+    border-radius: 18px;
+    pointer-events: none;
+  }
+
+  .cta-card {
+    position: relative;
+    background: #FFFFFF;
+    border-radius: 18px;
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    box-shadow: 0 10px 24px rgba(15,31,61,0.04);
+    z-index: 1;
+    /* Thin border so the card doesn't overlap the glow entirely */
+    border: 1px solid rgba(226,232,240,0.6);
+  }
+
+  .cta-icon {
+    width: 24px; height: 24px;
+    border-radius: 999px;
+    background: rgba(43,112,239,0.14);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .cta-icon svg { width: 14px; height: 14px; }
+
+  .cta-label {
+    flex: 1;
+    font-family: 'Nunito Sans', sans-serif;
+    font-weight: 600;
+    font-size: 14px;
+    color: #374151;
+  }
+  .cta-arrow { color: #94A3B8; font-size: 16px; }
+
+  /* ── Travelling glow stroke animation ── */
+  .glow-track {
+    stroke: rgba(43,112,239,0.12);
+    stroke-width: 3;
+    fill: none;
+  }
+  .glow-beam {
+    stroke: #2B70EF;
+    stroke-width: 3;
+    fill: none;
+    filter: drop-shadow(0 0 6px #2B70EF) drop-shadow(0 0 12px rgba(43,112,239,0.5));
+    /* Perimeter of 350x52 rect w/ r=18 ≈ 2*(350+52) - (8-2π)*18 ≈ 773px */
+    stroke-dasharray: 80 693;
+    stroke-dashoffset: 0;
+    animation: beam-travel 2.2s linear infinite;
+    stroke-linecap: round;
+  }
+
+  @keyframes beam-travel {
+    from { stroke-dashoffset: 0; }
+    to   { stroke-dashoffset: -773; }
+  }
+
+  /* Static snapshot label */
+  .snapshot-badge {
+    display: inline-block;
+    background: rgba(43,112,239,0.1);
+    color: #2B70EF;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    margin-bottom: 6px;
+    font-family: 'Nunito Sans', sans-serif;
+  }
+
+  /* ── Hero card ── */
+  .hero-section {
+    margin: 14px 20px 0;
+  }
+  .hero-card {
+    background: #2B70EF;
+    border-radius: 32px;
+    padding: 20px 20px 18px;
+    box-shadow: 0 24px 44px rgba(43,112,239,0.26);
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Decorative glows inside hero */
+  .hero-glow1 {
+    position: absolute;
+    width: 200px; height: 200px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+    top: -60px; right: -40px;
+    pointer-events: none;
+  }
+  .hero-glow2 {
+    position: absolute;
+    width: 160px; height: 160px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,255,255,0.06) 0%, transparent 70%);
+    bottom: -40px; left: -30px;
+    pointer-events: none;
+  }
+
+  .hero-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .hero-label {
+    font-family: 'Nunito Sans', sans-serif;
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 1px;
+    color: rgba(255,255,255,0.8);
+    text-transform: uppercase;
+  }
+  .hero-countdown {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 8px 12px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.14);
+    font-family: 'Nunito Sans', sans-serif;
+    font-size: 12px;
+    color: rgba(255,255,255,0.9);
+  }
+
+  /* ── Ring + score ── */
+  .score-zone {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 0;
+    position: relative;
+  }
+
+  .ring-wrap {
+    position: relative;
+    width: 214px;
+    height: 214px;
+  }
+  .ring-wrap svg {
+    position: absolute;
+    top: 0; left: 0;
+  }
+  .score-core {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .score-number-row {
+    display: flex;
+    align-items: flex-end;
+  }
+  .score-number {
+    font-family: 'Outfit', sans-serif;
+    font-weight: 800;
+    font-size: 86px;
+    color: #22C55E;
+    line-height: 0.9;
+    letter-spacing: -4px;
+    /* Count-up animation: we show the number counting */
+    animation: count-up 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+  .score-pct {
+    font-family: 'Outfit', sans-serif;
+    font-weight: 800;
+    font-size: 34px;
+    color: #22C55E;
+    padding-bottom: 10px;
+    margin-left: 4px;
+  }
+
+  /* Ring fill animation */
+  /* Circumference for r=102 = 2π*102 ≈ 640.9 */
+  .ring-progress {
+    stroke: #22C55E;
+    stroke-width: 10;
+    fill: none;
+    stroke-linecap: round;
+    stroke-dasharray: 640.9;
+    /* Start fully empty (offset = circumference), fill to 93% */
+    stroke-dashoffset: 640.9;
+    animation: ring-fill 1.2s cubic-bezier(0.16, 1, 0.3, 1) 0.1s forwards;
+    transform-origin: 107px 107px;
+    transform: rotate(-90deg);
+  }
+
+  @keyframes ring-fill {
+    from { stroke-dashoffset: 640.9; }
+    to   { stroke-dashoffset: 44.9; }   /* 640.9 * (1 - 0.93) = 44.9 */
+  }
+
+  /* Count-up: we use CSS counter trick via a number that changes */
+  @keyframes count-up {
+    0%   { opacity: 1; }  /* Can't do real counter in CSS, so we show freeze */
+  }
+  /* We'll use JS for count-up below */
+
+  .ring-bg {
+    stroke: rgba(255,255,255,0.12);
+    stroke-width: 10;
+    fill: none;
+  }
+
+  .score-caption {
+    font-family: 'Nunito Sans', sans-serif;
+    font-weight: 400;
+    font-size: 14px;
+    color: rgba(255,255,255,0.74);
+    text-align: center;
+    margin-top: 2px;
+  }
+
+  /* ── Label strip at bottom of hero ── */
+  .label-strip {
+    display: flex;
+    gap: 8px;
+    margin-top: 16px;
+  }
+  .label-pill {
+    background: rgba(255,255,255,0.12);
+    border-radius: 999px;
+    padding: 6px 14px;
+    font-family: 'Nunito Sans', sans-serif;
+    font-size: 12px;
+    color: rgba(255,255,255,0.75);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  /* ── Side panel annotations ── */
+  .annotation-panel {
+    width: 260px;
+    display: flex;
+    flex-direction: column;
+    gap: 32px;
+    padding-top: 60px;
+  }
+  .annotation {
+    background: white;
+    border-radius: 16px;
+    padding: 16px;
+    box-shadow: 0 4px 16px rgba(15,31,61,0.08);
+  }
+  .annotation h3 {
+    font-family: 'Nunito Sans', sans-serif;
+    font-weight: 700;
+    font-size: 13px;
+    color: #1E293B;
+    margin-bottom: 8px;
+  }
+  .annotation p {
+    font-family: 'Nunito Sans', sans-serif;
+    font-size: 12px;
+    color: #64748B;
+    line-height: 1.5;
+  }
+  .annotation .tag {
+    display: inline-block;
+    background: #EFF6FF;
+    color: #2B70EF;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 4px;
+    margin-bottom: 8px;
+    letter-spacing: 0.5px;
+  }
+  .annotation .tag.green {
+    background: #F0FDF4;
+    color: #16A34A;
+  }
+</style>
+</head>
+<body>
+
+<!-- ── Phone mockup ── -->
+<div>
+  <div class="phone-label">Home Screen — Animation Mockup</div>
+  <div class="phone">
+
+    <!-- Greeting -->
+    <div class="greeting-row">
+      <span class="greeting-text">Good evening, Arun</span>
+      <span class="quote-text">The final stretch — you've got it.</span>
+    </div>
+
+    <!-- CTA Bar with glow -->
+    <div class="cta-row">
+      <div class="snapshot-badge">CHANGE 2 — LIVE BELOW</div>
+      <div class="glow-border-wrap" id="glowWrap">
+        <!-- Glow SVG injected by JS after layout -->
+        <div class="cta-card">
+          <div class="cta-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#2B70EF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+            </svg>
+          </div>
+          <span class="cta-label">Continue your daily stream</span>
+          <span class="cta-arrow">›</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Spacer / level badge placeholder -->
+    <div style="height:24px;"></div>
+
+    <!-- Hero card -->
+    <div class="hero-section">
+      <div class="snapshot-badge green">CHANGE 3 — ANIMATED RING + COUNT-UP</div>
+      <div class="hero-card">
+        <div class="hero-glow1"></div>
+        <div class="hero-glow2"></div>
+
+        <div class="hero-top">
+          <span class="hero-label">Exam Readiness</span>
+          <div class="hero-countdown">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.8)" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+            </svg>
+            <span>38 days left</span>
+          </div>
+        </div>
+
+        <!-- Score ring -->
+        <div class="score-zone">
+          <div class="ring-wrap">
+            <svg width="214" height="214" viewBox="0 0 214 214">
+              <!-- Background ring -->
+              <circle class="ring-bg" cx="107" cy="107" r="102"/>
+              <!-- Animated progress ring -->
+              <circle class="ring-progress" cx="107" cy="107" r="102"/>
+            </svg>
+            <div class="score-core">
+              <div class="score-number-row">
+                <span class="score-number" id="scoreNum">0</span>
+                <span class="score-pct">%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="score-caption">You're exam ready — stay sharp</div>
+
+        <div class="label-strip">
+          <div class="label-pill">🔥 12 day streak</div>
+          <div class="label-pill">⚡ 340 XP</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── Annotation panel ── -->
+<div class="annotation-panel">
+
+  <div class="annotation">
+    <div class="tag">CHANGE 1 — FONT SIZES</div>
+    <h3>Greeting text bump</h3>
+    <p>
+      <strong>Greeting line</strong> ("Good evening, Arun") increases from 12px → <strong>14px</strong>.<br><br>
+      <strong>Subtitle line</strong> ("The final stretch…") increases from 12px → <strong>13px</strong>.<br><br>
+      Both remain in muted gray (#94A3B8) and keep the same font families.
+    </p>
+  </div>
+
+  <div class="annotation">
+    <div class="tag">CHANGE 2 — GLOW BORDER</div>
+    <h3>Travelling glow on CTA bar</h3>
+    <p>
+      A Wordifi-blue (#2B70EF) glow segment travels continuously around the border of the "Continue your daily stream" rectangle — right → bottom → left → top → repeat.<br><br>
+      Implemented as an SVG <code>rect</code> with animated <code>stroke-dashoffset</code> + a CSS <code>drop-shadow</code> filter for the soft glow halo. Duration: ~2.2s per loop. Only shows on the paid/stream path, not the upgrade banner.
+    </p>
+  </div>
+
+  <div class="annotation">
+    <div class="tag green">CHANGE 3 — RING + SCORE</div>
+    <h3>Animated readiness ring</h3>
+    <p>
+      On screen mount, the green ring fills from 0% to the user's score (e.g. 93%) over ~1.2s using an ease-out curve.<br><br>
+      The percentage number simultaneously counts up from <strong>0 → 93</strong> at the same speed, giving a "powering up" feel.<br><br>
+      Both animations use the existing <code>motion.duration.scoreRing</code> constant from <code>theme/motion.ts</code>.
+    </p>
+  </div>
+
+</div>
+
+<script>
+  // ── Inject glow SVG after measuring the CTA card ──
+  const wrap = document.getElementById('glowWrap');
+  const card = wrap.querySelector('.cta-card');
+
+  function injectGlow() {
+    const w = wrap.offsetWidth;
+    const h = wrap.offsetHeight;
+    const r = 18;
+    // Perimeter of rounded rect ≈ 2*(w-2r) + 2*(h-2r) + 2πr
+    const perimeter = 2 * (w - 2*r) + 2 * (h - 2*r) + 2 * Math.PI * r;
+    const glowLength = 80;
+
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('width', w);
+    svg.setAttribute('height', h);
+    svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+    svg.style.cssText = `position:absolute;top:0;left:0;pointer-events:none;border-radius:18px;overflow:visible;`;
+
+    // Track (faint always-on ring)
+    const track = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    track.setAttribute('x', '1.5');
+    track.setAttribute('y', '1.5');
+    track.setAttribute('width', w - 3);
+    track.setAttribute('height', h - 3);
+    track.setAttribute('rx', r);
+    track.setAttribute('ry', r);
+    track.setAttribute('fill', 'none');
+    track.setAttribute('stroke', 'rgba(43,112,239,0.12)');
+    track.setAttribute('stroke-width', '3');
+
+    // Beam (animated)
+    const beam = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    beam.setAttribute('x', '1.5');
+    beam.setAttribute('y', '1.5');
+    beam.setAttribute('width', w - 3);
+    beam.setAttribute('height', h - 3);
+    beam.setAttribute('rx', r);
+    beam.setAttribute('ry', r);
+    beam.setAttribute('fill', 'none');
+    beam.setAttribute('stroke', '#2B70EF');
+    beam.setAttribute('stroke-width', '3');
+    beam.setAttribute('stroke-linecap', 'round');
+    beam.style.filter = 'drop-shadow(0 0 5px #2B70EF) drop-shadow(0 0 10px rgba(43,112,239,0.4))';
+
+    const dashArray = `${glowLength} ${perimeter - glowLength}`;
+    beam.setAttribute('stroke-dasharray', dashArray);
+    beam.setAttribute('stroke-dashoffset', '0');
+
+    const style = document.createElementNS('http://www.w3.org/2000/svg', 'style');
+    style.textContent = `
+      @keyframes beam${w} {
+        from { stroke-dashoffset: 0; }
+        to   { stroke-dashoffset: -${perimeter.toFixed(1)}; }
+      }
+    `;
+    beam.style.animation = `beam${w} 2.2s linear infinite`;
+
+    const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+    defs.appendChild(style);
+    svg.appendChild(defs);
+    svg.appendChild(track);
+    svg.appendChild(beam);
+    wrap.insertBefore(svg, wrap.firstChild);
+  }
+
+  // Wait for paint then inject
+  requestAnimationFrame(() => requestAnimationFrame(injectGlow));
+
+  // ── Score count-up ──
+  const TARGET = 93;
+  const DURATION = 1200; // ms
+  const el = document.getElementById('scoreNum');
+  const start = performance.now();
+
+  function easeOut(t) {
+    return 1 - Math.pow(1 - t, 3);
+  }
+
+  function tick(now) {
+    const elapsed = now - start;
+    const t = Math.min(elapsed / DURATION, 1);
+    const value = Math.round(easeOut(t) * TARGET);
+    el.textContent = value;
+    if (t < 1) requestAnimationFrame(tick);
+  }
+
+  // Small delay so user sees it start from zero
+  setTimeout(() => requestAnimationFrame(tick), 100);
+</script>
+
+</body>
+</html>
