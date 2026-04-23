@@ -201,9 +201,9 @@ export default function AuthScreen() {
           <View style={styles.card}>
             <Pressable
               accessibilityLabel="Continue with Google"
-              disabled={isLoading || (mode === 'signUp' && !tcAccepted)}
+              disabled={isLoading}
               onPress={handleGoogleAuth}
-              style={[styles.googleButton, ((mode === 'signUp' && !tcAccepted) || isLoading) ? styles.buttonDisabled : null]}
+              style={[styles.googleButton, isLoading ? styles.buttonDisabled : null]}
               testID="google-auth-button"
             >
               <View style={styles.googleIconWrap}>

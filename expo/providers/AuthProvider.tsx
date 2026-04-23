@@ -67,6 +67,9 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
 
     const { data: listener } = supabase.auth.onAuthStateChange((event, nextSession) => {
       console.log('AuthProvider auth state changed', event, Boolean(nextSession));
+      if (event === 'SIGNED_OUT' && !nextSession) {
+        AsyncStorage.removeItem('sb-wwfiauhsbssjowaxmqyn-auth-token').catch(() => {});
+      }
       setSession(nextSession);
       setIsSessionLoading(false);
 
