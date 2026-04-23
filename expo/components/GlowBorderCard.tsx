@@ -11,11 +11,11 @@ import Animated, {
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 
-const DOT_LENGTH   = 5;
+const DOT_LENGTH   = 72;   // arc length in px — visible sweep around the card
 const BORDER_COLOR = '#2B70EF';
 const TRACK_COLOR  = 'rgba(43,112,239,0.10)';
 const BORDER_R     = 18;
-const DURATION     = 30000;
+const DURATION     = 9000; // ms per full lap — noticeable but not distracting
 
 /** SVG path that traces a rounded rectangle border, inset by 1.5px so the stroke is fully visible. */
 function rrPath(w: number, h: number, r: number): string {
@@ -82,7 +82,20 @@ export function GlowBorderCard({ children }: Props) {
             style={{ position: 'absolute', top: 0, left: 0 }}
             pointerEvents="none"
           >
+            {/* Track */}
             <Path d={path} fill="none" stroke={TRACK_COLOR} strokeWidth={1.5} />
+            {/* Glow halo — wider, semi-transparent, same offset */}
+            <AnimatedPath
+              animatedProps={animatedProps}
+              d={path}
+              fill="none"
+              stroke={BORDER_COLOR}
+              strokeWidth={10}
+              strokeLinecap="round"
+              strokeDasharray={`${DOT_LENGTH} ${(perim - DOT_LENGTH).toFixed(1)}`}
+              opacity={0.18}
+            />
+            {/* Main arc */}
             <AnimatedPath
               animatedProps={animatedProps}
               d={path}

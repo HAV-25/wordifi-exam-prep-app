@@ -277,7 +277,8 @@ export default function ProfileScreen() {
     }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
-      allowsEditing: false,
+      allowsEditing: true,
+      aspect: [1, 1],
       quality: 0.8,
     });
     if (!result.canceled && result.assets[0]) {
@@ -293,7 +294,8 @@ export default function ProfileScreen() {
       return;
     }
     const result = await ImagePicker.launchCameraAsync({
-      allowsEditing: false,
+      allowsEditing: true,
+      aspect: [1, 1],
       quality: 0.8,
     });
     if (!result.canceled && result.assets[0]) {
@@ -715,7 +717,7 @@ export default function ProfileScreen() {
 
           {/* Instruction */}
           <Text style={styles.cropHint}>
-            Your photo will be used as-is. Adjust the frame as needed.
+            Looking good? Tap Done to save, or go back to re-crop.
           </Text>
 
           {/* Image preview */}

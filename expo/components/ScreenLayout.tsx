@@ -58,7 +58,7 @@ export function ScreenLayout({
           {children}
         </ScrollView>
       ) : (
-        <View style={{ flex: 1 }}>{children}</View>
+        <View style={[{ flex: 1 }, contentContainerStyle]}>{children}</View>
       )}
 
       {/* ── Fixed footer — always above fold ────────────────────────── */}
