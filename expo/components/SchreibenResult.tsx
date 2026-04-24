@@ -33,6 +33,7 @@ export function SchreibenResult({ assessment, taskType, level, teil }: Schreiben
     ? Math.round((assessment.overall_score / assessment.max_score) * 100)
     : 0;
 
+  const moderationFlagged = Boolean(assessment.moderation_flagged);
   const hasScoreDetails = assessment.score_details && assessment.score_details.length > 0;
   const hasCorrections = assessment.corrections && assessment.corrections.length > 0;
 
@@ -40,36 +41,51 @@ export function SchreibenResult({ assessment, taskType, level, teil }: Schreiben
     <View style={styles.container} testID="schreiben-result">
       <ScoreHeroCard scorePct={scorePct} assessment={assessment} />
 
-      {hasScoreDetails ? (
-        <ScoreBreakdownCard items={assessment.score_details!} />
-      ) : null}
+      {/* Moderation blocked — replaces all feedback cards */}
+      {moderationFlagged ? (
+        <View style={[styles.moderationCard, shadows.card]}>
+          <Text style={styles.moderationTitle}>Response Could Not Be Evaluated</Text>
+          <Text style={styles.moderationBody}>
+            Your response could not be assessed because it contained content that violates our usage policy.
+          </Text>
+          <Text style={styles.moderationHint}>
+            Please keep responses relevant to the exam task and write in German.
+          </Text>
+        </View>
+      ) : (
+        <>
+          {hasScoreDetails ? (
+            <ScoreBreakdownCard items={assessment.score_details!} />
+          ) : null}
 
-      <View style={[styles.sectionCard, shadows.card]}>
-        <Text style={styles.sectionTitle}>TASK POINTS</Text>
-        {assessment.points_coverage.map((pt, idx) => (
-          <View key={idx} style={styles.pointItem}>
-            <View style={styles.pointHeader}>
-              <Text style={[styles.pointIcon, pt.addressed ? styles.pointIconGreen : styles.pointIconRed]}>
-                {pt.addressed ? '✓' : '✗'}
-              </Text>
-              <Text style={[styles.pointLabel, !pt.addressed && styles.pointLabelRed]}>
-                {pt.point}
-              </Text>
-            </View>
-            {pt.comment ? (
-              <Text style={styles.pointComment}>{pt.comment}</Text>
-            ) : null}
+          <View style={[styles.sectionCard, shadows.card]}>
+            <Text style={styles.sectionTitle}>TASK POINTS</Text>
+            {assessment.points_coverage.map((pt, idx) => (
+              <View key={idx} style={styles.pointItem}>
+                <View style={styles.pointHeader}>
+                  <Text style={[styles.pointIcon, pt.addressed ? styles.pointIconGreen : styles.pointIconRed]}>
+                    {pt.addressed ? '✓' : '✗'}
+                  </Text>
+                  <Text style={[styles.pointLabel, !pt.addressed && styles.pointLabelRed]}>
+                    {pt.point}
+                  </Text>
+                </View>
+                {pt.comment ? (
+                  <Text style={styles.pointComment}>{pt.comment}</Text>
+                ) : null}
+              </View>
+            ))}
           </View>
-        ))}
-      </View>
 
-      {hasCorrections ? (
-        <CorrectionsCard corrections={assessment.corrections!} />
-      ) : null}
+          {hasCorrections ? (
+            <CorrectionsCard corrections={assessment.corrections!} />
+          ) : null}
 
-      {taskType !== 'form_fill' && assessment.language_feedback ? (
-        <LanguageFeedbackCard feedback={assessment.language_feedback} />
-      ) : null}
+          {taskType !== 'form_fill' && assessment.language_feedback ? (
+            <LanguageFeedbackCard feedback={assessment.language_feedback} />
+          ) : null}
+        </>
+      )}
     </View>
   );
 }
@@ -588,5 +604,32 @@ const styles = StyleSheet.create({
     fontSize: fontSize.bodyMd,
     color: colors.blue,
     fontWeight: '700' as const,
+  },
+
+  // ── Moderation blocked ────────────────────────────────────────────────────
+  moderationCard: {
+    backgroundColor: '#FFF4F4',
+    borderRadius: radius.lg,
+    padding: spacing.xl,
+    gap: spacing.md,
+    borderWidth: 1.5,
+    borderColor: colors.red,
+  },
+  moderationTitle: {
+    color: colors.red,
+    fontSize: fontSize.bodyLg,
+    fontWeight: '800' as const,
+  },
+  moderationBody: {
+    color: colors.bodyText,
+    fontSize: fontSize.bodyMd,
+    fontWeight: '500' as const,
+    lineHeight: 22,
+  },
+  moderationHint: {
+    color: colors.muted,
+    fontSize: fontSize.bodySm,
+    fontWeight: '500' as const,
+    lineHeight: 20,
   },
 });

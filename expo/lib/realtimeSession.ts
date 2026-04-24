@@ -51,6 +51,7 @@ export type SprechenScores = {
   overall_score: number;             // 0–100
   max_score: number;                 // always 100
   passed: boolean;
+  moderation_flagged: boolean;       // true = content policy blocked; skip all feedback
   score_details: SprechenScoreDetail[];
 
   // ── Raw AI category scores (1–5) ──────────────────────────────────────
@@ -178,10 +179,11 @@ export async function scoreSprechenConversation(params: {
 
   const scores: SprechenScores = {
     // ── Backend-calculated ───────────────────────────────────────────────
-    overall_score: toNum(flat.overall_score),
-    max_score:     toNum(flat.max_score, 100),
-    passed:        Boolean(flat.passed),
-    score_details: toArr<SprechenScoreDetail>(flat.score_details),
+    overall_score:      toNum(flat.overall_score),
+    max_score:          toNum(flat.max_score, 100),
+    passed:             Boolean(flat.passed),
+    moderation_flagged: Boolean(flat.moderation_flagged),
+    score_details:      toArr<SprechenScoreDetail>(flat.score_details),
 
     // ── Raw category scores ──────────────────────────────────────────────
     fluency_score:   toNum(flat.fluency_score   ?? flat.fluency),

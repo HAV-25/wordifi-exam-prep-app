@@ -20,9 +20,15 @@ export type ScoreBreakdownItem = {
 };
 
 export type AssessmentResult = {
+  // ── Backend-calculated ────────────────────────────────────────────────────
   overall_score: number;
   max_score: number;
   passed: boolean;
+  moderation_flagged?: boolean;        // true = content policy blocked
+  criterion_scores?: Record<string, number>; // raw per-criterion values (A1/A2/B1 keys differ)
+  score_details?: ScoreBreakdownItem[];      // backend-derived 3-category aggregates
+
+  // ── AI qualitative ────────────────────────────────────────────────────────
   points_coverage: PointResult[];
   language_feedback: {
     grammar: string;
@@ -31,9 +37,8 @@ export type AssessmentResult = {
     sentence_structure: string;
   };
   encouragement: string;
-  assessment_type: 'local' | 'ai';
+  assessment_type: 'local' | 'ai' | 'moderation_blocked';
   scoring_breakdown?: string;
-  score_details?: ScoreBreakdownItem[];
   corrections?: CorrectionItem[];
 };
 

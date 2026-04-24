@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Wordifi — Sprechen & Schreiben System Overview</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      font-size: 11px;
+      color: #1f2937;
+      background: #fff;
+      padding: 40px 48px;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    /* ── Header ── */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      border-bottom: 2.5px solid #2B70EF;
+      padding-bottom: 10px;
+      margin-bottom: 20px;
+    }
+    .header-title { font-size: 20px; font-weight: 800; color: #111827; }
+    .header-sub   { font-size: 11px; color: #6b7280; font-weight: 500; }
+    .header-date  { font-size: 10px; color: #9ca3af; }
+
+    /* ── Two-column layout ── */
+    .columns {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    /* ── Section ── */
+    .section {
+      background: #f9fafb;
+      border-radius: 10px;
+      padding: 14px 16px;
+      border: 1px solid #e5e7eb;
+    }
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .badge {
+      display: inline-block;
+      padding: 2px 9px;
+      border-radius: 99px;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      color: #fff;
+    }
+    .badge-blue   { background: #2B70EF; }
+    .badge-orange { background: #F97316; }
+
+    .section-title {
+      font-size: 13px;
+      font-weight: 800;
+      color: #111827;
+    }
+
+    h4 {
+      font-size: 10px;
+      font-weight: 700;
+      color: #6b7280;
+      letter-spacing: 0.6px;
+      text-transform: uppercase;
+      margin: 10px 0 4px;
+    }
+    h4:first-of-type { margin-top: 0; }
+
+    p, li {
+      font-size: 11px;
+      color: #374151;
+      line-height: 1.6;
+    }
+    ul { padding-left: 14px; }
+    li { margin-bottom: 2px; }
+
+    /* ── Formula box ── */
+    .formula {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-radius: 6px;
+      padding: 8px 10px;
+      font-size: 11px;
+      color: #1d4ed8;
+      font-weight: 600;
+      line-height: 1.7;
+    }
+
+    /* ── Guard / Penalty rows ── */
+    .guard-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 7px;
+      margin-bottom: 4px;
+    }
+    .guard-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: #F97316;
+      flex-shrink: 0;
+      margin-top: 4px;
+    }
+
+    /* ── Threshold pill ── */
+    .pill {
+      display: inline-block;
+      padding: 1px 7px;
+      border-radius: 99px;
+      font-size: 10px;
+      font-weight: 700;
+    }
+    .pill-green  { background: #dcfce7; color: #16a34a; }
+    .pill-red    { background: #fee2e2; color: #dc2626; }
+
+    /* ── UI row ── */
+    .ui-row {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 4px;
+      align-items: flex-start;
+    }
+    .ui-label {
+      font-size: 10px;
+      font-weight: 700;
+      color: #2B70EF;
+      width: 90px;
+      flex-shrink: 0;
+      padding-top: 1px;
+    }
+
+    /* ── Full-width section ── */
+    .full-width {
+      margin-top: 16px;
+      background: #f9fafb;
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      padding: 14px 16px;
+    }
+    .full-width-inner {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 16px;
+    }
+
+    /* ── Footer ── */
+    .footer {
+      margin-top: 18px;
+      border-top: 1px solid #e5e7eb;
+      padding-top: 8px;
+      display: flex;
+      justify-content: space-between;
+    }
+    .footer p { font-size: 9.5px; color: #9ca3af; }
+
+    /* ── Print ── */
+    @media print {
+      body { padding: 20px 28px; }
+      @page { size: A4; margin: 15mm; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <div class="header">
+    <div>
+      <div class="header-title">Wordifi — Sprechen &amp; Schreiben</div>
+      <div class="header-sub">Logic, Scoring &amp; UI Reference · Internal One-Pager</div>
+    </div>
+    <div class="header-date">April 2026 · v10 / v10</div>
+  </div>
+
+  <!-- Two columns -->
+  <div class="columns">
+
+    <!-- ── SPRECHEN ── -->
+    <div class="section">
+      <div class="section-header">
+        <span class="badge badge-blue">SPRECHEN</span>
+        <span class="section-title">Speaking Assessment</span>
+      </div>
+
+      <h4>How It Works</h4>
+      <ul>
+        <li>Live session via OpenAI Realtime API (WebRTC / WebSocket fallback)</li>
+        <li>AI partner — female voice (coral / shimmer / alloy), randomised female German name</li>
+        <li>Two modes: <strong>Dialogue</strong> (partner-led) · <strong>Monologue</strong> (user presents)</li>
+        <li>4-minute max; VAD silence detection ends each turn automatically</li>
+        <li>Transcript built from Whisper transcriptions; sent to <code>score-sprechen</code> on end</li>
+      </ul>
+
+      <h4>Scoring Formula (Backend — deterministic)</h4>
+      <div class="formula">
+        Fluency (1–5)  × 35% → max 35 pts<br>
+        Grammar (1–5)  × 40% → max 40 pts<br>
+        Vocabulary (1–5) × 25% → max 25 pts<br>
+        ─────────────────────────────────<br>
+        Raw Total → 0–100
+      </div>
+
+      <h4>Integrity Guards (applied after raw total)</h4>
+      <div class="guard-row"><div class="guard-dot"></div><p>&lt; 10 unique words → score capped at <strong>20</strong></p></div>
+      <div class="guard-row"><div class="guard-dot"></div><p>&lt; 20 unique words → score capped at <strong>40</strong></p></div>
+      <div class="guard-row"><div class="guard-dot"></div><p>&lt; 2 user turns → <code>task_completion</code> forced to <em>minimal</em></p></div>
+      <div class="guard-row"><div class="guard-dot"></div><p>task_completion <em>partial</em> → × 0.8 · <em>minimal</em> → × 0.5</p></div>
+
+      <h4>Pass Threshold</h4>
+      <p><span class="pill pill-green">≥ 60 → Passed</span> &nbsp; <span class="pill pill-red">&lt; 60 → Needs Improvement</span> &nbsp; (universal across A1/A2/B1)</p>
+
+      <h4>Content Moderation</h4>
+      <p>OpenAI Moderation API runs on <em>Sie:</em> lines before GPT scoring. Flagged → 0/100, not saved to DB. Fails open on API errors.</p>
+
+      <h4>What the UI Shows</h4>
+      <div class="ui-row"><div class="ui-label">Hero</div><p>Score <strong>X / 100</strong> + Passed / Needs Improvement badge</p></div>
+      <div class="ui-row"><div class="ui-label">Score Bars</div><p>Fluency / Grammar / Vocabulary — raw /5 bar + weighted contribution %</p></div>
+      <div class="ui-row"><div class="ui-label">Task Badge</div><p>Task completed / Partially completed / Not completed</p></div>
+      <div class="ui-row"><div class="ui-label">Feedback</div><p>Overall feedback · Key improvement tip</p></div>
+      <div class="ui-row"><div class="ui-label">Observations</div><p>Grammar &amp; Vocabulary observations</p></div>
+      <div class="ui-row"><div class="ui-label">Corrections</div><p>2 specific error → corrected examples with explanation</p></div>
+      <div class="ui-row"><div class="ui-label">Suggestions</div><p>Opening &amp; closing sentence examples in German</p></div>
+      <div class="ui-row"><div class="ui-label">Connectors</div><p>3 German connector phrases with English meanings</p></div>
+      <div class="ui-row"><div class="ui-label">Phrases</div><p>3 useful topic phrases with translations</p></div>
+      <div class="ui-row"><div class="ui-label">Blocked</div><p>Red banner only — no scores, no feedback</p></div>
+    </div>
+
+    <!-- ── SCHREIBEN ── -->
+    <div class="section">
+      <div class="section-header">
+        <span class="badge badge-orange">SCHREIBEN</span>
+        <span class="section-title">Writing Assessment</span>
+      </div>
+
+      <h4>How It Works</h4>
+      <ul>
+        <li>User writes a German response in a text editor within the app</li>
+        <li>Task types: Form Fill · SMS · Formal Email · Informal Letter · Opinion</li>
+        <li>One-attempt rule — first submission is locked and cached for the question</li>
+        <li>English detection guard: submission rejected before calling GPT</li>
+        <li>Submitted to <code>assess-schreiben</code>; <strong>form_fill</strong> scored locally (no GPT)</li>
+      </ul>
+
+      <h4>Scoring Rubric (CEFR-level specific)</h4>
+      <div class="formula">
+        <strong>A1</strong> — Max 10 pts · Pass ≥ 6<br>
+        &nbsp;&nbsp;Task Completion (3 content points × 3.0) + Register (1.0)<br><br>
+        <strong>A2</strong> — Max 12 pts · Pass ≥ 7<br>
+        &nbsp;&nbsp;Sprachfunktion (5) + Register (2) + Spektrum (2.5) + Beherrschung (2.5)<br><br>
+        <strong>B1</strong> — Max 15 pts · Pass ≥ 9<br>
+        &nbsp;&nbsp;Erfüllung (4) + Textsorte (1) + Register (1) + Kohärenz (1.5)<br>
+        &nbsp;&nbsp;+ Wortschatz Spektrum (2) + Wortschatz Beherr. (1.5)<br>
+        &nbsp;&nbsp;+ Strukturen Spektrum (2) + Strukturen Beherr. (2)
+      </div>
+
+      <h4>Integrity Guards</h4>
+      <div class="guard-row"><div class="guard-dot"></div><p>English submission → 0 pts, not saved, no GPT call</p></div>
+      <div class="guard-row"><div class="guard-dot"></div><p>&gt; 20% English in German text → language mixing penalty applied by GPT</p></div>
+      <div class="guard-row"><div class="guard-dot"></div><p>Moderation API runs before GPT — flagged → 0 pts, not saved</p></div>
+
+      <h4>Pass Threshold</h4>
+      <p>
+        <span class="pill pill-green">A1 ≥ 6/10</span> &nbsp;
+        <span class="pill pill-green">A2 ≥ 7/12</span> &nbsp;
+        <span class="pill pill-green">B1 ≥ 9/15</span>
+      </p>
+
+      <h4>Content Moderation</h4>
+      <p>OpenAI Moderation API runs on <code>user_text</code> before any DB read or GPT call. Applies to all task types including form_fill. Fails open on API errors.</p>
+
+      <h4>What the UI Shows</h4>
+      <div class="ui-row"><div class="ui-label">Hero Ring</div><p>Animated score ring showing % · Passed / Not passed badge</p></div>
+      <div class="ui-row"><div class="ui-label">Score Bars</div><p>Task Completion / Communication / Correctness — score vs max per category</p></div>
+      <div class="ui-row"><div class="ui-label">Task Points</div><p>Each required content point: ✓ addressed or ✗ missed + comment</p></div>
+      <div class="ui-row"><div class="ui-label">Corrections</div><p>3–6 items tagged ERROR / SUGGESTION / EXCELLENT with original → corrected + explanation</p></div>
+      <div class="ui-row"><div class="ui-label">Language</div><p>Collapsible panel: Grammar · Spelling · Register · Sentence Structure</p></div>
+      <div class="ui-row"><div class="ui-label">Blocked</div><p>Red banner only — no scores, no feedback</p></div>
+    </div>
+  </div>
+
+  <!-- Full-width shared section -->
+  <div class="full-width">
+    <h4 style="margin-bottom:10px;">Shared Infrastructure</h4>
+    <div class="full-width-inner">
+      <div>
+        <p><strong>Moderation (both)</strong></p>
+        <ul style="margin-top:4px;">
+          <li>Model: <code>omni-moderation-latest</code></li>
+          <li>Checks: harassment, hate, sexual, violence, self-harm, illicit</li>
+          <li>Fail-open — transient API errors never block the user</li>
+          <li>Logs: categories fired + top scores (no user content logged)</li>
+          <li>Blocked responses never saved to DB</li>
+        </ul>
+      </div>
+      <div>
+        <p><strong>Diagnostic Logging (Sprechen)</strong></p>
+        <ul style="margin-top:4px;">
+          <li><code>total_words</code> · <code>unique_words</code></li>
+          <li><code>user_turns</code> · <code>raw_contribution_total</code></li>
+          <li><code>final_multiplier</code> (1.0 / 0.8 / 0.5)</li>
+          <li><code>capped_by_guard</code> boolean</li>
+          <li><code>overall_score</code> · <code>passed</code> · <code>task_completion</code></li>
+        </ul>
+      </div>
+      <div>
+        <p><strong>Edge Functions</strong></p>
+        <ul style="margin-top:4px;">
+          <li><code>score-sprechen</code> v10 — scoring + moderation</li>
+          <li><code>create-sprechen-session</code> v9 — Realtime session</li>
+          <li><code>assess-schreiben</code> v10 — scoring + moderation</li>
+          <li>DB: <code>sprechen_responses</code> · <code>schreiben_submissions</code></li>
+          <li>Analytics via <code>track('section_completed')</code> with <code>score_pct</code></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <p>Wordifi Exam Prep · Internal Technical Reference</p>
+    <p>To save as PDF: File → Print → Save as PDF &nbsp;|&nbsp; Recommended: A4, no margins</p>
+  </div>
+
+</body>
+</html>

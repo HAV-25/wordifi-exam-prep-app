@@ -840,8 +840,9 @@ export default function SprechenRealtimeScreen() {
     const scoreDetails: Array<{ label: string; raw_score: number; weighted_percent: number; weight: number }> =
       Array.isArray(s.score_details) ? s.score_details : [];
     const taskCompletion: string = s.task_completion ?? '';
+    const moderationFlagged: boolean = Boolean(s.moderation_flagged);
     const hasUserSpeech = transcriptEntries.some(e => e.role === 'user');
-    const noSpeechDetected = !hasUserSpeech && overallNum === 0;
+    const noSpeechDetected = !hasUserSpeech && overallNum === 0 && !moderationFlagged;
 
     return (
       <View style={[styles.screen, { paddingTop: insets.top }]}>
@@ -896,33 +897,48 @@ export default function SprechenRealtimeScreen() {
             )}
           </View>
 
-          {/* Task completion badge */}
-          {taskCompletion === 'full' ? (
-            <View style={[styles.badgeCard, shadows.card, { borderColor: colors.green }]}>
-              <Text style={styles.badgeEmoji}>✅</Text>
-              <Text style={[styles.badgeText, { color: colors.green }]}>Task completed</Text>
-            </View>
-          ) : taskCompletion === 'partial' ? (
-            <View style={[styles.badgeCard, shadows.card, { borderColor: colors.amber }]}>
-              <Text style={styles.badgeEmoji}>⚠️</Text>
-              <Text style={[styles.badgeText, { color: colors.amber }]}>Partially completed</Text>
-            </View>
-          ) : taskCompletion === 'minimal' ? (
-            <View style={[styles.badgeCard, shadows.card, { borderColor: colors.red }]}>
-              <Text style={styles.badgeEmoji}>❌</Text>
-              <Text style={[styles.badgeText, { color: colors.red }]}>Not completed</Text>
+          {/* Task completion badge — hidden when moderation blocked */}
+          {!moderationFlagged && (
+            taskCompletion === 'full' ? (
+              <View style={[styles.badgeCard, shadows.card, { borderColor: colors.green }]}>
+                <Text style={styles.badgeEmoji}>✅</Text>
+                <Text style={[styles.badgeText, { color: colors.green }]}>Task completed</Text>
+              </View>
+            ) : taskCompletion === 'partial' ? (
+              <View style={[styles.badgeCard, shadows.card, { borderColor: colors.amber }]}>
+                <Text style={styles.badgeEmoji}>⚠️</Text>
+                <Text style={[styles.badgeText, { color: colors.amber }]}>Partially completed</Text>
+              </View>
+            ) : taskCompletion === 'minimal' ? (
+              <View style={[styles.badgeCard, shadows.card, { borderColor: colors.red }]}>
+                <Text style={styles.badgeEmoji}>❌</Text>
+                <Text style={[styles.badgeText, { color: colors.red }]}>Not completed</Text>
+              </View>
+            ) : null
+          )}
+
+          {/* Moderation blocked — replaces all feedback when content policy fires */}
+          {moderationFlagged ? (
+            <View style={[styles.moderationCard, shadows.card]}>
+              <Text style={styles.moderationTitle}>Response Could Not Be Evaluated</Text>
+              <Text style={styles.moderationBody}>
+                Your response could not be assessed because it contained content that violates our usage policy.
+              </Text>
+              <Text style={styles.moderationHint}>
+                Please keep responses relevant to the exam task and speak in German.
+              </Text>
             </View>
           ) : null}
 
           {/* Feedback */}
-          {noSpeechDetected ? (
+          {!moderationFlagged && noSpeechDetected ? (
             <View style={[styles.feedbackCard, shadows.card]}>
               <Text style={styles.feedbackLabel}>NOTICE</Text>
               <Text style={styles.feedbackText}>
                 No speech was detected. Please check your microphone and try again.
               </Text>
             </View>
-          ) : (
+          ) : !moderationFlagged ? (
             <>
               {scores.encouragement_note ? (
                 <View style={[styles.feedbackCard, shadows.card]}>
@@ -1854,5 +1870,32 @@ const styles = StyleSheet.create({
     fontSize: fontSize.bodyMd,
     fontWeight: '500' as const,
     lineHeight: 22,
+  },
+
+  // ── Results — Moderation blocked ──────────────────────────────────────────
+  moderationCard: {
+    backgroundColor: '#FFF4F4',
+    borderRadius: radius.lg,
+    padding: spacing.xl,
+    gap: spacing.md,
+    borderWidth: 1.5,
+    borderColor: colors.red,
+  },
+  moderationTitle: {
+    color: colors.red,
+    fontSize: fontSize.bodyLg,
+    fontWeight: '800' as const,
+  },
+  moderationBody: {
+    color: colors.bodyText,
+    fontSize: fontSize.bodyMd,
+    fontWeight: '500' as const,
+    lineHeight: 22,
+  },
+  moderationHint: {
+    color: colors.muted,
+    fontSize: fontSize.bodySm,
+    fontWeight: '500' as const,
+    lineHeight: 20,
   },
 });
