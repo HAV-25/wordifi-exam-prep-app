@@ -28,7 +28,7 @@ async function buildTemplateContext(
 ): Promise<TemplateContext> {
   const { data: profile } = await supabase
     .from('user_profiles')
-    .select('first_name, target_level, trial_expires_at, timezone')
+    .select('first_name, target_level, trial_expires_at, timezone, exam_type, exam_date')
     .eq('id', userId)
     .maybeSingle() as { data: Row | null };
 
@@ -41,9 +41,24 @@ async function buildTemplateContext(
   const trialEndsAt = profile?.trial_expires_at ?? (payload.trial_ends_at as string | undefined);
   const tz = profile?.timezone ?? 'Europe/Berlin';
 
+  // Compute days_to_exam from exam_date if present
+  const examDate: string | null = profile?.exam_date ?? null;
+  const daysToExam = examDate
+    ? Math.max(0, Math.ceil((new Date(examDate).getTime() - Date.now()) / 86_400_000))
+    : undefined;
+
+  // Format exam_date for display (e.g. "12 May 2026")
+  const examDateFormatted = examDate
+    ? new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(examDate))
+    : undefined;
+
   return {
     first_name: profile?.first_name ?? '',
     cefr_level: profile?.target_level ?? '',
+    target_level: profile?.target_level ?? '',
+    exam_type: profile?.exam_type ?? undefined,
+    exam_date: examDateFormatted ?? undefined,
+    days_to_exam: daysToExam,
     streak_days: (streak?.current_streak_days as number | undefined) ?? 0,
     trial_ends_at_formatted: trialEndsAt
       ? new Intl.DateTimeFormat('en-US', { timeZone: tz, month: 'long', day: 'numeric', year: 'numeric' }).format(new Date(trialEndsAt))
@@ -106,7 +121,7 @@ export async function dispatchChannel(
 
   try {
     // Gating
-    const gateResult = await gate(supabase, userId, channel, category);
+    const gateResult = await gate(supabase, userId, channel, category, eventKey);
     if (!gateResult.ok) {
       await logEvent(supabase, userId, eventKey, channel, category, 'suppressed', {
         suppression_reason: gateResult.reason,
@@ -143,7 +158,7 @@ export async function dispatchChannel(
 
     if (channel === 'email') {
       const r = rendered as RenderedEmail;
-      const result = await sendEmail(gateResult.email!, r.subject, r.html);
+      const result = await sendEmail(gateResult.email!, r.subject, r.html, r.text);
       const status = result.ok ? 'sent' : 'failed';
       await logEvent(supabase, userId, eventKey, channel, category, status, {
         provider_message_id: result.messageId,

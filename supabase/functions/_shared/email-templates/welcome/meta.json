@@ -1,0 +1,10 @@
+{
+  "rich": {
+    "subject": "Your {{exam_type}} {{target_level}} plan starts here, {{first_name}}",
+    "preview_text": "Your personalized German exam prep starts now."
+  },
+  "generic": {
+    "subject": "Welcome to Wordifi",
+    "preview_text": "Your German exam prep companion is ready."
+  }
+}

@@ -1,0 +1,31 @@
+Hi {{first_name}} —
+
+Your {{exam_type}} {{target_level}} prep starts now.
+
+{{#if exam_date}}
+Your exam is {{days_to_exam}} days away ({{exam_date}}). We'll keep you on track.
+{{else}}
+Set your exam date in Profile to unlock your countdown.
+{{/if}}
+
+Wordifi turns your goal into a short, daily stream — vocabulary, listening, and the sections you're weakest on. Show up each day, build a streak, and watch your readiness climb.
+
+What to expect:
+  Daily streams — short, focused sessions tuned to your level.
+  Streak system — show up daily, earn badges, don't break the chain.
+  Weak-section focus — we find what's holding you back and drill it.
+
+Start your first daily stream:
+wordifi://stream
+
+or open Wordifi: wordifi://home
+
+Don't have the app?
+Google Play: https://play.google.com/store/apps/details?id=com.wordifi
+App Store:   https://apps.apple.com/app/wordifi
+
+— The Wordifi team
+
+You're receiving this because you signed up for Wordifi.
+Manage notification preferences: wordifi://settings/notifications
+Wordifi · The smart path to certified.

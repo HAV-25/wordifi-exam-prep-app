@@ -55,6 +55,8 @@ Or paste each SQL file in the Supabase SQL editor in order:
 1. `20260421000001_gamification_event_log.sql`
 2. `20260421000002_test_sessions_notify_trigger.sql`
 3. `20260421000003_notification_cron_schedules.sql`
+4. `20260421000004_welcome_email_trigger.sql`
+5. `20260421000005_signup_trigger_welcome_email.sql` (**run in SQL editor with superuser** — requires auth schema access)
 
 ### 4. Deploy Edge Functions
 ```bash
@@ -92,6 +94,33 @@ npx supabase gen types typescript --project-id wwfiauhsbssjowaxmqyn --schema pub
 
 ---
 
+## Welcome email
+
+The welcome email (`notif.welcome_email`) is a one-time transactional email sent after signup.
+It is wired via two complementary paths:
+
+| Path | Mechanism | When |
+|------|-----------|------|
+| **A — Onboarding** | `trg_notify_onboarding_completed` trigger on `user_profiles` | Fires immediately when `onboarding_completed_at` transitions NULL → value |
+| **B — Safety net** | `on_auth_user_created_welcome_email` trigger on `auth.users` | Inserts a 15-min queued row at signup; processor sends if Path A has not already |
+
+**Deduplication** — the gating pipeline checks `notification_events` for any prior `sent`/`delivered` row with `event_key = 'notif.welcome_email'` on the same channel and returns `already_sent_once` if found. This prevents double-send when both paths fire.
+
+**Variant selection** — at render time `templates.ts` picks:
+- **Rich** — if `first_name`, `target_level`, and `exam_type` are all present in the context
+- **Generic** — fallback when any of the three are missing
+
+**Template files** — live at `_shared/email-templates/welcome/`:
+- `rich.html` / `rich.txt` — personalized variant with exam countdown or nudge
+- `generic.html` / `generic.txt` — fallback variant
+- `meta.json` — subjects and preview text for each variant
+
+**Sender** — `Wordifi <team@wordifimail.eu>` (domain: `wordifimail.eu`)
+
+**Category** — `transactional` — bypasses quiet hours and category opt-outs.
+
+---
+
 ## Verification checklist
 
 1. `GET /functions/v1/notify-user?health=1` → `{"status":"ok"}`
@@ -101,9 +130,10 @@ npx supabase gen types typescript --project-id wwfiauhsbssjowaxmqyn --schema pub
 5. Insert `notification_events` row with `status='queued'`, `scheduled_at = now() - '2 minutes'::interval` → picked up within 5 min by processor
 6. UPDATE a `test_sessions` row's `completed_at` → row appears in `notification_events`
 7. Insert row in `gamification_event_log` with `event_type='streak_broke'` → `processed_at` set within 1 min
-8. Toggle `push_enabled=false` in `notification_preferences` → dispatch returns `suppressed / channel_disabled`
-9. `SELECT * FROM cron.job` → 4 jobs visible
-10. All 6 functions respond 200 on `GET /?health=1`
+8. POST to `notify-user` with test user + `notif.welcome_email` + `channels=["email"]` + `category="transactional"` → welcome email received (rich variant if profile is complete, generic otherwise); send a second identical POST → second call returns `suppressed / already_sent_once`
+9. Toggle `push_enabled=false` in `notification_preferences` → dispatch returns `suppressed / channel_disabled`
+10. `SELECT * FROM cron.job` → 4 jobs visible
+11. All 6 functions respond 200 on `GET /?health=1`
 
 ---
 
