@@ -319,13 +319,24 @@ export default function SprechenRealtimeScreen() {
     } catch (err) {
       console.log('[SprechenRealtime] Scoring error:', err);
       setScores({
-        overall: 0,
-        fluency: 0,
-        grammar: 0,
-        vocabulary: 0,
+        overall_score: 0,
+        max_score: 100,
+        passed: false,
+        moderation_flagged: false,
+        score_details: [],
+        fluency_score: 0,
+        grammar_score: 0,
+        vocabulary_score: 0,
+        task_completion: 'minimal',
+        grammar_observations: '',
+        vocabulary_observations: '',
         encouragement_note: 'Assessment could not be loaded.',
         improvement_tip: '',
-        task_completion: false,
+        opening_suggestion: null,
+        closing_suggestion: null,
+        connector_examples: [],
+        example_phrases: [],
+        correction_examples: [],
       });
       setScreenState('results');
     }
@@ -1034,7 +1045,7 @@ export default function SprechenRealtimeScreen() {
                 </View>
               ) : null}
             </>
-          )}
+          ) : null}
 
           <Text style={styles.durationNote}>
             Conversation duration: {formatTime(elapsedSeconds)}

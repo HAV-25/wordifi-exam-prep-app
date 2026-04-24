@@ -144,10 +144,10 @@ export function SectionPlayerSprechen({
   const handleTeilCompleted = useCallback((result: MockSprechenTeilResult) => {
     finalizeTeil({
       teil: currentTeil,
-      overall: result.scores.overall,
-      fluency: result.scores.fluency,
-      grammar: result.scores.grammar,
-      vocabulary: result.scores.vocabulary,
+      overall: result.scores.overall_score,
+      fluency: result.scores.fluency_score,
+      grammar: result.scores.grammar_score,
+      vocabulary: result.scores.vocabulary_score,
       transcript: result.transcript,
     });
   }, [currentTeil, finalizeTeil]);
