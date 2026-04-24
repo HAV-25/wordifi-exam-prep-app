@@ -67,6 +67,15 @@ async function buildTemplateContext(
   };
 }
 
+// Maps a channel to the external provider name written to notification_events.
+// Returns null for cases where no provider was invoked (suppressed rows).
+function channelProvider(ch: Channel): string | null {
+  if (ch === 'push')   return 'onesignal';
+  if (ch === 'email')  return 'resend';
+  if (ch === 'in_app') return 'supabase';
+  return null;
+}
+
 async function logEvent(
   supabase: SupabaseClient,
   userId: string,
@@ -74,7 +83,7 @@ async function logEvent(
   channel: Channel,
   category: Category,
   status: string,
-  opts: { suppression_reason?: string; provider_message_id?: string; error?: unknown; payload?: Record<string, unknown> },
+  opts: { suppression_reason?: string; provider_message_id?: string; provider?: string | null; error?: unknown; payload?: Record<string, unknown> },
 ) {
   await supabase.from('notification_events').insert({
     user_id: userId,
@@ -82,6 +91,7 @@ async function logEvent(
     channel,
     category,
     status,
+    provider: opts.provider ?? null,
     sent_at: ['sent', 'delivered'].includes(status) ? new Date().toISOString() : null,
     suppression_reason: opts.suppression_reason ?? null,
     provider_message_id: opts.provider_message_id ?? null,
@@ -149,6 +159,7 @@ export async function dispatchChannel(
       const result = await sendPush(gateResult.token!, r.headings, r.contents, r.deep_link, payload);
       const status = result.ok ? 'sent' : 'failed';
       await logEvent(supabase, userId, eventKey, channel, category, status, {
+        provider: 'onesignal',
         provider_message_id: result.messageId,
         error: result.error,
         payload,
@@ -161,6 +172,7 @@ export async function dispatchChannel(
       const result = await sendEmail(gateResult.email!, r.subject, r.html, r.text);
       const status = result.ok ? 'sent' : 'failed';
       await logEvent(supabase, userId, eventKey, channel, category, status, {
+        provider: 'resend',
         provider_message_id: result.messageId,
         error: result.error,
         payload,
@@ -178,12 +190,19 @@ export async function dispatchChannel(
     await writeUserNotification(supabase, userId, eventKey, r, payload);
 
     // Write notification_events log (secondary)
-    await logEvent(supabase, userId, eventKey, channel, category, 'delivered', { payload });
+    await logEvent(supabase, userId, eventKey, channel, category, 'delivered', {
+      provider: 'supabase',
+      payload,
+    });
 
     return { channel, status: 'delivered' };
   } catch (e) {
     console.warn('[dispatch] unexpected error', e);
-    await logEvent(supabase, userId, eventKey, channel, category, 'failed', { error: e, payload }).catch(() => {});
+    await logEvent(supabase, userId, eventKey, channel, category, 'failed', {
+      provider: channelProvider(channel),
+      error: e,
+      payload,
+    }).catch(() => {});
     return { channel, status: 'failed', reason: String(e) };
   }
 }
