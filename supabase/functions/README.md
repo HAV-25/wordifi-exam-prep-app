@@ -121,6 +121,33 @@ It is wired via two complementary paths:
 
 ---
 
+## `notification_config` table
+
+Runtime tunables are stored in `public.notification_config` (key TEXT PK, value JSONB). The `_shared/notifConfig.ts` helper reads all rows once per function invocation and returns a typed `NotifConfig` object; code-level `DEFAULTS` serve as a last-resort fallback if the table is unreachable.
+
+**Current keys** (seed values match the previous hard-coded constants):
+
+| Key | Default | Description |
+|---|---|---|
+| `notif.t1_fire_hour_local` | `20` | Hour (0–23) user-local when T1 streak-at-risk fires |
+| `notif.t4_min_hours_inactive` | `48` | Min hours inactive before T4 fires |
+| `notif.t4_max_hours_inactive` | `72` | Max hours inactive for T4 window |
+| `notif.t4_ramp_in_days` | `30` | Days post-signup before T4 is allowed to fire |
+| `notif.default_max_push_per_day` | `1` | Push cap fallback when prefs row has NULL |
+| `notif.default_max_email_per_week` | `2` | Email cap fallback when prefs row has NULL |
+| `notif.email_from_address` | `"Wordifi <team@wordifimail.eu>"` | Sender address for all Resend outbound email |
+
+**Adding a new tunable requires two changes:** insert the new row in a migration, and add the corresponding typed field to `NotifConfig` in `_shared/notifConfig.ts` (plus its mapping in `loadNotifConfig`). This is intentional — the typed helper prevents silent key-name mismatches and gives TypeScript callers compile-time safety. A generic free-form key lookup is deliberately not exposed.
+
+**Hot-reload test** (no redeploy needed):
+```sql
+UPDATE notification_config SET value = '21' WHERE key = 'notif.t1_fire_hour_local';
+-- invoke streak-at-risk-cron, confirm it skips users at hour 20, matches at hour 21
+UPDATE notification_config SET value = '20' WHERE key = 'notif.t1_fire_hour_local';
+```
+
+---
+
 ## Verification checklist
 
 1. `GET /functions/v1/notify-user?health=1` → `{"status":"ok"}`
@@ -153,7 +180,7 @@ Before declaring T1 and T4 production-ready, Payal must verify with at least two
 1. One account with `timezone = 'Europe/Berlin'` (default)
 2. One account with `timezone = 'America/New_York'`
 
-For each: confirm T1 (`notif.streak_at_risk`) fires at 19:00 **local** time and T4 (`notif.no_activity_48h`) fires within the 48–72h window in **local** time, not UTC. Set timezone via:
+For each: confirm T1 (`notif.streak_at_risk`) fires at 20:00 **local** time (configured via `notification_config` key `notif.t1_fire_hour_local`) and T4 (`notif.no_activity_48h`) fires within the 48–72h window in **local** time, not UTC. Set timezone via:
 ```sql
 UPDATE user_profiles SET timezone = 'America/New_York' WHERE id = '<test_user_id>';
 UPDATE user_streak_state SET timezone = 'America/New_York' WHERE user_id = '<test_user_id>';

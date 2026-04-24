@@ -1,5 +1,6 @@
 import { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { getUserTimezone, isInQuietHours, getStartOfDayUTC } from './timezone.ts';
+import { NotifConfig } from './notifConfig.ts';
 
 export type Channel = 'push' | 'email' | 'in_app';
 export type Category = 'practice' | 'progress' | 'monetisation' | 'transactional';
@@ -26,6 +27,7 @@ export async function gate(
   channel: Channel,
   category: Category,
   eventKey?: string,
+  config?: NotifConfig,
 ): Promise<GateResult> {
   // Welcome email dedup: suppress if already sent on this channel
   if (eventKey === 'notif.welcome_email') {
@@ -104,7 +106,7 @@ export async function gate(
       .in('status', ['sent', 'delivered', 'opened'])
       .gte('sent_at', startOfDay) as { count: number | null };
 
-    const cap = prefs.max_push_per_day ?? 1;
+    const cap = prefs.max_push_per_day ?? config?.defaultMaxPushPerDay ?? 1;
     if ((count ?? 0) >= cap) {
       return { ok: false, reason: 'frequency_cap' };
     }
@@ -120,7 +122,7 @@ export async function gate(
       .in('status', ['sent', 'delivered', 'opened'])
       .gte('sent_at', sevenDaysAgo) as { count: number | null };
 
-    const cap = prefs.max_email_per_week ?? 2;
+    const cap = prefs.max_email_per_week ?? config?.defaultMaxEmailPerWeek ?? 2;
     if ((count ?? 0) >= cap) {
       return { ok: false, reason: 'frequency_cap' };
     }

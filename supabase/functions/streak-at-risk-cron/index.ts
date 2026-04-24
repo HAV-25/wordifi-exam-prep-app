@@ -2,16 +2,16 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { dispatchChannel } from '../_shared/dispatch.ts';
 import { getUserTimezone, getLocalHour, getCurrentDateInTz, getStartOfDayUTC } from '../_shared/timezone.ts';
 import { isAuthorised } from '../_shared/cronAuth.ts';
+import { loadNotifConfig } from '../_shared/notifConfig.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-// T1 fires at 20:00 user-local time. Updated from 19:00 on 2026-04-24 per
-// product decision — gives users a later evening reminder window.
+// T1 fire hour is configured via notification_config key 'notif.t1_fire_hour_local'
+// (default: 20 = 8 PM local). Updated without redeploy by changing the DB row.
 // NOTE: This is NOT reading daily_reminder_time from notification_preferences.
 // If per-user reminder times are needed in future, the cron will need to scan
 // every :30 tick and match users whose daily_reminder_time falls within the
 // current window (e.g. within ±30 min of now in the user's timezone).
-const FIRE_HOUR = 20; // 8 PM local
 
 // deno-lint-ignore no-explicit-any
 type Row = Record<string, any>;
@@ -28,6 +28,7 @@ Deno.serve(async (req: Request) => {
   }
 
   const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+  const config = await loadNotifConfig(supabase);
 
   // Fetch all users with an active streak
   const { data: streakUsers, error } = await supabase
@@ -61,7 +62,7 @@ Deno.serve(async (req: Request) => {
     const tz = getUserTimezone(u, profileTz);
     const localHour = getLocalHour(tz);
 
-    if (localHour !== FIRE_HOUR) {
+    if (localHour !== config.t1FireHourLocal) {
       skipped++;
       continue;
     }
@@ -120,6 +121,7 @@ Deno.serve(async (req: Request) => {
       eventKey: 'notif.streak_at_risk',
       channel: 'push',
       category: 'practice',
+      config,
       payload: {
         streak_days: u.current_streak_days,
         questions_remaining: questionsRemaining,

@@ -2,12 +2,14 @@ import { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { gate, Channel, Category } from './gating.ts';
 import { renderTemplate, TemplateContext, RenderedPush, RenderedEmail, RenderedInApp } from './templates.ts';
 import { sendPush, sendEmail, setInAppTag } from './providers.ts';
+import { NotifConfig } from './notifConfig.ts';
 
 export type DispatchInput = {
   userId: string;
   eventKey: string;
   channel: Channel;
   category: Category;
+  config: NotifConfig;
   payload?: Record<string, unknown>;
 };
 
@@ -127,11 +129,11 @@ export async function dispatchChannel(
   supabase: SupabaseClient,
   input: DispatchInput,
 ): Promise<DispatchResult> {
-  const { userId, eventKey, channel, category, payload = {} } = input;
+  const { userId, eventKey, channel, category, config, payload = {} } = input;
 
   try {
     // Gating
-    const gateResult = await gate(supabase, userId, channel, category, eventKey);
+    const gateResult = await gate(supabase, userId, channel, category, eventKey, config);
     if (!gateResult.ok) {
       await logEvent(supabase, userId, eventKey, channel, category, 'suppressed', {
         suppression_reason: gateResult.reason,
@@ -169,7 +171,7 @@ export async function dispatchChannel(
 
     if (channel === 'email') {
       const r = rendered as RenderedEmail;
-      const result = await sendEmail(gateResult.email!, r.subject, r.html, r.text);
+      const result = await sendEmail(gateResult.email!, r.subject, r.html, r.text, config.emailFromAddress);
       const status = result.ok ? 'sent' : 'failed';
       await logEvent(supabase, userId, eventKey, channel, category, status, {
         provider: 'resend',

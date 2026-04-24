@@ -2,12 +2,14 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { dispatchChannel } from '../_shared/dispatch.ts';
 import { getUserTimezone, hoursSince } from '../_shared/timezone.ts';
 import { isAuthorised } from '../_shared/cronAuth.ts';
+import { loadNotifConfig } from '../_shared/notifConfig.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-const MIN_HOURS = 48;
-const MAX_HOURS = 72;
-const RAMP_IN_DAYS = 30;
+// T4 window + ramp-in are configured via notification_config:
+//   notif.t4_min_hours_inactive  (default 48)
+//   notif.t4_max_hours_inactive  (default 72)
+//   notif.t4_ramp_in_days        (default 30)
 
 // deno-lint-ignore no-explicit-any
 type Row = Record<string, any>;
@@ -24,6 +26,7 @@ Deno.serve(async (req: Request) => {
   }
 
   const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+  const config = await loadNotifConfig(supabase);
 
   const { data: streakUsers, error } = await supabase
     .from('user_streak_state')
@@ -61,7 +64,7 @@ Deno.serve(async (req: Request) => {
     const tz = getUserTimezone(u, profileTz);
     const hrs = hoursSince(u.last_qualifying_day, tz);
 
-    if (hrs < MIN_HOURS || hrs >= MAX_HOURS) {
+    if (hrs < config.t4MinHoursInactive || hrs >= config.t4MaxHoursInactive) {
       skipped++;
       continue;
     }
@@ -75,7 +78,7 @@ Deno.serve(async (req: Request) => {
 
     if (profile?.signup_day_zero_date) {
       const daysSinceSignup = hoursSince(profile.signup_day_zero_date, tz) / 24;
-      if (daysSinceSignup < RAMP_IN_DAYS) {
+      if (daysSinceSignup < config.t4RampInDays) {
         skipped++;
         continue;
       }
@@ -101,6 +104,7 @@ Deno.serve(async (req: Request) => {
       eventKey: 'notif.no_activity_48h',
       channel: 'push',
       category: 'practice',
+      config,
       payload: {},
     });
 

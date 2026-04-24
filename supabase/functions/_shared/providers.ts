@@ -91,6 +91,7 @@ export async function sendEmail(
   subject: string,
   html: string,
   text?: string,
+  from?: string,
 ): Promise<ProviderResult> {
   const apiKey = Deno.env.get('RESEND_API_KEY');
   if (!apiKey) {
@@ -106,7 +107,7 @@ export async function sendEmail(
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        from: 'Wordifi <team@wordifimail.eu>',
+        from: from ?? 'Wordifi <team@wordifimail.eu>',
         to: [to],
         subject,
         html,

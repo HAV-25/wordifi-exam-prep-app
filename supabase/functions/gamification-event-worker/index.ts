@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { dispatchChannel } from '../_shared/dispatch.ts';
 import { isAuthorised } from '../_shared/cronAuth.ts';
+import { loadNotifConfig } from '../_shared/notifConfig.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -20,6 +21,7 @@ Deno.serve(async (req: Request) => {
   }
 
   const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+  const config = await loadNotifConfig(supabase);
 
   const { data: events, error } = await supabase
     .from('gamification_event_log')
@@ -80,6 +82,7 @@ Deno.serve(async (req: Request) => {
           eventKey: 'notif.streak_broken',
           channel: 'push',
           category: 'practice',
+          config,
           payload: mergedPayload,
         }),
         dispatchChannel(supabase, {
@@ -87,6 +90,7 @@ Deno.serve(async (req: Request) => {
           eventKey: 'notif.streak_broken',
           channel: 'email',
           category: 'practice',
+          config,
           payload: mergedPayload,
         }),
       ]);
@@ -100,6 +104,7 @@ Deno.serve(async (req: Request) => {
         eventKey: 'notif.score_shield_used',
         channel: 'in_app',
         category: 'practice',
+        config,
         payload,
       });
       processedIds.push(ev.id);
@@ -111,6 +116,7 @@ Deno.serve(async (req: Request) => {
           eventKey: 'notif.badge_rank_up',
           channel: 'in_app',
           category: 'progress',
+          config,
           payload,
         }),
         dispatchChannel(supabase, {
@@ -118,6 +124,7 @@ Deno.serve(async (req: Request) => {
           eventKey: 'notif.badge_rank_up',
           channel: 'push',
           category: 'progress',
+          config,
           payload,
         }),
       ]);

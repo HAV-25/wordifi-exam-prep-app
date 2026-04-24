@@ -2,6 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { dispatchChannel } from '../_shared/dispatch.ts';
 import { Channel, Category } from '../_shared/gating.ts';
 import { isAuthorised } from '../_shared/cronAuth.ts';
+import { loadNotifConfig } from '../_shared/notifConfig.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -22,6 +23,7 @@ Deno.serve(async (req: Request) => {
   }
 
   const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+  const config = await loadNotifConfig(supabase);
 
   const { data: rows, error } = await supabase
     .from('notification_events')
@@ -49,6 +51,7 @@ Deno.serve(async (req: Request) => {
           eventKey: row.event_key,
           channel: row.channel as Channel,
           category: row.category as Category,
+          config,
           payload: row.payload ?? {},
         })
       )
