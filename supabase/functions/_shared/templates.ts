@@ -34,6 +34,9 @@ export type TemplateContext = {
   // Exam countdown variables
   days_to_exam?: number;
   exam_name?: string;
+  exam_type?: string;
+  exam_date?: string;
+  target_level?: string;
   // Weekly digest variables
   week_of?: string;
   score_delta?: string;
@@ -68,6 +71,7 @@ type PushTemplate = {
 type EmailTemplate = {
   subject: string;
   html: string;
+  text?: string;
 };
 
 type InAppTemplate = {
@@ -81,6 +85,494 @@ type Template = {
   email?: EmailTemplate;
   in_app?: InAppTemplate;
 };
+
+// ---------------------------------------------------------------------------
+// Welcome email — templates are inlined as string constants so they are
+// always present in the deployed bundle.  Supabase Edge Functions only bundle
+// imported .ts modules; Deno.readTextFileSync on static asset files fails at
+// runtime because the files are never deployed to the function filesystem.
+// ---------------------------------------------------------------------------
+
+type WelcomeMeta = { subject: string; preview_text: string };
+type WelcomeMetaFile = { rich: WelcomeMeta; generic: WelcomeMeta };
+
+const _welcomeMeta: WelcomeMetaFile = {
+  rich:    { subject: 'Your {{exam_type}} {{target_level}} plan starts here, {{first_name}}', preview_text: 'Your personalized German exam prep starts now.' },
+  generic: { subject: 'Welcome to Wordifi', preview_text: 'Your German exam prep companion is ready.' },
+};
+
+const _welcomeRichHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light only">
+<meta name="supported-color-schemes" content="light">
+<title>Your {{exam_type}} {{target_level}} plan starts here, {{first_name}}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@700;800;900&family=Nunito+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  body, table, td { -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%; }
+  table { border-collapse:collapse !important; }
+  img   { -ms-interpolation-mode:bicubic; border:0; outline:none; text-decoration:none; display:block; }
+  a     { color:#2B70EF; }
+  @media only screen and (max-width: 520px) {
+    .shell   { width:100% !important; }
+    .pad     { padding-left:24px !important; padding-right:24px !important; }
+    .h1      { font-size:28px !important; line-height:1.15 !important; }
+    .bignum  { font-size:96px !important; line-height:0.95 !important; }
+    .logo    { height:26px !important; }
+    .cta     { width:100% !important; box-sizing:border-box !important; }
+    .badge-wrap { padding:18px 20px !important; }
+  }
+</style>
+</head>
+<body style="margin:0; padding:0; background-color:#F8FAFF; font-family:'Nunito Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color:#374151;">
+
+<div style="display:none; visibility:hidden; opacity:0; height:0; width:0; overflow:hidden; mso-hide:all;">
+  Your plan is ready. Streak day 1 starts today.
+</div>
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#F8FAFF;">
+  <tr><td align="center" style="padding:40px 16px;">
+
+    <table role="presentation" class="shell" width="560" cellpadding="0" cellspacing="0" border="0" style="width:560px; max-width:560px;">
+
+      <!-- Header -->
+      <tr>
+        <td style="background-color:#0A0E1A; border-radius:24px 24px 0 0; padding:28px 40px; text-align:left;">
+          <img src="https://wwfiauhsbssjowaxmqyn.supabase.co/storage/v1/object/sign/Wordifi%20Brand/email/assets/logo-light.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9hZGExZDI2Zi1lMzg3LTQzMWMtYjkxNi0wMjY4NjM3Y2YwNzAiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJXb3JkaWZpIEJyYW5kL2VtYWlsL2Fzc2V0cy9sb2dvLWxpZ2h0LnBuZyIsImlhdCI6MTc3NjkzNzAxOCwiZXhwIjoxOTM0NjE3MDE4fQ.-d64zsBC0ExEBBYb9u3VQ1vEiTaiTIMao9qrXIcjVwA" width="128" height="40" alt="wordifi" class="logo"
+               style="height:32px; width:auto; display:block; color:#FFFFFF; font-family:'Outfit', Tahoma, Arial, sans-serif; font-weight:800; font-size:22px; letter-spacing:-0.03em;">
+        </td>
+      </tr>
+
+      <!-- Body -->
+      <tr>
+        <td class="pad" style="background-color:#FFFFFF; padding:40px 40px 36px;">
+
+          <div style="font-family:'Nunito Sans', Arial, sans-serif; font-weight:800; font-size:11px; letter-spacing:0.12em; text-transform:uppercase; color:#9CA3AF;">
+            Welcome &middot; day zero
+          </div>
+
+          <p style="margin:10px 0 0; font-family:'Nunito Sans', Arial, sans-serif; font-size:16px; line-height:1.5; color:#374151;">
+            Hi {{first_name}} &mdash;
+          </p>
+
+          <h1 class="h1" style="margin:8px 0 14px; font-family:'Outfit', Tahoma, Arial, sans-serif; font-weight:800; font-size:34px; line-height:1.08; letter-spacing:-0.03em; color:#0A0E1A;">
+            Your {{exam_type}} {{target_level}}<br>
+            <span style="color:#2B70EF;">prep starts now.</span>
+          </h1>
+
+          <p style="margin:0; font-family:'Nunito Sans', Arial, sans-serif; font-size:16px; line-height:1.6; color:#374151;">
+            Wordifi turns your goal into a short, daily stream &mdash; vocabulary, listening, and the sections you&rsquo;re weakest on. Show up each day, build a streak, and watch your readiness climb.
+          </p>
+
+        </td>
+      </tr>
+
+      <!--{{#if exam_date}}-->
+      <!-- Countdown hero -->
+      <tr>
+        <td class="pad" style="background-color:#FFFFFF; padding:8px 40px 0;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+            <tr>
+              <td align="center" style="background-color:#F2F4FF; border-radius:20px; padding:32px 24px;">
+                <p style="margin:0 0 4px; font-family:'Nunito Sans', Arial, sans-serif; font-weight:800; font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:#2B70EF;">
+                  Days to exam
+                </p>
+                <p class="bignum" style="margin:0; font-family:'Outfit', Tahoma, Arial, sans-serif; font-weight:900; font-size:120px; line-height:0.92; letter-spacing:-0.055em; color:#0A0E1A;">
+                  {{days_to_exam}}
+                </p>
+                <p style="margin:10px 0 0; font-family:'Nunito Sans', Arial, sans-serif; font-size:14px; line-height:1.5; color:#6B7280;">
+                  {{exam_type}} {{target_level}} &middot; {{exam_date}}
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+      <!--{{else}}-->
+      <!-- Nudge to set exam date -->
+      <tr>
+        <td class="pad" style="background-color:#FFFFFF; padding:8px 40px 0;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+            <tr>
+              <td style="background-color:#F2F4FF; border-radius:20px; padding:22px 24px;">
+                <p style="margin:0 0 4px; font-family:'Nunito Sans', Arial, sans-serif; font-weight:800; font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:#2B70EF;">
+                  One more thing
+                </p>
+                <p style="margin:0; font-family:'Outfit', Tahoma, Arial, sans-serif; font-weight:700; font-size:20px; line-height:1.25; letter-spacing:-0.02em; color:#0A0E1A;">
+                  Set your exam date to unlock your countdown.
+                </p>
+                <p style="margin:8px 0 0; font-family:'Nunito Sans', Arial, sans-serif; font-size:14px; line-height:1.55; color:#6B7280;">
+                  Open <a href="wordifi://profile" style="color:#2B70EF; text-decoration:underline; font-weight:700;">Profile</a> and tell us when you sit the exam &mdash; we&rsquo;ll tune your daily stream around it.
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+      <!--{{/if}}-->
+
+      <!-- What to expect -->
+      <tr>
+        <td class="pad" style="background-color:#FFFFFF; padding:28px 40px 0;">
+          <p style="margin:0 0 14px; font-family:'Nunito Sans', Arial, sans-serif; font-weight:800; font-size:11px; letter-spacing:0.12em; text-transform:uppercase; color:#9CA3AF;">
+            What to expect
+          </p>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+            <tr>
+              <td style="padding:0 0 14px;">
+                <p style="margin:0; font-family:'Outfit', Tahoma, Arial, sans-serif; font-weight:700; font-size:16px; color:#0A0E1A;">Daily streams</p>
+                <p style="margin:2px 0 0; font-family:'Nunito Sans', Arial, sans-serif; font-size:15px; line-height:1.55; color:#6B7280;">Short, focused sessions tuned to your level.</p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:0 0 14px;">
+                <p style="margin:0; font-family:'Outfit', Tahoma, Arial, sans-serif; font-weight:700; font-size:16px; color:#0A0E1A;">Streak system</p>
+                <p style="margin:2px 0 0; font-family:'Nunito Sans', Arial, sans-serif; font-size:15px; line-height:1.55; color:#6B7280;">Show up daily. Earn badges. Don&rsquo;t break the chain.</p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:0;">
+                <p style="margin:0; font-family:'Outfit', Tahoma, Arial, sans-serif; font-weight:700; font-size:16px; color:#0A0E1A;">Weak-section focus</p>
+                <p style="margin:2px 0 0; font-family:'Nunito Sans', Arial, sans-serif; font-size:15px; line-height:1.55; color:#6B7280;">We find what&rsquo;s holding you back and drill it.</p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+
+      <!-- Badge preview -->
+      <tr>
+        <td class="pad" style="background-color:#FFFFFF; padding:28px 40px 0;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+            <tr>
+              <td class="badge-wrap" style="background-color:#0A0E1A; border-radius:20px; padding:22px 28px;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                  <tr>
+                    <td width="64" valign="middle" style="padding-right:18px;">
+                      <table role="presentation" width="64" height="64" cellpadding="0" cellspacing="0" border="0" style="background-color:#2B70EF; border-radius:16px;">
+                        <tr>
+                          <td align="center" valign="middle" style="font-family:'Outfit', Tahoma, Arial, sans-serif; font-weight:900; font-size:30px; color:#FFFFFF; letter-spacing:-0.04em; height:64px; width:64px;">
+                            A
+                          </td>
+                        </tr>
+                      </table>
+                    </td>
+                    <td valign="middle">
+                      <p style="margin:0 0 2px; font-family:'Nunito Sans', Arial, sans-serif; font-weight:800; font-size:10px; letter-spacing:0.14em; text-transform:uppercase; color:#6B7280;">Your first badge</p>
+                      <p style="margin:0; font-family:'Outfit', Tahoma, Arial, sans-serif; font-weight:800; font-size:20px; letter-spacing:-0.02em; color:#FFFFFF;">Der Anf&auml;nger</p>
+                      <p style="margin:2px 0 0; font-family:'Nunito Sans', Arial, sans-serif; font-size:13px; line-height:1.45; color:#9CA3AF;">Finish today&rsquo;s stream to earn it.</p>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+
+      <!-- CTA -->
+      <tr>
+        <td class="pad" style="background-color:#FFFFFF; padding:32px 40px 8px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+            <tr>
+              <td align="center">
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                  <tr>
+                    <td bgcolor="#2B70EF" style="border-radius:14px;">
+                      <a class="cta" href="wordifi://stream"
+                         style="display:inline-block; padding:16px 32px; font-family:'Outfit', Tahoma, Arial, sans-serif; font-weight:800; font-size:16px; letter-spacing:-0.01em; color:#FFFFFF; text-decoration:none; border-radius:14px;">
+                        Start your first daily stream
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td align="center" style="padding:14px 0 0;">
+                <p style="margin:0; font-family:'Nunito Sans', Arial, sans-serif; font-size:13px; line-height:1.5; color:#9CA3AF;">
+                  or <a href="wordifi://home" style="color:#2B70EF; text-decoration:underline; font-weight:700;">open Wordifi</a>
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+
+      <!-- App install fallback -->
+      <tr>
+        <td class="pad" style="background-color:#FFFFFF; border-radius:0 0 24px 24px; padding:20px 40px 36px;">
+          <p style="margin:0; text-align:center; font-family:'Nunito Sans', Arial, sans-serif; font-size:12px; line-height:1.55; color:#9CA3AF;">
+            Don&rsquo;t have the app yet? <a href="https://play.google.com/store/apps/details?id=com.wordifi" style="color:#9CA3AF; text-decoration:underline;">Get it on Google Play</a> &middot; <a href="https://apps.apple.com/app/wordifi" style="color:#9CA3AF; text-decoration:underline;">App Store</a>
+          </p>
+        </td>
+      </tr>
+
+      <!-- Footer -->
+      <tr>
+        <td class="pad" style="padding:24px 40px 0;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+            <tr>
+              <td style="padding-top:4px;">
+                <p style="margin:0; font-family:'Nunito Sans', Arial, sans-serif; font-size:12px; line-height:1.55; color:#9CA3AF;">
+                  &mdash; The Wordifi team
+                </p>
+                <p style="margin:14px 0 0; font-family:'Nunito Sans', Arial, sans-serif; font-size:12px; line-height:1.55; color:#9CA3AF;">
+                  You&rsquo;re receiving this because you signed up for Wordifi. Manage preferences in <a href="wordifi://settings/notifications" style="color:#9CA3AF; text-decoration:underline;">notification settings</a>.
+                </p>
+                <p style="margin:10px 0 0; font-family:'Nunito Sans', Arial, sans-serif; font-size:12px; line-height:1.55; color:#9CA3AF;">
+                  Wordifi &middot; The smart path to certified.
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+
+    </table>
+
+  </td></tr>
+</table>
+
+</body>
+</html>`;
+
+const _welcomeRichTxt = `Hi {{first_name}} —
+
+Your {{exam_type}} {{target_level}} prep starts now.
+
+{{#if exam_date}}
+Your exam is {{days_to_exam}} days away ({{exam_date}}). We'll keep you on track.
+{{else}}
+Set your exam date in Profile to unlock your countdown.
+{{/if}}
+
+Wordifi turns your goal into a short, daily stream — vocabulary, listening, and the sections you're weakest on. Show up each day, build a streak, and watch your readiness climb.
+
+What to expect:
+  Daily streams — short, focused sessions tuned to your level.
+  Streak system — show up daily, earn badges, don't break the chain.
+  Weak-section focus — we find what's holding you back and drill it.
+
+Start your first daily stream:
+wordifi://stream
+
+or open Wordifi: wordifi://home
+
+Don't have the app?
+Google Play: https://play.google.com/store/apps/details?id=com.wordifi
+App Store:   https://apps.apple.com/app/wordifi
+
+— The Wordifi team
+
+You're receiving this because you signed up for Wordifi.
+Manage notification preferences: wordifi://settings/notifications
+Wordifi · The smart path to certified.`;
+
+const _welcomeGenericHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light only">
+<meta name="supported-color-schemes" content="light">
+<title>Welcome to Wordifi</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@700;800;900&family=Nunito+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  body, table, td { -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%; }
+  table { border-collapse:collapse !important; }
+  img   { -ms-interpolation-mode:bicubic; border:0; outline:none; text-decoration:none; display:block; }
+  a     { color:#2B70EF; }
+  @media only screen and (max-width: 520px) {
+    .shell   { width:100% !important; }
+    .pad     { padding-left:24px !important; padding-right:24px !important; }
+    .h1      { font-size:28px !important; line-height:1.15 !important; }
+    .logo    { height:26px !important; }
+    .cta     { width:100% !important; box-sizing:border-box !important; }
+  }
+</style>
+</head>
+<body style="margin:0; padding:0; background-color:#F8FAFF; font-family:'Nunito Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color:#374151;">
+
+<div style="display:none; visibility:hidden; opacity:0; height:0; width:0; overflow:hidden; mso-hide:all;">
+  Your German exam prep companion is ready. Start practising.
+</div>
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#F8FAFF;">
+  <tr><td align="center" style="padding:40px 16px;">
+
+    <table role="presentation" class="shell" width="560" cellpadding="0" cellspacing="0" border="0" style="width:560px; max-width:560px;">
+
+      <!-- Header -->
+      <tr>
+        <td style="background-color:#0A0E1A; border-radius:24px 24px 0 0; padding:28px 40px; text-align:left;">
+          <img src="https://wwfiauhsbssjowaxmqyn.supabase.co/storage/v1/object/sign/Wordifi%20Brand/email/assets/logo-light.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9hZGExZDI2Zi1lMzg3LTQzMWMtYjkxNi0wMjY4NjM3Y2YwNzAiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJXb3JkaWZpIEJyYW5kL2VtYWlsL2Fzc2V0cy9sb2dvLWxpZ2h0LnBuZyIsImlhdCI6MTc3NjkzNzAxOCwiZXhwIjoxOTM0NjE3MDE4fQ.-d64zsBC0ExEBBYb9u3VQ1vEiTaiTIMao9qrXIcjVwA" width="128" height="40" alt="wordifi" class="logo"
+               style="height:32px; width:auto; display:block; color:#FFFFFF; font-family:'Outfit', Tahoma, Arial, sans-serif; font-weight:800; font-size:22px; letter-spacing:-0.03em;">
+        </td>
+      </tr>
+
+      <!-- Body -->
+      <tr>
+        <td class="pad" style="background-color:#FFFFFF; padding:40px 40px 28px;">
+
+          <div style="font-family:'Nunito Sans', Arial, sans-serif; font-weight:800; font-size:11px; letter-spacing:0.12em; text-transform:uppercase; color:#9CA3AF;">
+            Welcome &middot; day zero
+          </div>
+
+          <p style="margin:10px 0 0; font-family:'Nunito Sans', Arial, sans-serif; font-size:16px; line-height:1.5; color:#374151;">
+            Hi,
+          </p>
+
+          <h1 class="h1" style="margin:8px 0 14px; font-family:'Outfit', Tahoma, Arial, sans-serif; font-weight:800; font-size:34px; line-height:1.08; letter-spacing:-0.03em; color:#0A0E1A;">
+            Welcome to<br>
+            <span style="color:#2B70EF;">Wordifi.</span>
+          </h1>
+
+          <p style="margin:0; font-family:'Nunito Sans', Arial, sans-serif; font-size:16px; line-height:1.6; color:#374151;">
+            Your German exam prep companion is ready. Set your goal, start practising, watch your streak build.
+          </p>
+
+        </td>
+      </tr>
+
+      <!-- Three steps -->
+      <tr>
+        <td class="pad" style="background-color:#FFFFFF; padding:4px 40px 0;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#F2F4FF; border-radius:20px;">
+            <tr>
+              <td style="padding:22px 24px 16px;">
+                <p style="margin:0 0 2px; font-family:'Nunito Sans', Arial, sans-serif; font-weight:800; font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:#2B70EF;">Step one</p>
+                <p style="margin:0; font-family:'Outfit', Tahoma, Arial, sans-serif; font-weight:700; font-size:17px; line-height:1.3; letter-spacing:-0.02em; color:#0A0E1A;">Pick your exam level and date.</p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:0 24px 16px;">
+                <p style="margin:0 0 2px; font-family:'Nunito Sans', Arial, sans-serif; font-weight:800; font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:#2B70EF;">Step two</p>
+                <p style="margin:0; font-family:'Outfit', Tahoma, Arial, sans-serif; font-weight:700; font-size:17px; line-height:1.3; letter-spacing:-0.02em; color:#0A0E1A;">Finish your first daily stream.</p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:0 24px 22px;">
+                <p style="margin:0 0 2px; font-family:'Nunito Sans', Arial, sans-serif; font-weight:800; font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:#2B70EF;">Step three</p>
+                <p style="margin:0; font-family:'Outfit', Tahoma, Arial, sans-serif; font-weight:700; font-size:17px; line-height:1.3; letter-spacing:-0.02em; color:#0A0E1A;">Come back tomorrow. Keep the streak.</p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+
+      <!-- CTA -->
+      <tr>
+        <td class="pad" style="background-color:#FFFFFF; padding:28px 40px 8px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+            <tr>
+              <td align="center">
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                  <tr>
+                    <td bgcolor="#2B70EF" style="border-radius:14px;">
+                      <a class="cta" href="wordifi://home"
+                         style="display:inline-block; padding:16px 32px; font-family:'Outfit', Tahoma, Arial, sans-serif; font-weight:800; font-size:16px; letter-spacing:-0.01em; color:#FFFFFF; text-decoration:none; border-radius:14px;">
+                        Open Wordifi
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+
+      <!-- App install fallback -->
+      <tr>
+        <td class="pad" style="background-color:#FFFFFF; border-radius:0 0 24px 24px; padding:20px 40px 36px;">
+          <p style="margin:0; text-align:center; font-family:'Nunito Sans', Arial, sans-serif; font-size:12px; line-height:1.55; color:#9CA3AF;">
+            Don&rsquo;t have the app yet? <a href="https://play.google.com/store/apps/details?id=com.wordifi" style="color:#9CA3AF; text-decoration:underline;">Get it on Google Play</a> &middot; <a href="https://apps.apple.com/app/wordifi" style="color:#9CA3AF; text-decoration:underline;">App Store</a>
+          </p>
+        </td>
+      </tr>
+
+      <!-- Footer -->
+      <tr>
+        <td class="pad" style="padding:24px 40px 0;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+            <tr>
+              <td style="padding-top:4px;">
+                <p style="margin:0; font-family:'Nunito Sans', Arial, sans-serif; font-size:12px; line-height:1.55; color:#9CA3AF;">
+                  &mdash; The Wordifi team
+                </p>
+                <p style="margin:14px 0 0; font-family:'Nunito Sans', Arial, sans-serif; font-size:12px; line-height:1.55; color:#9CA3AF;">
+                  You&rsquo;re receiving this because you signed up for Wordifi. Manage preferences in <a href="wordifi://settings/notifications" style="color:#9CA3AF; text-decoration:underline;">notification settings</a>.
+                </p>
+                <p style="margin:10px 0 0; font-family:'Nunito Sans', Arial, sans-serif; font-size:12px; line-height:1.55; color:#9CA3AF;">
+                  Wordifi &middot; The smart path to certified.
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+
+    </table>
+
+  </td></tr>
+</table>
+
+</body>
+</html>`;
+
+const _welcomeGenericTxt = `Hi,
+
+Welcome to Wordifi.
+
+Your German exam prep companion is ready. Set your goal, start practising, watch your streak build.
+
+Step one:   Pick your exam level and date.
+Step two:   Finish your first daily stream.
+Step three: Come back tomorrow. Keep the streak.
+
+Open Wordifi: wordifi://home
+
+Don't have the app?
+Google Play: https://play.google.com/store/apps/details?id=com.wordifi
+App Store:   https://apps.apple.com/app/wordifi
+
+— The Wordifi team
+
+You're receiving this because you signed up for Wordifi.
+Manage notification preferences: wordifi://settings/notifications
+Wordifi · The smart path to certified.`;
+
+/**
+ * Minimal Handlebars-style renderer for welcome email templates.
+ * Supports:
+ *   {{variable}}               — simple value substitution
+ *   <!--{{#if var}}-->         — conditional block open (wrapped in HTML comments)
+ *   <!--{{else}}-->            — else branch
+ *   <!--{{/if}}-->             — conditional block close
+ */
+function _renderHandlebars(template: string, ctx: Record<string, unknown>): string {
+  // Resolve {{#if var}}...{{else}}...{{/if}} blocks (comment-wrapped for HTML)
+  let out = template.replace(
+    /<!--\{\{#if (\w+)\}\}-->([\s\S]*?)<!--\{\{else\}\}-->([\s\S]*?)<!--\{\{\/if\}\}-->/g,
+    (_m, key, thenPart, elsePart) => {
+      const val = ctx[key];
+      return (val !== undefined && val !== null && val !== '' && val !== 0) ? thenPart : elsePart;
+    },
+  );
+  // Replace {{variable}} placeholders
+  out = out.replace(/\{\{(\w+)\}\}/g, (_m, key) => {
+    const val = ctx[key];
+    return (val !== undefined && val !== null) ? String(val) : '';
+  });
+  return out;
+}
+
+// ---------------------------------------------------------------------------
 
 export const TEMPLATES: Record<string, Template> = {
   'notif.streak_at_risk': {
@@ -1032,7 +1524,7 @@ function interpolate(template: string, ctx: TemplateContext, escapeHtml = false)
 }
 
 export type RenderedPush = { headings: { en: string }; contents: { en: string }; deep_link: string };
-export type RenderedEmail = { subject: string; html: string };
+export type RenderedEmail = { subject: string; html: string; text?: string };
 export type RenderedInApp = { headings: { en: string }; contents: { en: string }; deep_link?: string };
 
 export function renderTemplate(
@@ -1040,6 +1532,24 @@ export function renderTemplate(
   channel: 'push' | 'email' | 'in_app',
   ctx: TemplateContext,
 ): RenderedPush | RenderedEmail | RenderedInApp | null {
+  // Welcome email: variant selection + handlebars rendering
+  if (eventKey === 'notif.welcome_email') {
+    if (channel !== 'email') {
+      console.warn('[templates] notif.welcome_email only supports email channel');
+      return null;
+    }
+    const isRich = !!(ctx.first_name && (ctx.target_level ?? ctx.cefr_level) && ctx.exam_type);
+    const meta       = _welcomeMeta[isRich ? 'rich' : 'generic'];
+    const htmlTmpl   = isRich ? _welcomeRichHtml    : _welcomeGenericHtml;
+    const txtTmpl    = isRich ? _welcomeRichTxt     : _welcomeGenericTxt;
+    const ctxMap     = ctx as Record<string, unknown>;
+    return {
+      subject: _renderHandlebars(meta.subject, ctxMap),
+      html:    _renderHandlebars(htmlTmpl, ctxMap),
+      text:    _renderHandlebars(txtTmpl, ctxMap) || undefined,
+    };
+  }
+
   const tmpl = TEMPLATES[eventKey];
   if (!tmpl) {
     console.warn(`[templates] no template for event: ${eventKey}`);
