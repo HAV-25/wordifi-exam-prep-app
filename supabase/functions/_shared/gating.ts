@@ -25,7 +25,24 @@ export async function gate(
   userId: string,
   channel: Channel,
   category: Category,
+  eventKey?: string,
 ): Promise<GateResult> {
+  // Welcome email dedup: suppress if already sent on this channel
+  if (eventKey === 'notif.welcome_email') {
+    const { data: prior } = await supabase
+      .from('notification_events')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('event_key', 'notif.welcome_email')
+      .eq('channel', channel)
+      .in('status', ['sent', 'delivered'])
+      .limit(1)
+      .maybeSingle() as { data: Row | null };
+    if (prior?.id) {
+      return { ok: false, reason: 'already_sent_once' };
+    }
+  }
+
   // Step 1 — fetch prefs
   const { data: prefs, error: prefsErr } = await supabase
     .from('notification_preferences')
@@ -35,6 +52,21 @@ export async function gate(
 
   if (prefsErr || !prefs) {
     return { ok: false, reason: 'no_prefs' };
+  }
+
+  // Lazy timezone resolver — notification_preferences.timezone is authoritative;
+  // falls back to user_streak_state → user_profiles → 'Europe/Berlin'.
+  // Resolved at most once and shared between Steps 4 and 5.
+  let _tz: string | undefined;
+  async function resolveTimezone(): Promise<string> {
+    if (_tz !== undefined) return _tz;
+    if (prefs.timezone) { _tz = prefs.timezone; return _tz; }
+    const [{ data: streakState }, { data: profile }] = await Promise.all([
+      supabase.from('user_streak_state').select('timezone').eq('user_id', userId).maybeSingle(),
+      supabase.from('user_profiles').select('timezone').eq('id', userId).maybeSingle(),
+    ]);
+    _tz = getUserTimezone(streakState as Row | null, profile as Row | null);
+    return _tz;
   }
 
   // Step 2 — channel enabled
@@ -51,21 +83,9 @@ export async function gate(
     }
   }
 
-  // Step 4 — quiet hours (in_app skips quiet hours)
-  if (channel !== 'in_app' && prefs.quiet_hours_enabled) {
-    const { data: streakState } = await supabase
-      .from('user_streak_state')
-      .select('timezone')
-      .eq('user_id', userId)
-      .maybeSingle() as { data: Row | null };
-
-    const { data: profile } = await supabase
-      .from('user_profiles')
-      .select('timezone')
-      .eq('id', userId)
-      .maybeSingle() as { data: Row | null };
-
-    const tz = getUserTimezone(streakState, profile);
+  // Step 4 — quiet hours (in_app and transactional skip quiet hours)
+  if (channel !== 'in_app' && category !== 'transactional' && prefs.quiet_hours_enabled) {
+    const tz = await resolveTimezone();
     if (isInQuietHours(tz, prefs.quiet_hours_start, prefs.quiet_hours_end)) {
       return { ok: false, reason: 'quiet_hours' };
     }
@@ -73,17 +93,7 @@ export async function gate(
 
   // Step 5 — frequency cap
   if (channel === 'push') {
-    const { data: streakState } = await supabase
-      .from('user_streak_state')
-      .select('timezone')
-      .eq('user_id', userId)
-      .maybeSingle() as { data: Row | null };
-    const { data: profile } = await supabase
-      .from('user_profiles')
-      .select('timezone')
-      .eq('id', userId)
-      .maybeSingle() as { data: Row | null };
-    const tz = getUserTimezone(streakState, profile);
+    const tz = await resolveTimezone();
     const startOfDay = getStartOfDayUTC(tz).toISOString();
 
     const { count } = await supabase
@@ -94,7 +104,7 @@ export async function gate(
       .in('status', ['sent', 'delivered', 'opened'])
       .gte('sent_at', startOfDay) as { count: number | null };
 
-    const cap = prefs.max_push_per_day ?? 3;
+    const cap = prefs.max_push_per_day ?? 1;
     if ((count ?? 0) >= cap) {
       return { ok: false, reason: 'frequency_cap' };
     }
