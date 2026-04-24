@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { dispatchChannel, DispatchInput } from '../_shared/dispatch.ts';
 import { Channel, Category } from '../_shared/gating.ts';
+import { isAuthorised } from '../_shared/cronAuth.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -12,9 +13,7 @@ Deno.serve(async (req: Request) => {
     return Response.json({ status: 'ok' });
   }
 
-  // Auth check
-  const auth = req.headers.get('Authorization') ?? '';
-  if (!auth.startsWith('Bearer ') || auth.slice(7) !== SERVICE_ROLE_KEY) {
+  if (!isAuthorised(req)) {
     return Response.json({ error: 'unauthorized' }, { status: 401 });
   }
 
