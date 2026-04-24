@@ -1,6 +1,6 @@
 import { Audio } from 'expo-av';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
-import { AlertCircle, ChevronLeft, Mic, MicOff, PhoneOff, RefreshCw, Star, Timer } from 'lucide-react-native';
+import { AlertCircle, ChevronLeft, Mic, MicOff, PhoneOff, RefreshCw, Timer } from 'lucide-react-native';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -834,14 +834,14 @@ export default function SprechenRealtimeScreen() {
   if (screenState === 'results' && scores) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const s = scores as any;
-    const overallNum = Number(s.overall_score ?? s.overall ?? 0);
-    const fluencyNum = Number(s.fluency_score ?? s.fluency ?? 0);
-    const grammarNum = Number(s.grammar_score ?? s.grammar ?? 0);
-    const vocabularyNum = Number(s.vocabulary_score ?? s.vocabulary ?? 0);
+    const overallNum: number = Number(s.overall_score ?? 0);
+    const maxScore: number   = Number(s.max_score ?? 100);
+    const passed: boolean    = Boolean(s.passed);
+    const scoreDetails: Array<{ label: string; raw_score: number; weighted_percent: number; weight: number }> =
+      Array.isArray(s.score_details) ? s.score_details : [];
     const taskCompletion: string = s.task_completion ?? '';
-    const starCount = Math.max(0, Math.min(5, Math.round(overallNum)));
     const hasUserSpeech = transcriptEntries.some(e => e.role === 'user');
-    const noSpeechDetected = !hasUserSpeech && overallNum <= 1;
+    const noSpeechDetected = !hasUserSpeech && overallNum === 0;
 
     return (
       <View style={[styles.screen, { paddingTop: insets.top }]}>
@@ -856,35 +856,44 @@ export default function SprechenRealtimeScreen() {
             </View>
             <Text style={styles.resultsTitle}>Sprechen · Teil {teil}</Text>
             <Text style={styles.resultsSubtitle}>{level} · {taskLabel}</Text>
-            <View style={styles.starsRow}>
-              {[1, 2, 3, 4, 5].map(n => (
-                <Star
-                  key={n}
-                  color={n <= starCount ? '#FFD700' : 'rgba(255,255,255,0.3)'}
-                  fill={n <= starCount ? '#FFD700' : 'transparent'}
-                  size={28}
-                />
-              ))}
+            <Text style={styles.resultsScoreLabel}>{overallNum} / {maxScore}</Text>
+            <View style={[styles.passBadge, { backgroundColor: passed ? colors.green : colors.red }]}>
+              <Text style={styles.passBadgeText}>{passed ? 'Passed' : 'Needs Improvement'}</Text>
             </View>
-            <Text style={styles.resultsScoreLabel}>{overallNum} / 5</Text>
           </View>
 
           {/* Detailed scores */}
           <View style={[styles.scoresCard, shadows.card]}>
             <Text style={styles.scoresHeader}>Detailed Assessment</Text>
-            {[
-              { label: 'Fluency', value: fluencyNum },
-              { label: 'Grammar', value: grammarNum },
-              { label: 'Vocabulary', value: vocabularyNum },
-            ].map(item => (
+            {scoreDetails.length > 0 ? scoreDetails.map(item => (
               <View key={item.label} style={styles.scoreRow}>
                 <Text style={styles.scoreLabel}>{item.label}</Text>
                 <View style={styles.scoreBarTrack}>
-                  <View style={[styles.scoreBarFill, { width: `${(item.value / 5) * 100}%` }]} />
+                  <View style={[styles.scoreBarFill, { width: `${(item.raw_score / 5) * 100}%` }]} />
                 </View>
-                <Text style={styles.scoreValue}>{item.value}/5</Text>
+                <View style={styles.scoreValueGroup}>
+                  <Text style={styles.scoreValue}>{item.raw_score}/5</Text>
+                  <Text style={styles.scoreContrib}>+{item.weighted_percent}%</Text>
+                </View>
               </View>
-            ))}
+            )) : (
+              // Fallback for legacy responses without score_details
+              [
+                { label: 'Fluency',    value: Number(s.fluency_score    ?? s.fluency    ?? 0) },
+                { label: 'Grammar',    value: Number(s.grammar_score    ?? s.grammar    ?? 0) },
+                { label: 'Vocabulary', value: Number(s.vocabulary_score ?? s.vocabulary ?? 0) },
+              ].map(item => (
+                <View key={item.label} style={styles.scoreRow}>
+                  <Text style={styles.scoreLabel}>{item.label}</Text>
+                  <View style={styles.scoreBarTrack}>
+                    <View style={[styles.scoreBarFill, { width: `${(item.value / 5) * 100}%` }]} />
+                  </View>
+                  <View style={styles.scoreValueGroup}>
+                    <Text style={styles.scoreValue}>{item.value}/5</Text>
+                  </View>
+                </View>
+              ))
+            )}
           </View>
 
           {/* Task completion badge */}
@@ -1587,16 +1596,24 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.65)',
     fontWeight: '600' as const,
   },
-  starsRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    marginTop: spacing.md,
-  },
   resultsScoreLabel: {
-    fontSize: fontSize.bodyLg,
+    fontSize: 40,
     fontWeight: '800' as const,
     color: colors.white,
-    marginTop: spacing.xs,
+    marginTop: spacing.md,
+    letterSpacing: -1,
+  },
+  passBadge: {
+    borderRadius: 99,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.xs,
+    marginTop: spacing.sm,
+  },
+  passBadgeText: {
+    fontSize: fontSize.bodySm,
+    fontWeight: '700' as const,
+    color: colors.white,
+    letterSpacing: 0.3,
   },
   scoresCard: {
     backgroundColor: colors.white,
@@ -1632,11 +1649,20 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: colors.blue,
   },
+  scoreValueGroup: {
+    alignItems: 'flex-end' as const,
+    minWidth: 52,
+  },
   scoreValue: {
     color: colors.navy,
     fontSize: fontSize.bodySm,
     fontWeight: '800' as const,
-    width: 30,
+    textAlign: 'right' as const,
+  },
+  scoreContrib: {
+    color: colors.blue,
+    fontSize: 11,
+    fontWeight: '600' as const,
     textAlign: 'right' as const,
   },
   badgeCard: {

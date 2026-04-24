@@ -39,14 +39,36 @@ export type ConversationState =
   | 'ended'
   | 'error';
 
+export type SprechenScoreDetail = {
+  label: string;
+  raw_score: number;        // 1–5 AI score
+  weighted_percent: number; // integer contribution to overall (e.g. 28)
+  weight: number;           // category weight % (35 / 40 / 25)
+};
+
 export type SprechenScores = {
-  overall: number;
-  fluency: number;
-  grammar: number;
-  vocabulary: number;
+  // ── Backend-calculated ─────────────────────────────────────────────────
+  overall_score: number;             // 0–100
+  max_score: number;                 // always 100
+  passed: boolean;
+  score_details: SprechenScoreDetail[];
+
+  // ── Raw AI category scores (1–5) ──────────────────────────────────────
+  fluency_score: number;
+  grammar_score: number;
+  vocabulary_score: number;
+
+  // ── Qualitative ─────────────────────────────────────────────────────────
+  task_completion: string;           // "full" | "partial" | "minimal"
+  grammar_observations: string;
+  vocabulary_observations: string;
   encouragement_note: string;
   improvement_tip: string;
-  task_completion: boolean;
+  opening_suggestion: string | null;
+  closing_suggestion: string | null;
+  connector_examples: string[];
+  example_phrases: string[];
+  correction_examples: Array<{ original: string; corrected: string; explanation: string }>;
 };
 
 export type TranscriptEntry = {
@@ -145,31 +167,46 @@ export async function scoreSprechenConversation(params: {
 
   const data = await res.json();
 
-  // The score-sprechen edge function returns scores at the TOP LEVEL using DB
-  // column names (overall_score, fluency_score, ...) on a 0–5 rubric scale,
-  // matching public.sprechen_responses. Older callers expected `data.scores`
-  // with no suffix. Normalize both shapes here, scaling rubric→0-100%.
-  const rubricToPct = (raw: unknown): number => {
-    const n = typeof raw === 'number' ? raw : Number(raw);
-    if (!Number.isFinite(n)) return 0;
-    // Keep scores on the 0–5 rubric scale (1 decimal place).
-    // If the edge function ever returns a 0–100 percentage (>5), convert back to 0–5.
-    return n <= 5 ? Math.round(n * 10) / 10 : Math.round((n / 20) * 10) / 10;
-  };
-
+  // Edge function v8+ returns backend-calculated scores (0–100 normalized).
+  // `data.scores` is the canonical shape; fall back to flat `data` for
+  // any legacy callers that returned top-level fields.
   const flat = (data.scores ?? data) as Record<string, unknown>;
 
+  const toNum  = (v: unknown, fallback = 0) => { const n = Number(v); return Number.isFinite(n) ? n : fallback; };
+  const toStr  = (v: unknown) => String(v ?? '');
+  const toArr  = <T>(v: unknown): T[] => Array.isArray(v) ? v as T[] : [];
+
   const scores: SprechenScores = {
-    overall:    rubricToPct(flat.overall    ?? flat.overall_score),
-    fluency:    rubricToPct(flat.fluency    ?? flat.fluency_score),
-    grammar:    rubricToPct(flat.grammar    ?? flat.grammar_score),
-    vocabulary: rubricToPct(flat.vocabulary ?? flat.vocabulary_score),
-    encouragement_note: String(flat.encouragement_note ?? ''),
-    improvement_tip:    String(flat.improvement_tip    ?? ''),
-    task_completion:    flat.task_completion === true || flat.task_completion === 'true',
+    // ── Backend-calculated ───────────────────────────────────────────────
+    overall_score: toNum(flat.overall_score),
+    max_score:     toNum(flat.max_score, 100),
+    passed:        Boolean(flat.passed),
+    score_details: toArr<SprechenScoreDetail>(flat.score_details),
+
+    // ── Raw category scores ──────────────────────────────────────────────
+    fluency_score:   toNum(flat.fluency_score   ?? flat.fluency),
+    grammar_score:   toNum(flat.grammar_score   ?? flat.grammar),
+    vocabulary_score:toNum(flat.vocabulary_score ?? flat.vocabulary),
+
+    // ── Qualitative ──────────────────────────────────────────────────────
+    task_completion:         toStr(flat.task_completion),
+    grammar_observations:    toStr(flat.grammar_observations),
+    vocabulary_observations: toStr(flat.vocabulary_observations),
+    encouragement_note:      toStr(flat.encouragement_note),
+    improvement_tip:         toStr(flat.improvement_tip),
+    opening_suggestion:  (flat.opening_suggestion  as string | null) ?? null,
+    closing_suggestion:  (flat.closing_suggestion  as string | null) ?? null,
+    connector_examples:  toArr<string>(flat.connector_examples),
+    example_phrases:     toArr<string>(flat.example_phrases),
+    correction_examples: toArr<SprechenScores['correction_examples'][number]>(flat.correction_examples),
   };
 
-  track('section_completed', { section: 'Sprechen', cefr_level: params.level, score_pct: Math.round(scores.overall * 20), duration_sec: params.duration_seconds });
+  track('section_completed', {
+    section: 'Sprechen',
+    cefr_level: params.level,
+    score_pct: scores.overall_score,   // already 0–100
+    duration_sec: params.duration_seconds,
+  });
 
   return scores;
 }
