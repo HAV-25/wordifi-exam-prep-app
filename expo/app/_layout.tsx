@@ -40,7 +40,7 @@ Sentry.init({
 
 void SplashScreen.preventAutoHideAsync();
 
-Purchases.configure({ apiKey: 'goog_sLePzbKxQdzAQwFkIfWdQajwxVh' });
+Purchases.configure({ apiKey: process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_KEY ?? '' });
 
 const queryClient = new QueryClient();
 

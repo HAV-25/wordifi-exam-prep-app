@@ -8,17 +8,26 @@
       "distribution": "internal",
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_REVENUECAT_ANDROID_KEY": "goog_sLePzbKxQdzAQwFkIfWdQajwxVh"
       }
     },
     "preview": {
       "distribution": "internal",
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_REVENUECAT_ANDROID_KEY": "goog_sLePzbKxQdzAQwFkIfWdQajwxVh"
       }
     },
     "production": {
       "android": {
         "buildType": "app-bundle"
+      },
+      "env": {
+        "EXPO_PUBLIC_REVENUECAT_ANDROID_KEY": "goog_sLePzbKxQdzAQwFkIfWdQajwxVh"
       }
     }
   },
