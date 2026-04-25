@@ -1,8 +1,8 @@
 /**
  * Onboarding Launch — "Ready to start?" screen.
- * Replaces the blocking Adapty paywall with a non-blocking choice:
- *   "Start 72-hour free trial" → presents Adapty → then routes to /auth
- *   "Continue free"            → routes directly to /auth (no Adapty)
+ * Non-blocking onboarding choice:
+ *   "Start 72-hour free trial" → presents RevenueCat paywall → then routes to /auth
+ *   "Continue free"            → routes directly to /auth (no paywall)
  */
 import React, { useState } from 'react';
 import {
@@ -16,7 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Zap } from 'lucide-react-native';
 
-import { presentAdaptyPaywall } from '@/lib/adaptyPaywall';
+import { presentRevenueCatPaywall } from '@/lib/revenuecatPaywall';
 import { savePendingOnboarding } from '@/lib/profileHelpers';
 import { track } from '@/lib/track';
 import { colors } from '@/theme';
@@ -30,12 +30,12 @@ export default function StartScreen() {
     setIsStartingTrial(true);
     try {
       track('paywall_viewed', { source_screen: 'onboarding_start' });
-      const result = await presentAdaptyPaywall();
+      const result = await presentRevenueCatPaywall();
       if (!result.purchased && !result.restored) {
         track('paywall_dismissed', { source_screen: 'onboarding_start' });
       }
     } catch (err) {
-      console.error('[Start] presentAdaptyPaywall error:', err);
+      console.error('[Start] presentRevenueCatPaywall error:', err);
     } finally {
       await savePendingOnboarding(onboardingStore, onboardingSessionNonce);
       router.replace('/auth?mode=signUp');

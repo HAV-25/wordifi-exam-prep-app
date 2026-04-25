@@ -22,7 +22,7 @@ import { AppConfigProvider } from '@/providers/AppConfigProvider';
 import { AuthProvider, useAuth } from '@/providers/AuthProvider';
 import { QuestionTypeMetaProvider, useQuestionTypeMetaContext } from '@/lib/useQuestionTypeMeta';
 import * as Sentry from '@sentry/react-native';
-import { adapty } from 'react-native-adapty';
+import Purchases from 'react-native-purchases';
 import { initPostHog } from '@/lib/posthog';
 import { initOneSignal } from '@/lib/onesignal';
 Sentry.init({
@@ -40,7 +40,7 @@ Sentry.init({
 
 void SplashScreen.preventAutoHideAsync();
 
-adapty.activate('public_live_PsXzPNln.zSOwZEDaKjadnp341RBT');
+Purchases.configure({ apiKey: 'goog_sLePzbKxQdzAQwFkIfWdQajwxVh' });
 
 const queryClient = new QueryClient();
 

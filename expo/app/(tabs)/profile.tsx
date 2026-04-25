@@ -43,7 +43,7 @@ import { AvatarImage } from '@/components/AvatarImage';
 
 import Colors from '@/constants/colors';
 import { colors, spacing } from '@/theme';
-import { presentAdaptyPaywall, syncSubscriptionAfterPurchase } from '@/lib/adaptyPaywall';
+import { presentRevenueCatPaywall, syncSubscriptionAfterPurchase } from '@/lib/revenuecatPaywall';
 import { supabase } from '@/lib/supabaseClient';
 import { useHomeData } from '@/lib/useHomeData';
 import { useAccess } from '@/providers/AccessProvider';
@@ -368,7 +368,7 @@ export default function ProfileScreen() {
 
   const navigateUpgrade = useCallback(async () => {
     try {
-      await presentAdaptyPaywall(async () => {
+      await presentRevenueCatPaywall(async () => {
         if (user?.id) {
           await syncSubscriptionAfterPurchase(user.id);
           await refreshAccess();

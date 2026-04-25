@@ -7,12 +7,12 @@ import * as Linking from 'expo-linking';
 import { router } from 'expo-router';
 import * as Sentry from '@sentry/react-native';
 
-import { adapty } from 'react-native-adapty';
+import Purchases from 'react-native-purchases';
 
 const HAS_ACCOUNT_KEY = 'wordifi_has_account_v1';
 
 import { signOutUser, updateTcAccepted } from '@/lib/authHelpers';
-import { syncSubscriptionOnLaunch } from '@/lib/adaptyPaywall';
+import { syncSubscriptionOnLaunch } from '@/lib/revenuecatPaywall';
 import { ensureUserProfile, reconcilePendingOnboarding } from '@/lib/profileHelpers';
 import { supabase } from '@/lib/supabaseClient';
 import type { UserProfile } from '@/types/database';
@@ -43,17 +43,17 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
         if (flag === 'true') {
           setHasKnownAccount(true);
         } else {
-          // Fallback: check Adapty for active subscription (handles reinstall scenario)
+          // Fallback: check RevenueCat for active subscription (handles reinstall scenario)
           try {
-            const adaptyProfile = await Promise.race<boolean>([
-              adapty.getProfile().then(
-                (p) => p?.accessLevels?.['premium']?.isActive === true
+            const rcProfile = await Promise.race<boolean>([
+              Purchases.getCustomerInfo().then(
+                (info) => info.entitlements.active['Wordifi Pro']?.isActive === true
               ),
               new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 2000)),
             ]);
-            if (adaptyProfile) setHasKnownAccount(true);
+            if (rcProfile) setHasKnownAccount(true);
           } catch {
-            // no-op — Adapty unavailable
+            // no-op — RevenueCat unavailable
           }
         }
       } else {
@@ -80,9 +80,9 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
           id: nextSession.user.id,
           email: nextSession.user.email,
         });
-        // Link Adapty profile with Supabase user
-        adapty.identify(nextSession.user.id).catch((err) =>
-          console.warn('[Adapty] identify failed:', err)
+        // Link RevenueCat profile with Supabase user
+        Purchases.logIn(nextSession.user.id).catch((err) =>
+          console.warn('[RevenueCat] logIn failed:', err)
         );
         identifyUser(nextSession.user.id);
         linkOneSignalIdentity(nextSession.user.id);
@@ -92,7 +92,7 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
         }
       } else {
         Sentry.setUser(null);
-        adapty.logout().catch(() => {});
+        Purchases.logOut().catch(() => {});
         unlinkOneSignalIdentity();
         resetUser();
       }
@@ -208,13 +208,13 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       });
   }, [session?.user?.id, profileQuery.data]);
 
-  // Sync Adapty subscription status on launch (handles renewals/expirations between sessions)
-  const adaptysSyncRef = useRef(false);
+  // Sync RevenueCat subscription status on launch (handles renewals/expirations between sessions)
+  const rcSyncRef = useRef(false);
   useEffect(() => {
     const uid = session?.user?.id;
     const profile = profileQuery.data;
-    if (!uid || !profile || adaptysSyncRef.current) return;
-    adaptysSyncRef.current = true;
+    if (!uid || !profile || rcSyncRef.current) return;
+    rcSyncRef.current = true;
 
     syncSubscriptionOnLaunch(uid, profile.subscription_tier ?? 'free_trial')
       .then((changed) => {
