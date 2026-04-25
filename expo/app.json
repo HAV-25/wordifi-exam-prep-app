@@ -52,7 +52,6 @@
           "iosDisplayInForeground": true
         }
       ],
-      "react-native-purchases",
       "expo-localization",
       [
         "onesignal-expo-plugin",
