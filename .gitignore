@@ -11,6 +11,7 @@ supabase/.temp/
 
 # Large binary / reference files
 *.mp4
+!expo/assets/wordifi.mp4
 *.docx
 
 # Claude Code session data
