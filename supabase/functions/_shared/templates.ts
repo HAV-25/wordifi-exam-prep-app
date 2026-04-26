@@ -101,6 +101,8 @@ const _welcomeMeta: WelcomeMetaFile = {
   generic: { subject: 'Welcome to Wordifi', preview_text: 'Your German exam prep companion is ready.' },
 };
 
+const LOGO_LIGHT_URL = 'https://wwfiauhsbssjowaxmqyn.supabase.co/storage/v1/object/public/Wordifi%20Brand/email/assets/logo-light.png';
+
 const _welcomeRichHtml = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -141,7 +143,7 @@ const _welcomeRichHtml = `<!DOCTYPE html>
       <!-- Header -->
       <tr>
         <td style="background-color:#0A0E1A; border-radius:24px 24px 0 0; padding:28px 40px; text-align:left;">
-          <img src="https://wwfiauhsbssjowaxmqyn.supabase.co/storage/v1/object/sign/Wordifi%20Brand/email/assets/logo-light.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9hZGExZDI2Zi1lMzg3LTQzMWMtYjkxNi0wMjY4NjM3Y2YwNzAiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJXb3JkaWZpIEJyYW5kL2VtYWlsL2Fzc2V0cy9sb2dvLWxpZ2h0LnBuZyIsImlhdCI6MTc3NjkzNzAxOCwiZXhwIjoxOTM0NjE3MDE4fQ.-d64zsBC0ExEBBYb9u3VQ1vEiTaiTIMao9qrXIcjVwA" width="128" height="40" alt="wordifi" class="logo"
+          <img src="${LOGO_LIGHT_URL}" width="128" height="40" alt="wordifi" class="logo"
                style="height:32px; width:auto; display:block; color:#FFFFFF; font-family:'Outfit', Tahoma, Arial, sans-serif; font-weight:800; font-size:22px; letter-spacing:-0.03em;">
         </td>
       </tr>
@@ -410,7 +412,7 @@ const _welcomeGenericHtml = `<!DOCTYPE html>
       <!-- Header -->
       <tr>
         <td style="background-color:#0A0E1A; border-radius:24px 24px 0 0; padding:28px 40px; text-align:left;">
-          <img src="https://wwfiauhsbssjowaxmqyn.supabase.co/storage/v1/object/sign/Wordifi%20Brand/email/assets/logo-light.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9hZGExZDI2Zi1lMzg3LTQzMWMtYjkxNi0wMjY4NjM3Y2YwNzAiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJXb3JkaWZpIEJyYW5kL2VtYWlsL2Fzc2V0cy9sb2dvLWxpZ2h0LnBuZyIsImlhdCI6MTc3NjkzNzAxOCwiZXhwIjoxOTM0NjE3MDE4fQ.-d64zsBC0ExEBBYb9u3VQ1vEiTaiTIMao9qrXIcjVwA" width="128" height="40" alt="wordifi" class="logo"
+          <img src="${LOGO_LIGHT_URL}" width="128" height="40" alt="wordifi" class="logo"
                style="height:32px; width:auto; display:block; color:#FFFFFF; font-family:'Outfit', Tahoma, Arial, sans-serif; font-weight:800; font-size:22px; letter-spacing:-0.03em;">
         </td>
       </tr>
@@ -639,7 +641,7 @@ export const TEMPLATES: Record<string, Template> = {
       <!-- Dark hero: day counter -->
       <tr>
         <td style="background-color:#0A0E1A; border-radius:24px 24px 0 0; padding:36px 40px 28px; text-align:left;">
-          <img src="https://wwfiauhsbssjowaxmqyn.supabase.co/storage/v1/object/sign/Wordifi%20Brand/email/assets/logo-light.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9hZGExZDI2Zi1lMzg3LTQzMWMtYjkxNi0wMjY4NjM3Y2YwNzAiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJXb3JkaWZpIEJyYW5kL2VtYWlsL2Fzc2V0cy9sb2dvLWxpZ2h0LnBuZyIsImlhdCI6MTc3NjkzNzAxOCwiZXhwIjoxOTM0NjE3MDE4fQ.-d64zsBC0ExEBBYb9u3VQ1vEiTaiTIMao9qrXIcjVwA"
+          <img src="${LOGO_LIGHT_URL}"
                width="128" height="40"
                alt="wordifi"
                class="logo"
@@ -805,7 +807,7 @@ export const TEMPLATES: Record<string, Template> = {
       <!-- Header -->
       <tr>
         <td style="background-color:#0A0E1A; border-radius:24px 24px 0 0; padding:28px 40px; text-align:left;">
-          <img src="https://wwfiauhsbssjowaxmqyn.supabase.co/storage/v1/object/sign/Wordifi%20Brand/email/assets/logo-light.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9hZGExZDI2Zi1lMzg3LTQzMWMtYjkxNi0wMjY4NjM3Y2YwNzAiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJXb3JkaWZpIEJyYW5kL2VtYWlsL2Fzc2V0cy9sb2dvLWxpZ2h0LnBuZyIsImlhdCI6MTc3NjkzNzAxOCwiZXhwIjoxOTM0NjE3MDE4fQ.-d64zsBC0ExEBBYb9u3VQ1vEiTaiTIMao9qrXIcjVwA"
+          <img src="${LOGO_LIGHT_URL}"
                width="128" height="40"
                alt="wordifi"
                class="logo"
@@ -1010,7 +1012,7 @@ export const TEMPLATES: Record<string, Template> = {
 
       <tr>
         <td style="background-color:#0A0E1A; border-radius:24px 24px 0 0; padding:28px 40px; text-align:left;">
-          <img src="https://wwfiauhsbssjowaxmqyn.supabase.co/storage/v1/object/sign/Wordifi%20Brand/email/assets/logo-light.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9hZGExZDI2Zi1lMzg3LTQzMWMtYjkxNi0wMjY4NjM3Y2YwNzAiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJXb3JkaWZpIEJyYW5kL2VtYWlsL2Fzc2V0cy9sb2dvLWxpZ2h0LnBuZyIsImlhdCI6MTc3NjkzNzAxOCwiZXhwIjoxOTM0NjE3MDE4fQ.-d64zsBC0ExEBBYb9u3VQ1vEiTaiTIMao9qrXIcjVwA" width="128" height="40" alt="wordifi" class="logo"
+          <img src="${LOGO_LIGHT_URL}" width="128" height="40" alt="wordifi" class="logo"
                style="height:32px; width:auto; display:block; color:#FFFFFF; font-family:'Outfit', Tahoma, Arial, sans-serif; font-weight:800; font-size:22px; letter-spacing:-0.03em;">
         </td>
       </tr>
@@ -1148,7 +1150,7 @@ export const TEMPLATES: Record<string, Template> = {
 
       <tr>
         <td style="background-color:#0A0E1A; border-radius:24px 24px 0 0; padding:28px 40px; text-align:left;">
-          <img src="https://wwfiauhsbssjowaxmqyn.supabase.co/storage/v1/object/sign/Wordifi%20Brand/email/assets/logo-light.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9hZGExZDI2Zi1lMzg3LTQzMWMtYjkxNi0wMjY4NjM3Y2YwNzAiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJXb3JkaWZpIEJyYW5kL2VtYWlsL2Fzc2V0cy9sb2dvLWxpZ2h0LnBuZyIsImlhdCI6MTc3NjkzNzAxOCwiZXhwIjoxOTM0NjE3MDE4fQ.-d64zsBC0ExEBBYb9u3VQ1vEiTaiTIMao9qrXIcjVwA" width="128" height="40" alt="wordifi" class="logo"
+          <img src="${LOGO_LIGHT_URL}" width="128" height="40" alt="wordifi" class="logo"
                style="height:32px; width:auto; display:block; color:#FFFFFF; font-family:'Outfit', Tahoma, Arial, sans-serif; font-weight:800; font-size:22px; letter-spacing:-0.03em;">
         </td>
       </tr>
@@ -1284,7 +1286,7 @@ export const TEMPLATES: Record<string, Template> = {
 
       <tr>
         <td style="background-color:#0A0E1A; border-radius:24px 24px 0 0; padding:32px 40px 36px; text-align:left;">
-          <img src="https://wwfiauhsbssjowaxmqyn.supabase.co/storage/v1/object/sign/Wordifi%20Brand/email/assets/logo-light.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9hZGExZDI2Zi1lMzg3LTQzMWMtYjkxNi0wMjY4NjM3Y2YwNzAiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJXb3JkaWZpIEJyYW5kL2VtYWlsL2Fzc2V0cy9sb2dvLWxpZ2h0LnBuZyIsImlhdCI6MTc3NjkzNzAxOCwiZXhwIjoxOTM0NjE3MDE4fQ.-d64zsBC0ExEBBYb9u3VQ1vEiTaiTIMao9qrXIcjVwA" width="128" height="40" alt="wordifi" class="logo"
+          <img src="${LOGO_LIGHT_URL}" width="128" height="40" alt="wordifi" class="logo"
                style="height:28px; width:auto; display:block; margin:0 0 28px; color:#FFFFFF; font-family:'Outfit', Tahoma, Arial, sans-serif; font-weight:800; font-size:20px; letter-spacing:-0.03em;">
           <p style="margin:0 0 4px; font-family:'Nunito Sans', Arial, sans-serif; font-weight:800; font-size:11px; letter-spacing:0.12em; text-transform:uppercase; color:#9CA3AF;">
             Trial ending
@@ -1405,7 +1407,7 @@ export const TEMPLATES: Record<string, Template> = {
 
       <tr>
         <td style="background-color:#0A0E1A; border-radius:24px 24px 0 0; padding:32px 40px 36px; text-align:left;">
-          <img src="https://wwfiauhsbssjowaxmqyn.supabase.co/storage/v1/object/sign/Wordifi%20Brand/email/assets/logo-light.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9hZGExZDI2Zi1lMzg3LTQzMWMtYjkxNi0wMjY4NjM3Y2YwNzAiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJXb3JkaWZpIEJyYW5kL2VtYWlsL2Fzc2V0cy9sb2dvLWxpZ2h0LnBuZyIsImlhdCI6MTc3NjkzNzAxOCwiZXhwIjoxOTM0NjE3MDE4fQ.-d64zsBC0ExEBBYb9u3VQ1vEiTaiTIMao9qrXIcjVwA" width="128" height="40" alt="wordifi" class="logo"
+          <img src="${LOGO_LIGHT_URL}" width="128" height="40" alt="wordifi" class="logo"
                style="height:28px; width:auto; display:block; margin:0 0 28px; color:#FFFFFF; font-family:'Outfit', Tahoma, Arial, sans-serif; font-weight:800; font-size:20px; letter-spacing:-0.03em;">
           <p style="margin:0 0 4px; font-family:'Nunito Sans', Arial, sans-serif; font-weight:800; font-size:11px; letter-spacing:0.12em; text-transform:uppercase; color:#DD0000;">
             Final call
