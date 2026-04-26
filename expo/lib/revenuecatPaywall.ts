@@ -30,6 +30,11 @@ type PresentResult = {
 /** Map RC product identifier + trial flag → DB tier name */
 function productToTier(productId: string | undefined, isTrialPeriod: boolean): string {
   if (isTrialPeriod) return 'free_trial';
+  // activeSubscriptions returns the Google Play subscription ID (without base-plan suffix)
+  const id = (productId ?? '').split(':')[0].toLowerCase();
+  if (id === 'wordifi_premium_monthly') return 'monthly';
+  if (id === 'wordifi_premium_quarterly') return 'quarterly';
+  // Also handle RC package type identifiers as a fallback
   if (productId === '$rc_monthly') return 'monthly';
   if (productId === '$rc_three_month') return 'quarterly';
   return 'monthly'; // safe fallback for any unrecognised RC product
@@ -51,7 +56,6 @@ export async function presentRevenueCatPaywall(
 
     if (paywallResult === PAYWALL_RESULT.PURCHASED) {
       result.purchased = true;
-      track('subscription_started', { plan: 'revenuecat' });
       await onPurchaseSuccess?.();
     } else if (paywallResult === PAYWALL_RESULT.RESTORED) {
       result.restored = true;

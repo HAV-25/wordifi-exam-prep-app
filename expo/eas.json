@@ -27,7 +27,10 @@
         "buildType": "app-bundle"
       },
       "env": {
-        "EXPO_PUBLIC_REVENUECAT_ANDROID_KEY": "goog_sLePzbKxQdzAQwFkIfWdQajwxVh"
+        "EXPO_PUBLIC_REVENUECAT_ANDROID_KEY": "goog_sLePzbKxQdzAQwFkIfWdQajwxVh",
+        "SENTRY_AUTH_TOKEN": "$SENTRY_AUTH_TOKEN",
+        "SENTRY_ORG": "$SENTRY_ORG",
+        "SENTRY_PROJECT": "$SENTRY_PROJECT"
       }
     }
   },

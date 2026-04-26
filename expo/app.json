@@ -59,6 +59,14 @@
         {
           "mode": "production"
         }
+      ],
+      [
+        "@sentry/react-native/expo",
+        {
+          "url": "https://de.sentry.io/",
+          "organization": "appsbrite-ug",
+          "project": "wordifi"
+        }
       ]
     ],
     "experiments": {

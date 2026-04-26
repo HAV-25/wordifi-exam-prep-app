@@ -1,3 +1,4 @@
+import Constants from 'expo-constants';
 import { PostHog } from 'posthog-react-native';
 
 let _posthog: PostHog | null = null;
@@ -11,6 +12,12 @@ export function initPostHog(): PostHog {
     flushAt: 20,
     flushInterval: 30000,
     preloadFeatureFlags: true,
+  });
+
+  // Register super-properties on every event — mirrors Sentry's environment config
+  _posthog.register({
+    environment: __DEV__ ? 'development' : 'production',
+    app_version: Constants.expoConfig?.version ?? 'unknown',
   });
 
   return _posthog;
