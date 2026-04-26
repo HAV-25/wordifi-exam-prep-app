@@ -28,9 +28,8 @@
       },
       "env": {
         "EXPO_PUBLIC_REVENUECAT_ANDROID_KEY": "goog_sLePzbKxQdzAQwFkIfWdQajwxVh",
-        "SENTRY_AUTH_TOKEN": "$SENTRY_AUTH_TOKEN",
-        "SENTRY_ORG": "$SENTRY_ORG",
-        "SENTRY_PROJECT": "$SENTRY_PROJECT"
+        "SENTRY_ORG": "appsbrite-ug",
+        "SENTRY_PROJECT": "wordifi"
       }
     }
   },
