@@ -29,7 +29,7 @@
       "env": {
         "EXPO_PUBLIC_REVENUECAT_ANDROID_KEY": "goog_sLePzbKxQdzAQwFkIfWdQajwxVh",
         "SENTRY_ORG": "appsbrite-ug",
-        "SENTRY_PROJECT": "wordifi"
+        "SENTRY_PROJECT": "wordifi-de"
       }
     }
   },
