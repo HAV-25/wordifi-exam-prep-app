@@ -28,14 +28,21 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AvatarImage } from '@/components/AvatarImage';
+import { AnimatedFlame } from '@/components/AnimatedFlame';
+import { FlameStrip } from '@/components/FlameStrip';
 import { GlowBorderCard } from '@/components/GlowBorderCard';
 import { PaywallBottomSheet } from '@/components/PaywallBottomSheet';
 import { PaywallModal } from '@/components/PaywallModal';
+import { PracticeStatsCards } from '@/components/PracticeStatsCards';
 import { ReadinessBottomSheet } from '@/components/ReadinessBottomSheet';
-import { ProgressRing } from '@/components/ProgressRing';
+import { ReadinessRingV2 } from '@/components/ReadinessRingV2';
 import { Sparkline } from '@/components/Sparkline';
+import { StreakStatusIcon } from '@/components/StreakStatusIcon';
+import { InfoTooltip } from '@/components/InfoTooltip';
 import { WordifiLogo } from '@/components/WordifiLogo';
 import { formatXp } from '@/lib/badgeHelpers';
+import { getReadinessStub, getStreakStub, getDailyRollupStub } from '@/lib/gamificationStubs';
+import { getBaseStreakRequirement } from '@/lib/gamificationHelpers';
 import { useHomeData, type LeaderboardNeighbor } from '@/lib/useHomeData';
 import { getBadgeByStreak, useBadgeLadder } from '@/hooks/useBadgeLadder';
 import { useGameState } from '@/hooks/useGameState';
@@ -128,6 +135,7 @@ export default function HomeScreen() {
   const [showPaywall, setShowPaywall] = React.useState(false);
   const [showStreakPaywallSheet, setShowStreakPaywallSheet] = React.useState(false);
   const [showUpgradePaywallSheet, setShowUpgradePaywallSheet] = React.useState(false);
+  const [readinessTooltipVisible, setReadinessTooltipVisible] = React.useState(false);
 
   const isPaidUser = PAID_TIERS.has(data.subscriptionTier);
   const showUpgradeBanner = !isPaidUser;
@@ -146,6 +154,12 @@ export default function HomeScreen() {
   const streakDays       = gameState?.streak.current_days ?? 0;
   const badgeName        = getBadgeByStreak(streakDays, ladder)?.name ?? '';
 
+  // ── Streak status icon data ──────────────────────────────────────────────
+  const currentBadgeRank = gameState?.badge.current_rank ?? 0;
+  const missedDaysAtRank = gameState?.badge.missed_days_at_rank ?? 0;
+  const currentBadge     = ladder.find((b) => b.rank === currentBadgeRank) ?? null;
+  const nextBadge        = ladder.find((b) => b.rank === currentBadgeRank + 1) ?? null;
+
   // Show streak nudge card when: free user, streak req > 5 free cap, not yet met, no questions remaining
   const showStreakNudge =
     !isPaidUser &&
@@ -157,6 +171,14 @@ export default function HomeScreen() {
   const formattedXp = useMemo(() => formatXp(data.xp), [data.xp]);
   const initial = (data.firstName ?? user?.email ?? '?').charAt(0).toUpperCase();
   const scoreInt = Math.round(data.readiness);
+
+  // ── Gamification v2.8 stub data (TODO: replace with RPC in next sprint) ──
+  // Using 'paid30' scenario as the default visual state for development.
+  const gamReadiness = getReadinessStub('paid30');
+  const gamStreak    = getStreakStub('paid30');
+  const gamRollup    = getDailyRollupStub('paid30');
+  const gamBaseReq   = getBaseStreakRequirement(gamStreak.current_streak_days);
+  const gamTodayReq  = gamBaseReq + gamStreak.daily_requirement_tier_adjustment;
 
   // Sparkline data arrays (7 values)
   const xpSparkData = useMemo(
@@ -305,10 +327,20 @@ export default function HomeScreen() {
           <View style={s.heroGlow1} />
           <View style={s.heroGlow2} />
 
-          {/* Top: label + countdown + arrow */}
+          {/* Top: label + ⓘ icon + countdown + arrow */}
           <View style={s.heroTop}>
             <View style={s.heroTitleWrap}>
               <Text style={s.heroLabel}>EXAM READINESS</Text>
+              <Pressable
+                onPress={() => setReadinessTooltipVisible(true)}
+                hitSlop={8}
+                accessibilityLabel="About Exam Readiness"
+                accessibilityRole="button"
+              >
+                <View style={s.infoIcon}>
+                  <Text style={s.infoIconText}>i</Text>
+                </View>
+              </Pressable>
             </View>
             <View style={s.heroTopRight}>
               {data.daysToExam !== null ? (
@@ -323,22 +355,37 @@ export default function HomeScreen() {
             </View>
           </View>
 
-          {/* Score ring */}
+          {/* Readiness ring v2 — multi-colour progressive (display-only, no tap) */}
           <View style={s.scoreZone}>
-            <ProgressRing score={scoreInt} size={214} strokeWidth={10} />
-            <Text style={s.scoreCaption}>{readinessCaption(scoreInt)}</Text>
+            <ReadinessRingV2
+              normalizedScore={gamReadiness.normalized_score}
+              size={140}
+            />
           </View>
 
-          {/* Streak card */}
+          {/* Streak row — single inline row */}
           <View style={s.streakCard}>
-            <View style={s.streakIconWrap}>
-              <Flame color="#FDE68A" size={20} />
+            <View style={s.streakFlameWrap}>
+              <AnimatedFlame size={16} animated />
             </View>
-            <View style={s.streakCopy}>
-              <Text style={s.streakValue}>{data.streak}</Text>
-              <Text style={s.streakLabel}>day streak</Text>
+            <Text style={s.streakNum}>{gamStreak.current_streak_days}</Text>
+            <Text style={s.streakWord}>day streak</Text>
+            <View style={{ marginLeft: 8 }}>
+              <StreakStatusIcon
+                currentStreakDays={streakDays}
+                missedDaysAtRank={missedDaysAtRank}
+                todayRequirementMet={requirementMet}
+                todayRequirement={todayRequirement}
+                currentBadge={currentBadge}
+                nextBadge={nextBadge}
+              />
+            </View>
+            <View style={{ flex: 1, alignItems: 'flex-end' }}>
+              <FlameStrip days={gamRollup} />
             </View>
           </View>
+          {/* Today's requirement — below streak row, full width */}
+          <Text style={s.streakReqLabel}>Today: {gamTodayReq} questions</Text>
 
           {/* Stats row: XP + 7-day trend */}
           <View style={s.statsRow}>
@@ -360,6 +407,11 @@ export default function HomeScreen() {
               </Text>
               <Sparkline data={trendSparkData.length === 7 ? trendSparkData : [0,0,0,0,0,0,0]} color={BANANI.success} height={24} />
             </View>
+          </View>
+
+          {/* Practice stats: Total Practiced + Accuracy */}
+          <View style={s.practiceStatsWrap}>
+            <PracticeStatsCards rollup={gamRollup} />
           </View>
 
           {/* Divider */}
@@ -421,6 +473,13 @@ export default function HomeScreen() {
               );
             })}
           </View>
+
+          {/* Readiness info tooltip */}
+          <InfoTooltip
+            visible={readinessTooltipVisible}
+            onDismiss={() => setReadinessTooltipVisible(false)}
+            text="Your Readiness reflects how well you've performed since you joined Wordifi and how consistently you've practised in the last 2 weeks. Practise daily and answer accurately to climb."
+          />
         </Pressable>
 
         {/* ── Ranking Card ── */}
@@ -777,7 +836,25 @@ const s = StyleSheet.create({
     zIndex: 1,
   },
   heroTitleWrap: {
-    gap: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  infoIcon: {
+    width: 13,
+    height: 13,
+    borderRadius: 7,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    borderWidth: 1,
+    borderColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  infoIconText: {
+    fontFamily: fontFamily.bodySemiBold,
+    fontSize: 9,
+    color: '#FFFFFF',
+    lineHeight: 13,
   },
   heroTopRight: {
     flexDirection: 'row',
@@ -831,36 +908,45 @@ const s = StyleSheet.create({
   streakCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: 12,
+    gap: 4,
+    paddingHorizontal: 10,
     paddingVertical: 8,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    marginBottom: 4,
+    zIndex: 1,
+  },
+  streakFlameWrap: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 4,
+  },
+  streakNum: {
+    fontFamily: fontFamily.bodySemiBold,
+    fontSize: 15,
+    color: '#FFFFFF',
+    lineHeight: 18,
+  },
+  streakWord: {
+    fontFamily: fontFamily.bodyRegular,
+    fontSize: 9,
+    color: 'rgba(255,255,255,0.75)',
+    lineHeight: 13,
+  },
+  streakReqLabel: {
+    fontFamily: fontFamily.bodyRegular,
+    fontSize: 10,
+    color: 'rgba(255,255,255,0.7)',
     marginBottom: 12,
     zIndex: 1,
   },
-  streakIconWrap: {
-    width: 34,
-    height: 34,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.14)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  streakCopy: {
-    gap: 0,
-  },
-  streakValue: {
-    fontFamily: fontFamily.display,
-    fontSize: 22,
-    color: BANANI.primaryFg,
-    lineHeight: 22,
-    letterSpacing: -1,
-  },
-  streakLabel: {
-    fontFamily: fontFamily.bodySemiBold,
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.72)',
+  practiceStatsWrap: {
+    marginBottom: 16,
+    zIndex: 1,
   },
 
   // Stats row

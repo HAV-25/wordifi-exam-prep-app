@@ -115,8 +115,8 @@ export function HomeDashboard({ onStartPractice }: HomeDashboardProps) {
   useEffect(() => {
     if (userId) {
       fetchSectionAccuracy(userId).then((acc) => {
-        setHorenPct(Math.round(acc.horenAccuracy * 100));
-        setLesenPct(Math.round(acc.lesenAccuracy * 100));
+        setHorenPct(acc.horenTotal > 0 ? Math.round((acc.horenCorrect / acc.horenTotal) * 100) : 0);
+        setLesenPct(acc.lesenTotal > 0 ? Math.round((acc.lesenCorrect / acc.lesenTotal) * 100) : 0);
       }).catch(() => {});
     }
   }, [userId]);

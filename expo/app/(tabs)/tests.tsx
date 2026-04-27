@@ -40,7 +40,9 @@ import {
   fetchSprechenTeile,
 } from '@/lib/sprechenHelpers';
 import {
+  checkFreeHorenLesenAccess,
   checkRetestAvailability,
+  checkTrialTeilAccess,
   fetchAvailableTeile,
   fetchPreviousSessionResult,
   fetchSectionalQuestions,
@@ -216,16 +218,25 @@ export default function TestsScreen() {
     queryFn: () => hasCompletedAnyMockTest(userId),
   });
 
-  const handleStartSprechen = useCallback((teil: number) => {
+  const handleStartSprechen = useCallback(async (teil: number) => {
     if (!sprechenEnabled) {
       // Trigger #7 — bottom sheet first
       setPaywallSheetTrigger('sprechen_locked');
       setShowPaywallSheet(true);
       return;
     }
+    // Trial: each Sprechen teil once
+    if (access.tier === 'free_trial') {
+      const { canAccess } = await checkTrialTeilAccess(userId, targetLevel, 'Sprechen', teil);
+      if (!canAccess) {
+        setPaywallSheetTrigger('sectional_trial_limit');
+        setShowPaywallSheet(true);
+        return;
+      }
+    }
     setSprechenStarting(teil);
     router.push({ pathname: '/sprechen-realtime', params: { level: targetLevel, teil: String(teil) } });
-  }, [targetLevel, sprechenEnabled]);
+  }, [targetLevel, sprechenEnabled, access.tier, userId]);
 
   const handleStartSchreiben = useCallback(async (teil: number) => {
     if (!schreibenEnabled) {
@@ -233,6 +244,15 @@ export default function TestsScreen() {
       setPaywallSheetTrigger('schreiben_locked');
       setShowPaywallSheet(true);
       return;
+    }
+    // Trial: each Schreiben teil once
+    if (access.tier === 'free_trial') {
+      const { canAccess } = await checkTrialTeilAccess(userId, targetLevel, 'Schreiben', teil);
+      if (!canAccess) {
+        setPaywallSheetTrigger('sectional_trial_limit');
+        setShowPaywallSheet(true);
+        return;
+      }
     }
     setSchreibenStarting(teil);
     try {
@@ -260,11 +280,35 @@ export default function TestsScreen() {
 
   const openSetup = useCallback(
     async (teilInfo: TeilInfo) => {
-      if (!sectionalEnabled) {
-        // Trigger #5 — sectional exhausted → direct Adapty (hard block)
+      const isHorenLesen = teilInfo.section === 'Hören' || teilInfo.section === 'Lesen';
+
+      if (access.tier === 'free' && isHorenLesen) {
+        // Free tier: 1 Hören teil + 1 Lesen teil lifetime. Check before opening setup.
+        const { canAccess } = await checkFreeHorenLesenAccess(
+          userId, targetLevel, teilInfo.section as 'Hören' | 'Lesen',
+        );
+        if (!canAccess) {
+          setPaywallSheetTrigger('sectional_free_limit');
+          setShowPaywallSheet(true);
+          return;
+        }
+        // canAccess → fall through to setup modal
+      } else if (!sectionalEnabled) {
+        // Free tier on non-Hören/Lesen sections, or any other unlicensed case → hard paywall
         setShowPaywall(true);
         return;
+      } else if (access.tier === 'free_trial') {
+        // Trial: each (section × teil) once
+        const { canAccess } = await checkTrialTeilAccess(
+          userId, targetLevel, teilInfo.section, teilInfo.teil,
+        );
+        if (!canAccess) {
+          setPaywallSheetTrigger('sectional_trial_limit');
+          setShowPaywallSheet(true);
+          return;
+        }
       }
+
       setSetup({
         visible: true,
         teilInfo,
@@ -281,7 +325,7 @@ export default function TestsScreen() {
         setSetup((prev) => ({ ...prev, isLoadingRetest: false }));
       }
     },
-    [userId, targetLevel, sectionalEnabled]
+    [userId, targetLevel, sectionalEnabled, access.tier]
   );
 
   const closeSetup = useCallback(() => {

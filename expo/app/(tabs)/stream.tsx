@@ -172,8 +172,8 @@ export default function TestStreamScreen() {
   useEffect(() => {
     if (userId) {
       fetchSectionAccuracy(userId).then((acc) => {
-        setHorenPct(Math.round(acc.horenAccuracy * 100));
-        setLesenPct(Math.round(acc.lesenAccuracy * 100));
+        setHorenPct(acc.horenTotal > 0 ? Math.round((acc.horenCorrect / acc.horenTotal) * 100) : 0);
+        setLesenPct(acc.lesenTotal > 0 ? Math.round((acc.lesenCorrect / acc.lesenTotal) * 100) : 0);
       }).catch(() => {});
     }
   }, [userId]);
@@ -575,7 +575,7 @@ export default function TestStreamScreen() {
             ? (access.stream_questions_per_day ?? 5)   // all bars filled: used === total
             : (access.stream_questions_per_day ?? 5) - (access.stream_questions_remaining ?? 0)
         }
-        streamTotal={paywallSheetTrigger === 'stream_80_trial' ? 20 : (access.stream_questions_per_day ?? 5)}
+        streamTotal={access.stream_questions_per_day ?? 5}
         streakDays={streakDays}
         streakRequirement={todayRequirement}
         badgeName={badgeName}

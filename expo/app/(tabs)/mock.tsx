@@ -49,6 +49,7 @@ import {
   fetchActiveMockV2,
   fetchResumableMockV2,
 } from '@/lib/mockV2Helpers';
+import { checkTrialMockAccess } from '@/lib/sectionalHelpers';
 import { useAccess } from '@/providers/AccessProvider';
 import { useAuth } from '@/providers/AuthProvider';
 
@@ -150,6 +151,15 @@ export default function MockScreen() {
       setPaywallSheetTrigger('mock_locked');
       setShowPaywallSheet(true);
       return;
+    }
+    // Trial: one mock test total — gate before the active-session check
+    if (access.tier === 'free_trial') {
+      const { canAccess } = await checkTrialMockAccess(userId);
+      if (!canAccess) {
+        setPaywallSheetTrigger('mock_trial_limit');
+        setShowPaywallSheet(true);
+        return;
+      }
     }
     if (MOCK_V2_ENABLED) {
       try {

@@ -10,8 +10,8 @@ import { WalkthroughContext } from '@/components/walkthrough/WalkthroughProvider
  *   const ref = useWalkthroughTarget('profile-avatar');
  *   <View ref={ref} ... />
  */
-export function useWalkthroughTarget(key: string): React.RefObject<View> {
-  const ref = useRef<View>(null);
+export function useWalkthroughTarget(key: string): React.RefObject<View | null> {
+  const ref = useRef<View | null>(null);
   const ctx = useContext(WalkthroughContext);
 
   useEffect(() => {

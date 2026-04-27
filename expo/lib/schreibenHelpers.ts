@@ -92,11 +92,14 @@ export const assessSchreiben = async (
 
   // Client-side cache check — skip Edge Function if already assessed
   try {
-    const { data: cached } = await supabase
+    const { data: cachedRaw } = await supabase
       .from('schreiben_submissions')
       .select('assessment_json, score, passed')
       .eq('question_id', question.id)
       .maybeSingle();
+
+    // Cast needed: generated DB types are out of sync with actual schema
+    const cached = cachedRaw as { assessment_json: AssessmentResult | null; score: number | null; passed: boolean | null } | null;
 
     if (cached?.assessment_json) {
       console.log('schreibenHelpers assessSchreiben: returning cached result, score:', cached.score);
@@ -278,7 +281,8 @@ export async function fetchSchreibenQuestions(
     throw error;
   }
 
-  const all = (data ?? []) as AppQuestion[];
+  // Cast via unknown: generated types are stale (task_subtype not yet in generated schema)
+  const all = (data ?? []) as unknown as AppQuestion[];
   const shuffled = shuffleArray(all);
   return shuffled.slice(0, limit);
 }

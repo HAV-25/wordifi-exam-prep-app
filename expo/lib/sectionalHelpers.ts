@@ -70,6 +70,83 @@ export async function fetchTeileHistory(userId: string, level: string): Promise<
   return result;
 }
 
+// ─── Tier access checks ───────────────────────────────────────────────────────
+
+/**
+ * Free tier: user gets 1 Hören teil + 1 Lesen teil lifetime.
+ * Returns canAccess=true if they haven't started any session in this section yet.
+ * Fails open (returns true) on DB error so the user is never unjustly blocked.
+ */
+export async function checkFreeHorenLesenAccess(
+  userId: string,
+  targetLevel: string,
+  section: 'Hören' | 'Lesen',
+): Promise<{ canAccess: boolean }> {
+  if (!userId) return { canAccess: true };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase.from('test_sessions') as any)
+    .select('id')
+    .eq('user_id', userId)
+    .eq('level', targetLevel)
+    .eq('section', section)
+    .eq('session_type', 'sectional')
+    .limit(1);
+  if (error) {
+    console.log('checkFreeHorenLesenAccess error', error);
+    return { canAccess: true };
+  }
+  return { canAccess: (data?.length ?? 0) === 0 };
+}
+
+/**
+ * Trial tier: user can access each (section × teil) exactly once.
+ * Returns canAccess=true if no test_sessions row exists for this combination.
+ * Works for all section types (Hören, Lesen, Sprachbausteine, Schreiben, Sprechen)
+ * because every test type creates a test_sessions row.
+ * Fails open on DB error.
+ */
+export async function checkTrialTeilAccess(
+  userId: string,
+  targetLevel: string,
+  section: string,
+  teil: number,
+): Promise<{ canAccess: boolean }> {
+  if (!userId) return { canAccess: true };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase.from('test_sessions') as any)
+    .select('id')
+    .eq('user_id', userId)
+    .eq('level', targetLevel)
+    .eq('section', section)
+    .eq('teil', teil)
+    .limit(1);
+  if (error) {
+    console.log('checkTrialTeilAccess error', error);
+    return { canAccess: true };
+  }
+  return { canAccess: (data?.length ?? 0) === 0 };
+}
+
+/**
+ * Trial tier: user gets exactly 1 mock test during the trial.
+ * Returns canAccess=true if no mock test_sessions row exists for this user.
+ * Fails open on DB error.
+ */
+export async function checkTrialMockAccess(userId: string): Promise<{ canAccess: boolean }> {
+  if (!userId) return { canAccess: true };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase.from('test_sessions') as any)
+    .select('id')
+    .eq('user_id', userId)
+    .eq('session_type', 'mock')
+    .limit(1);
+  if (error) {
+    console.log('checkTrialMockAccess error', error);
+    return { canAccess: true };
+  }
+  return { canAccess: (data?.length ?? 0) === 0 };
+}
+
 export async function hasCompletedAnyMockTest(userId: string): Promise<boolean> {
   if (!userId) return false;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

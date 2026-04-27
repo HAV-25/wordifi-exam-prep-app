@@ -1,7 +1,6 @@
 import { Platform } from 'react-native';
 import { Audio } from 'expo-av';
 import { File as FSFile, Paths } from 'expo-file-system/next';
-import { EncodingType } from 'expo-file-system';
 import * as Sentry from '@sentry/react-native';
 import { track } from '@/lib/track';
 
@@ -319,13 +318,13 @@ export class WebRTCRealtimeSession implements IRealtimeSession {
       if (Platform.OS === 'web') {
         this.audioEl = document.createElement('audio');
         this.audioEl.autoplay = true;
-        this.pc.ontrack = (e: RTCTrackEvent) => {
+        this.pc!.ontrack = (e: RTCTrackEvent) => {
           if (this.audioEl && e.streams[0]) {
             this.audioEl.srcObject = e.streams[0];
           }
         };
       } else {
-        this.pc.ontrack = () => {
+        this.pc!.ontrack = () => {
           // react-native-webrtc routes audio to device speaker automatically
         };
       }
@@ -334,10 +333,10 @@ export class WebRTCRealtimeSession implements IRealtimeSession {
       this.mediaStream = await mediaDevices.getUserMedia({
         audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
       });
-      const track = this.mediaStream.getTracks()[0];
-      if (track) this.pc.addTrack(track, this.mediaStream);
+      const track = this.mediaStream!.getTracks()[0];
+      if (track) this.pc!.addTrack(track, this.mediaStream!);
 
-      this.dc = this.pc.createDataChannel('oai-events');
+      this.dc = this.pc!.createDataChannel('oai-events');
       this.dc.onopen = () => {
         console.log('[Realtime] DC open');
         this._isConnected = true;
@@ -356,8 +355,8 @@ export class WebRTCRealtimeSession implements IRealtimeSession {
         this._isConnected = false;
       };
 
-      const offer = await this.pc.createOffer();
-      await this.pc.setLocalDescription(offer);
+      const offer = await this.pc!.createOffer();
+      await this.pc!.setLocalDescription(offer);
 
       const sdpRes = await fetch(
         `https://api.openai.com/v1/realtime?model=${REALTIME_MODEL}`,
@@ -380,7 +379,7 @@ export class WebRTCRealtimeSession implements IRealtimeSession {
       const sessionDesc = Platform.OS !== 'web'
         ? new _NativeRTCSessionDescription({ type: 'answer', sdp: answerSdp })
         : { type: 'answer' as RTCSdpType, sdp: answerSdp };
-      await this.pc.setRemoteDescription(sessionDesc);
+      await this.pc!.setRemoteDescription(sessionDesc);
       console.log('[Realtime] WebRTC connected');
     } catch (err) {
       console.log('[Realtime] Connect error:', err);
@@ -672,7 +671,7 @@ export class NativeWSRealtimeSession implements IRealtimeSession {
 
       const tempFile = new FSFile(Paths.cache, `ai_response_${Date.now()}.wav`);
       await tempFile.create({ overwrite: true });
-      await tempFile.write(wavB64, { encoding: EncodingType.Base64 });
+      await tempFile.write(wavB64, { encoding: 'base64' });
       const tempUri = tempFile.uri;
 
       await Audio.setAudioModeAsync({

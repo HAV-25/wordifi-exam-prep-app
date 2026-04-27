@@ -14,6 +14,7 @@ import {
   Flame,
   Gift,
   Image as ImageIcon,
+  Info,
   LogOut,
   Pencil,
   Star,
@@ -167,16 +168,16 @@ export default function ProfileScreen() {
   const [editTag, setEditTag] = useState('');
   const [tagSaving, setTagSaving] = useState(false);
 
-  // Tier config display names
+  // Tier config display names + descriptions
   const tierConfigQuery = useQuery({
     queryKey: ['tier-config'],
-    queryFn: async (): Promise<Record<string, string>> => {
+    queryFn: async (): Promise<Record<string, { display_name: string; tier_description: string }>> => {
       const { data, error } = await (supabase.from('tier_config' as never) as any)
-        .select('tier_name, display_name');
+        .select('tier_name, display_name, tier_description');
       if (error || !data) return {};
       return Object.fromEntries(
-        (data as Array<{ tier_name: string; display_name: string }>).map((r) => [
-          r.tier_name, r.display_name,
+        (data as Array<{ tier_name: string; display_name: string; tier_description: string }>).map((r) => [
+          r.tier_name, { display_name: r.display_name, tier_description: r.tier_description ?? '' },
         ])
       );
     },
@@ -184,7 +185,7 @@ export default function ProfileScreen() {
   });
 
   const tierDisplayName = useCallback(
-    (tier: string) => tierConfigQuery.data?.[tier] ?? TIER_DISPLAY_FALLBACK[tier] ?? tier,
+    (t: string) => tierConfigQuery.data?.[t]?.display_name ?? TIER_DISPLAY_FALLBACK[t] ?? t,
     [tierConfigQuery.data],
   );
 
@@ -192,6 +193,23 @@ export default function ProfileScreen() {
   const tier = profile?.subscription_tier ?? 'free';
   const showUpgradeCard = FREE_TIERS.has(tier);
   const isPaid = PAID_TIERS.has(tier);
+
+  const tierDescription = tierConfigQuery.data?.[tier]?.tier_description ?? '';
+
+  // Tooltip state for tier description
+  const [tierTooltipVisible, setTierTooltipVisible] = useState(false);
+  const tooltipDismissTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showTierTooltip = useCallback(() => {
+    setTierTooltipVisible(true);
+    if (tooltipDismissTimer.current) clearTimeout(tooltipDismissTimer.current);
+    tooltipDismissTimer.current = setTimeout(() => setTierTooltipVisible(false), 3000);
+  }, []);
+
+  const hideTierTooltip = useCallback(() => {
+    if (tooltipDismissTimer.current) clearTimeout(tooltipDismissTimer.current);
+    setTierTooltipVisible(false);
+  }, []);
   const trialExpiresAt = (profile as Record<string, unknown> | null)
     ?.trial_expires_at as string | null ?? null;
   const trialActive = profile?.trial_active ?? false;
@@ -556,6 +574,11 @@ export default function ProfileScreen() {
 
           <InfoRow label="Plan">
             <Text style={styles.rowValue}>{tierDisplayName(tier)}</Text>
+            {tierDescription ? (
+              <Pressable onPress={showTierTooltip} hitSlop={8} accessibilityLabel="About this plan">
+                <Info size={16} color={colors.primaryBlue} />
+              </Pressable>
+            ) : null}
             <TierBadge tier={tier} isPaid={isPaid} />
           </InfoRow>
 
@@ -601,6 +624,21 @@ export default function ProfileScreen() {
           )}
         </View>
       </ScrollView>
+
+      {/* ── Tier description tooltip ────────────────────────────────── */}
+      <Modal
+        visible={tierTooltipVisible}
+        animationType="fade"
+        transparent
+        onRequestClose={hideTierTooltip}
+      >
+        <Pressable style={styles.tooltipBackdrop} onPress={hideTierTooltip}>
+          <View style={styles.tooltipCard}>
+            <Text style={styles.tooltipTitle}>{tierDisplayName(tier)}</Text>
+            <Text style={styles.tooltipBody}>{tierDescription}</Text>
+          </View>
+        </Pressable>
+      </Modal>
 
       {/* ── Avatar Edit Sheet ───────────────────────────────────────── */}
       <Modal
@@ -1331,5 +1369,37 @@ const styles = StyleSheet.create({
   cropImage: {
     width: '100%',
     height: '100%',
+  },
+
+  // Tier description tooltip
+  tooltipBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+  },
+  tooltipCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    gap: 8,
+    maxWidth: 340,
+    width: '100%',
+    ...Platform.select({
+      ios:     { shadowColor: '#0F1F3D', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.14, shadowRadius: 24 },
+      android: { elevation: 8 },
+    }),
+  },
+  tooltipTitle: {
+    fontFamily: 'Outfit_800ExtraBold',
+    fontSize: 15,
+    color: '#0A0E1A',
+  },
+  tooltipBody: {
+    fontFamily: 'NunitoSans_400Regular',
+    fontSize: 13,
+    color: '#374151',
+    lineHeight: 20,
   },
 });

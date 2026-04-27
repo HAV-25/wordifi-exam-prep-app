@@ -17,6 +17,7 @@ export type GameState = {
   badge: {
     current_rank: number;
     highest_rank: number;
+    missed_days_at_rank: number; // v3.0 — gradual decline counter; 0 when streak active
   };
   readiness: {
     current_score: number;

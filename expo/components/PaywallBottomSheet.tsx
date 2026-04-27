@@ -33,7 +33,11 @@ export type PaywallTriggerContext =
   | 'schreiben_locked'
   | 'sprechen_locked'
   | 'mock_locked'
-  | 'streak_req_exceeds_free';
+  | 'streak_req_exceeds_free'
+  // Tier access limits
+  | 'sectional_free_limit'   // free user tried a second Hören or Lesen teil
+  | 'sectional_trial_limit'  // trial user tried to repeat a teil
+  | 'mock_trial_limit';      // trial user tried a second mock test
 
 export interface PaywallBottomSheetProps {
   visible: boolean;
@@ -111,6 +115,27 @@ const PAYWALL_COPY: Record<
       `You've used your 5 free. ${remaining} more to keep ${badge}.`,
     indicator: 'streak_progress',
     show_badge: true,
+  },
+  sectional_free_limit: {
+    headline: 'Unlock all Teile',
+    subline: () =>
+      "You've used your free preview for this section. Upgrade to access every Teil and all sections — Hören, Lesen, Schreiben, Sprechen and more.",
+    indicator: 'none',
+    show_badge: true,
+  },
+  sectional_trial_limit: {
+    headline: 'Upgrade to repeat tests',
+    subline: () =>
+      "Your trial lets you try each Teil once. Upgrade for unlimited retakes and full access to every Teil.",
+    indicator: 'none',
+    show_badge: false,
+  },
+  mock_trial_limit: {
+    headline: 'Upgrade for more mocks',
+    subline: () =>
+      "Your trial includes one full mock test. Upgrade for unlimited mock exams and see your Readiness Score improve with every attempt.",
+    indicator: 'none',
+    show_badge: false,
   },
 };
 

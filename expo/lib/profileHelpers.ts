@@ -27,7 +27,22 @@ export async function ensureUserProfile(user: User): Promise<UserProfile> {
     return data as UserProfile;
   }
 
-  const trialExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  // Read trial duration from tier_config so it's DB-driven, not hardcoded.
+  // Falls back to 72 h if the row is missing or the query errors.
+  let trialDurationHours = 72;
+  try {
+    const { data: tcRow } = await supabase
+      .from('tier_config')
+      .select('trial_duration_hours')
+      .eq('tier_name', 'free_trial')
+      .single();
+    if (tcRow && typeof (tcRow as Record<string, unknown>).trial_duration_hours === 'number') {
+      trialDurationHours = (tcRow as Record<string, unknown>).trial_duration_hours as number;
+    }
+  } catch {
+    // non-critical — fallback already set
+  }
+  const trialExpiresAt = new Date(Date.now() + trialDurationHours * 60 * 60 * 1000).toISOString();
   const playerName =
     user.user_metadata?.full_name ??
     user.user_metadata?.name ??

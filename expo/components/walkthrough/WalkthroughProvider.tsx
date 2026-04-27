@@ -44,12 +44,12 @@ export type WalkthroughContextValue = {
   isActive: boolean;
   currentStep: number;
   totalSteps: number;
-  registerTarget: (key: string, ref: React.RefObject<View>) => void;
+  registerTarget: (key: string, ref: React.RefObject<View | null>) => void;
   startWalkthrough: () => void;
   nextStep: () => void;
   skipWalkthrough: () => void;
   completeWalkthrough: () => Promise<void>;
-  getTargetRef: (key: string) => React.RefObject<View> | undefined;
+  getTargetRef: (key: string) => React.RefObject<View | null> | undefined;
 };
 
 // ─── Step definitions ─────────────────────────────────────────────────────────
@@ -128,10 +128,10 @@ export function WalkthroughProvider({ children }: { children: React.ReactNode })
   const { user } = useAuth();
   const [isActive, setIsActive] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
-  const targetsRef = useRef<Map<string, React.RefObject<View>>>(new Map());
+  const targetsRef = useRef<Map<string, React.RefObject<View | null>>>(new Map());
   const hasCheckedRef = useRef(false);
 
-  const registerTarget = useCallback((key: string, ref: React.RefObject<View>) => {
+  const registerTarget = useCallback((key: string, ref: React.RefObject<View | null>) => {
     targetsRef.current.set(key, ref);
   }, []);
 
