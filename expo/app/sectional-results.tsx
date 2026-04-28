@@ -1,5 +1,5 @@
 import { Stack, router, useLocalSearchParams } from 'expo-router';
-import { Share2 } from 'lucide-react-native';
+import { ChevronRight, Share2 } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -318,8 +318,9 @@ export default function SectionalResultsScreen() {
           style={styles.shareButton}
           testID="sectional-share-button"
         >
-          <Share2 size={18} color={colors.blue} />
+          <Share2 size={20} color={Colors.accent} />
           <Text style={styles.shareButtonText}>Share your result</Text>
+          <ChevronRight size={16} color={Colors.textMuted} style={styles.shareChevron} />
         </Pressable>
 
         <Pressable
@@ -470,23 +471,26 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
   },
 
-  // ── Share button ──────────────────────────────────────────
+  // ── Share button (opens ShareResultSheet) ─────────────────
   shareButton: {
+    height: 56,
+    borderRadius: 16,
+    backgroundColor: Colors.primaryDeep,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: colors.white,
-    borderRadius: 16,
-    paddingVertical: 14,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
+    paddingHorizontal: 20,
+    gap: 12,
   },
   shareButtonText: {
-    fontSize: 15,
-    fontWeight: '700' as const,
-    color: colors.blue,
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '800' as const,
+    color: Colors.white,
+    fontFamily: 'Outfit_800ExtraBold',
   },
+  shareChevron: {
+    marginLeft: 'auto',
+  } as object,
 
   primaryButton: {
     minHeight: 54,
@@ -505,6 +509,9 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   secondaryButtonText: {
     color: Colors.primary,
