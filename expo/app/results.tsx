@@ -173,7 +173,7 @@ export default function ResultsScreen() {
                 <Text style={styles.xpLabel}> XP</Text>
               </View>
             </View>
-            <ScoreRing label="Score" score={scorePct} size={80} />
+            <ScoreRing label="Score" score={scorePct} size={80} color={sColor} />
           </View>
         </View>
 

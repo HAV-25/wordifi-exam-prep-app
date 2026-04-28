@@ -364,7 +364,7 @@ export default function MockResultsScreen() {
                 </Animated.Text>
               </View>
             </View>
-            <ScoreRing label="Overall" score={overallPct} size={96} />
+            <ScoreRing label="Overall" score={overallPct} size={96} color={scoreColor(overallPct)} />
           </View>
         </View>
 

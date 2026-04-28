@@ -219,7 +219,7 @@ export default function SprachbausteineResultsScreen() {
       >
         {/* Score header */}
         <View style={styles.scoreHeader}>
-          <ScoreRing score={scorePct} label="Score" size={100} />
+          <ScoreRing score={scorePct} label="Score" size={100} color={perf.color} />
           <View style={styles.scoreHeaderText}>
             <Text style={styles.scoreSectionName}>Sprachbausteine</Text>
             <Text style={[styles.perfLabel, { color: perf.color }]}>{perf.text}</Text>
