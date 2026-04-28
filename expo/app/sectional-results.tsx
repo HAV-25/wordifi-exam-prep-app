@@ -24,6 +24,7 @@ import { StimulusCard, shouldShowStimulus } from '@/components/StimulusCard';
 import Colors from '@/constants/colors';
 import { colors } from '@/theme';
 import { B } from '@/theme/banani';
+import { getBandColor } from '@/lib/gamificationHelpers';
 import { updateReadinessScore } from '@/lib/streamHelpers';
 import { useQuestionMeta } from '@/lib/useQuestionTypeMeta';
 import { useAuth } from '@/providers/AuthProvider';
@@ -35,11 +36,6 @@ function performanceLabel(score: number): { text: string; color: string } {
   return { text: 'Every answer is a learning step', color: 'rgba(255,255,255,0.74)' };
 }
 
-function scoreColor(score: number): string {
-  if (score >= 70) return colors.green;
-  if (score >= 40) return colors.amber;
-  return 'rgba(255,255,255,0.9)';
-}
 
 function formatDuration(seconds: number): string {
   const m = Math.floor(seconds / 60);
@@ -121,7 +117,7 @@ export default function SectionalResultsScreen() {
   const examType = profile?.exam_type ?? 'German language';
 
   const perf = performanceLabel(scorePct);
-  const sColor = scoreColor(scorePct);
+  const sColor = getBandColor(scorePct);
 
   // Confetti + share sheet
   const confettiRef = useRef<ConfettiBurstRef>(null);

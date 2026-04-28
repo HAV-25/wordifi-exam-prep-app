@@ -24,6 +24,7 @@ import { ScoreRing } from '@/components/ScoreRing';
 import { StimulusCard, shouldShowStimulus } from '@/components/StimulusCard';
 import Colors from '@/constants/colors';
 import { colors } from '@/theme';
+import { getBandColor } from '@/lib/gamificationHelpers';
 import { submitQuestionReport } from '@/lib/mockHelpers';
 import { updateReadinessScore } from '@/lib/streamHelpers';
 import { useAuth } from '@/providers/AuthProvider';
@@ -53,12 +54,6 @@ function formatDuration(seconds: number): string {
   return `${m}m ${s}s`;
 }
 
-function scoreColor(pct: number): string {
-  if (pct < 60) return colors.red;
-  if (pct < 75) return colors.amber;
-  if (pct < 90) return colors.green;
-  return '#FFD700';
-}
 
 function retestDateString(): string {
   const d = new Date();
@@ -364,7 +359,7 @@ export default function MockResultsScreen() {
                 </Animated.Text>
               </View>
             </View>
-            <ScoreRing label="Overall" score={overallPct} size={96} color={scoreColor(overallPct)} />
+            <ScoreRing label="Overall" score={overallPct} size={96} color={getBandColor(overallPct)} />
           </View>
         </View>
 
@@ -375,9 +370,9 @@ export default function MockResultsScreen() {
               <Text style={styles.sectionBarName}>Hören</Text>
             </View>
             <View style={styles.barTrackOuter}>
-              <View style={[styles.barFillOuter, { width: `${Math.min(100, horenPct)}%`, backgroundColor: scoreColor(horenPct) }]} />
+              <View style={[styles.barFillOuter, { width: `${Math.min(100, horenPct)}%`, backgroundColor: getBandColor(horenPct) }]} />
             </View>
-            <Text style={[styles.sectionBarPct, { color: scoreColor(horenPct) }]}>
+            <Text style={[styles.sectionBarPct, { color: getBandColor(horenPct) }]}>
               {Math.round(horenPct)}%
             </Text>
           </View>
@@ -387,9 +382,9 @@ export default function MockResultsScreen() {
               <Text style={styles.sectionBarName}>Lesen</Text>
             </View>
             <View style={styles.barTrackOuter}>
-              <View style={[styles.barFillOuter, { width: `${Math.min(100, lesenPct)}%`, backgroundColor: scoreColor(lesenPct) }]} />
+              <View style={[styles.barFillOuter, { width: `${Math.min(100, lesenPct)}%`, backgroundColor: getBandColor(lesenPct) }]} />
             </View>
-            <Text style={[styles.sectionBarPct, { color: scoreColor(lesenPct) }]}>
+            <Text style={[styles.sectionBarPct, { color: getBandColor(lesenPct) }]}>
               {Math.round(lesenPct)}%
             </Text>
           </View>
@@ -400,9 +395,9 @@ export default function MockResultsScreen() {
                 <Text style={styles.sectionBarName}>Sprachbausteine</Text>
               </View>
               <View style={styles.barTrackOuter}>
-                <View style={[styles.barFillOuter, { width: `${Math.min(100, sprachbausteinePct)}%`, backgroundColor: scoreColor(sprachbausteinePct) }]} />
+                <View style={[styles.barFillOuter, { width: `${Math.min(100, sprachbausteinePct)}%`, backgroundColor: getBandColor(sprachbausteinePct) }]} />
               </View>
-              <Text style={[styles.sectionBarPct, { color: scoreColor(sprachbausteinePct) }]}>
+              <Text style={[styles.sectionBarPct, { color: getBandColor(sprachbausteinePct) }]}>
                 {Math.round(sprachbausteinePct)}%
               </Text>
             </View>

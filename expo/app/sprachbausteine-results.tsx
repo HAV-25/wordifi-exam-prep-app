@@ -23,6 +23,7 @@ import Colors from '@/constants/colors';
 import { colors } from '@/theme';
 import { useAuth } from '@/providers/AuthProvider';
 import type { AppQuestion } from '@/types/database';
+import { getBandColor } from '@/lib/gamificationHelpers';
 import type { BlankAnswers } from '@/lib/sectionalHelpers';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -219,7 +220,7 @@ export default function SprachbausteineResultsScreen() {
       >
         {/* Score header */}
         <View style={styles.scoreHeader}>
-          <ScoreRing score={scorePct} label="Score" size={100} color={perf.color} />
+          <ScoreRing score={scorePct} label="Score" size={100} color={getBandColor(scorePct)} />
           <View style={styles.scoreHeaderText}>
             <Text style={styles.scoreSectionName}>Sprachbausteine</Text>
             <Text style={[styles.perfLabel, { color: perf.color }]}>{perf.text}</Text>
