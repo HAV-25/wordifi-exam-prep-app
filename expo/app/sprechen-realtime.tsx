@@ -862,8 +862,6 @@ export default function SprechenRealtimeScreen() {
           </View>
         ) : null}
 
-        {/* Spacer to push footer down */}
-        <View style={{ flex: 1 }} />
 
         {showSilenceNudge && (
           <View style={styles.silenceNudge} pointerEvents="none">
@@ -1609,8 +1607,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: spacing.xl,
-    paddingTop: 32,
-    gap: 56,
+    gap: 40,
   },
   avatarItem: {
     alignItems: 'center',
