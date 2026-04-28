@@ -3,19 +3,12 @@ import { Animated, Easing, StyleSheet, Text } from 'react-native';
 
 import Colors from '@/constants/colors';
 import { colors } from '@/theme';
-import type { BadgeType } from '@/lib/streamHelpers';
+import { getTierColor, getTierEmoji } from '@/lib/badgeHelpers';
 
 type CelebrationOverlayProps = {
-  badgeType: BadgeType;
+  tierName: string;
   level: string;
   onDismiss: () => void;
-};
-
-const BADGE_CONFIG: Record<BadgeType, { emoji: string; label: string; color: string }> = {
-  bronze: { emoji: '🥉', label: 'Bronze Badge', color: '#CD7F32' },
-  silver: { emoji: '🥈', label: 'Silver Badge', color: '#C0C0C0' },
-  gold: { emoji: '🥇', label: 'Gold Badge', color: '#FFD700' },
-  platinum: { emoji: '💎', label: 'Platinum Badge', color: '#E5E4E2' },
 };
 
 const SPARKLE_POSITIONS = [
@@ -27,12 +20,13 @@ const SPARKLE_POSITIONS = [
   { bottom: -10, right: '20%' },
 ] as const;
 
-export function CelebrationOverlay({ badgeType, level, onDismiss }: CelebrationOverlayProps) {
+export function CelebrationOverlay({ tierName, level, onDismiss }: CelebrationOverlayProps) {
   const opacity = useRef(new Animated.Value(0)).current;
   const scale = useRef(new Animated.Value(0.5)).current;
   const emojiScale = useRef(new Animated.Value(0)).current;
   const sparkleOpacity = useRef(new Animated.Value(0)).current;
-  const config = BADGE_CONFIG[badgeType];
+  const color = getTierColor(tierName);
+  const emoji = getTierEmoji(tierName);
 
   useEffect(() => {
     Animated.parallel([
@@ -74,9 +68,9 @@ export function CelebrationOverlay({ badgeType, level, onDismiss }: CelebrationO
         ))}
 
         <Animated.Text style={[styles.emoji, { transform: [{ scale: emojiScale }] }]}>
-          {config.emoji}
+          {emoji}
         </Animated.Text>
-        <Text style={[styles.title, { color: config.color }]}>{config.label}</Text>
+        <Text style={[styles.title, { color }]}>{tierName}</Text>
         <Text style={styles.subtitle}>Unlocked for {level}!</Text>
         <Text style={styles.encouragement}>You're making real progress</Text>
       </Animated.View>

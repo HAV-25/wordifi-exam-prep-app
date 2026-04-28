@@ -75,7 +75,6 @@ export default function SchreibenTestScreen() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [totalScore, setTotalScore] = useState<number>(0);
   const [totalMaxScore, setTotalMaxScore] = useState<number>(0);
-  const [showSummary, setShowSummary] = useState<boolean>(false);
   const progressAnim = useRef(new Animated.Value(0)).current;
   const sessionStartTimeRef = useRef<number>(Date.now());
 
@@ -295,7 +294,7 @@ export default function SchreibenTestScreen() {
 
   const finishTest = useCallback(async () => {
     if (!sessionId || !userId) {
-      setShowSummary(true);
+      router.replace('/(tabs)/tests');
       return;
     }
 
@@ -340,7 +339,7 @@ export default function SchreibenTestScreen() {
       console.log('SchreibenTest finishTest error', err);
     }
 
-    setShowSummary(true);
+    router.replace('/(tabs)/tests');
   }, [sessionId, userId, totalScore, totalMaxScore, questionStates, profile, refreshProfile]);
 
   const handleNext = useCallback(() => {
@@ -380,58 +379,6 @@ export default function SchreibenTestScreen() {
             actionLabel="Back"
             onActionPress={() => router.back()}
             testID="schreiben-empty-state"
-          />
-        </View>
-      </View>
-    );
-  }
-
-  if (showSummary) {
-    const scorePct = totalMaxScore > 0 ? Math.round((totalScore / totalMaxScore) * 100) : 0;
-    const passedCount = Object.values(questionStates).filter((s) => s.assessment?.passed).length;
-
-    return (
-      <View style={[styles.screen, { paddingTop: insets.top }]}>
-        <Stack.Screen options={{ headerShown: false }} />
-        <AppHeader />
-        <ScrollView contentContainerStyle={[styles.summaryContent, { paddingBottom: insets.bottom + CTA_BUTTON_HEIGHT + BOTTOM_CONTENT_BUFFER }]} showsVerticalScrollIndicator={false}>
-          <View style={[styles.summaryHero, shadows.card]}>
-            <View style={styles.summaryIconWrap}>
-              <PenLine color={colors.white} size={24} />
-            </View>
-            <Text style={styles.summaryTitle}>Writing · Part {teil}</Text>
-            <Text style={styles.summarySubtitle}>{level} · {taskLabel}</Text>
-            <Text style={styles.summaryScore}>{totalScore} / {totalMaxScore}</Text>
-            <Text style={styles.summaryPct}>{scorePct}%</Text>
-            <Text style={styles.summaryPassed}>
-              {passedCount} of {questions.length} passed
-            </Text>
-          </View>
-
-          {questions.map((q, idx) => {
-            const state = questionStates[idx];
-            const a = state?.assessment;
-            if (!a) return null;
-            return (
-              <View key={q.id} style={[styles.summaryItem, shadows.card]}>
-                <View style={styles.summaryItemHeader}>
-                  <Text style={[styles.summaryItemIcon, a.passed ? styles.greenText : styles.redText]}>
-                    {a.passed ? '✓' : '✗'}
-                  </Text>
-                  <Text style={styles.summaryItemTitle}>Frage {idx + 1}</Text>
-                  <Text style={styles.summaryItemScore}>{a.overall_score}/{a.max_score}</Text>
-                </View>
-              </View>
-            );
-          })}
-        </ScrollView>
-
-        <View style={[styles.footer, { bottom: insets.bottom }]}>
-          <CTAButton
-            label="Back to tests"
-            onPress={() => router.replace('/(tabs)/tests')}
-            style={styles.footerBtn}
-            testID="back-to-tests"
           />
         </View>
       </View>
@@ -537,14 +484,23 @@ export default function SchreibenTestScreen() {
             testID="schreiben-share"
           >
             <Share2 color={colors.blue} size={18} />
-            <Text style={styles.shareBtnText}>Share result</Text>
+            <Text style={styles.shareBtnText}>Share your result</Text>
           </Pressable>
           <CTAButton
-            label={currentIndex === questions.length - 1 ? 'Finish test' : 'Next question →'}
+            label="Back to Tests"
             onPress={handleNext}
             style={styles.footerBtn}
             testID="schreiben-next"
           />
+          {currentIndex === questions.length - 1 ? (
+            <Pressable
+              onPress={() => router.replace('/')}
+              style={styles.homeBtn}
+              testID="schreiben-home"
+            >
+              <Text style={styles.homeBtnText}>Home</Text>
+            </Pressable>
+          ) : null}
         </View>
       ) : null}
     </KeyboardAvoidingView>
@@ -685,6 +641,17 @@ const styles = StyleSheet.create({
     color: colors.blue,
     fontWeight: '700' as const,
   },
+  homeBtn: {
+    minHeight: 48,
+    borderRadius: radius.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  homeBtnText: {
+    fontSize: fontSize.bodyMd,
+    color: colors.blue,
+    fontWeight: '700' as const,
+  },
   errorWrap: {
     alignItems: 'center',
     gap: spacing.md,
@@ -718,85 +685,5 @@ const styles = StyleSheet.create({
     fontSize: fontSize.bodyMd,
     color: colors.muted,
     fontWeight: '600' as const,
-  },
-  summaryContent: {
-    padding: spacing.xl,
-    gap: spacing.lg,
-    paddingBottom: 140,
-  },
-  summaryHero: {
-    backgroundColor: colors.navy,
-    borderRadius: radius.lg,
-    padding: spacing.xxl,
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  summaryIconWrap: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
-    backgroundColor: '#D84315',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.sm,
-  },
-  summaryTitle: {
-    fontSize: fontSize.displaySm,
-    fontWeight: '800' as const,
-    color: colors.white,
-  },
-  summarySubtitle: {
-    fontSize: fontSize.bodyMd,
-    color: 'rgba(255,255,255,0.65)',
-    fontWeight: '600' as const,
-  },
-  summaryScore: {
-    fontSize: 34,
-    fontWeight: '800' as const,
-    color: colors.white,
-    marginTop: spacing.md,
-  },
-  summaryPct: {
-    fontSize: fontSize.displayMd,
-    fontWeight: '800' as const,
-    color: colors.teal,
-  },
-  summaryPassed: {
-    fontSize: fontSize.bodyMd,
-    color: 'rgba(255,255,255,0.65)',
-    fontWeight: '600' as const,
-  },
-  summaryItem: {
-    backgroundColor: colors.white,
-    borderRadius: radius.lg,
-    padding: spacing.lg,
-    gap: spacing.sm,
-  },
-  summaryItemHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  summaryItemIcon: {
-    fontSize: fontSize.bodyLg,
-    fontWeight: '800' as const,
-    width: 22,
-  },
-  greenText: {
-    color: colors.green,
-  },
-  redText: {
-    color: colors.red,
-  },
-  summaryItemTitle: {
-    fontSize: fontSize.bodyMd,
-    fontWeight: '700' as const,
-    color: colors.navy,
-    flex: 1,
-  },
-  summaryItemScore: {
-    fontSize: fontSize.bodyMd,
-    fontWeight: '800' as const,
-    color: colors.navy,
   },
 });

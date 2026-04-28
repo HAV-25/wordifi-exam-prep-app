@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 
 import { countWords } from '@/lib/schreibenHelpers';
+import { SCHREIBEN_STAGES } from '@/constants/evaluationStages';
 import { B } from '@/theme/banani';
 import { fontFamily } from '@/theme/typography';
 import type { AppQuestion } from '@/types/database';
@@ -540,12 +541,7 @@ function OpinionVariant({ question, onSubmit, isSubmitted, isLoading }: VariantP
 }
 
 // ── Loading indicator ─────────────────────────────────────────────────────
-const ASSESSMENT_STAGES: Array<{ de: string; en: string }> = [
-  { de: 'Wir bewerten deine Antwort…',  en: 'We are evaluating your response…' },
-  { de: 'Grammatik wird überprüft…',     en: 'Checking grammar…' },
-  { de: 'Feedback wird vorbereitet…',    en: 'Preparing feedback…' },
-  { de: 'Fast fertig…',                  en: 'Almost done…' },
-];
+const ASSESSMENT_STAGES = SCHREIBEN_STAGES;
 
 function LoadingIndicator() {
   const fadeAnim = useRef(new Animated.Value(0)).current;

@@ -7,16 +7,12 @@ const FOOTER_HEIGHT = 220;       // share(56) + primary(54) + secondary(48) + ga
 const BOTTOM_CONTENT_BUFFER = 24; // breathing room below last content item
 import {
   AccessibilityInfo,
-  Animated,
-  Easing,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
-import * as Haptics from 'expo-haptics';
 
 import { AppHeader } from '@/components/AppHeader';
 import { AudioPlayer } from '@/components/AudioPlayer';
@@ -30,7 +26,6 @@ import { colors } from '@/theme';
 import { B } from '@/theme/banani';
 import { updateReadinessScore } from '@/lib/streamHelpers';
 import { useQuestionMeta } from '@/lib/useQuestionTypeMeta';
-import { XP_RATES } from '@/theme/constants';
 import { useAuth } from '@/providers/AuthProvider';
 import type { AppQuestion } from '@/types/database';
 
@@ -59,18 +54,6 @@ function retestDateString(): string {
   return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-function AnimatedXpText({ value, style }: { value: Animated.AnimatedInterpolation<number>; style: object }) {
-  const [display, setDisplay] = useState<number>(0);
-
-  useEffect(() => {
-    const id = value.addListener(({ value: v }) => {
-      setDisplay(Math.round(v));
-    });
-    return () => value.removeListener(id);
-  }, [value]);
-
-  return <Text style={style}>{display}</Text>;
-}
 
 export default function SectionalResultsScreen() {
   const insets = useSafeAreaInsets();
@@ -137,28 +120,8 @@ export default function SectionalResultsScreen() {
   const teilNameDe = teilMeta?.name_de ?? '';
   const examType = profile?.exam_type ?? 'German language';
 
-  const xpEarned = correctCount * (XP_RATES[level] ?? 1);
-  const xpAnim = useRef(new Animated.Value(0)).current;
   const perf = performanceLabel(scorePct);
   const sColor = scoreColor(scorePct);
-
-  useEffect(() => {
-    Animated.timing(xpAnim, {
-      toValue: xpEarned,
-      duration: 800,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: false,
-    }).start(() => {
-      if (Platform.OS !== 'web') {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-      }
-    });
-  }, [xpAnim, xpEarned]);
-
-  const xpDisplay = xpAnim.interpolate({
-    inputRange: [0, xpEarned || 1],
-    outputRange: [0, xpEarned || 1],
-  });
 
   // Confetti + share sheet
   const confettiRef = useRef<ConfettiBurstRef>(null);
@@ -191,17 +154,7 @@ export default function SectionalResultsScreen() {
       <ConfettiBurst ref={confettiRef} />
 
       <Stack.Screen options={{ headerShown: false }} />
-      <AppHeader rightElement={
-        <Pressable
-          ref={shareButtonRef}
-          accessibilityLabel="Share your result"
-          onPress={handleSharePress}
-          style={styles.shareIconBtn}
-          testID="sectional-share-button-header"
-        >
-          <Share2 size={22} color={Colors.accent} />
-        </Pressable>
-      } />
+      <AppHeader />
 
       <ScrollView
         contentContainerStyle={[
@@ -221,11 +174,6 @@ export default function SectionalResultsScreen() {
               {isTimed && timeTaken > 0 ? (
                 <Text style={styles.timeLine}>⏱ {formatDuration(timeTaken)}</Text>
               ) : null}
-              <View style={styles.xpWrap}>
-                <Text style={styles.xpLabel}>+</Text>
-                <AnimatedXpText value={xpDisplay} style={styles.xpValue} />
-                <Text style={styles.xpLabel}> XP</Text>
-              </View>
             </View>
             <ScoreRing label="Score" score={scorePct} size={80} />
           </View>
@@ -415,12 +363,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.background,
   },
-  shareIconBtn: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   content: {
     padding: 20,
     gap: 16,
@@ -459,21 +401,6 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.74)',
     fontWeight: '700' as const,
     fontSize: 14,
-  },
-  xpWrap: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    marginTop: 4,
-  },
-  xpLabel: {
-    color: 'rgba(255,255,255,0.74)',
-    fontWeight: '700' as const,
-    fontSize: 16,
-  },
-  xpValue: {
-    color: colors.amber,
-    fontSize: 22,
-    fontWeight: '800' as const,
   },
   retestNotice: {
     backgroundColor: Colors.surfaceMuted,

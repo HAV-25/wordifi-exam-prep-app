@@ -33,25 +33,6 @@ export const READINESS = {
   amberBelow:    70,  // < 70% = amber gauge (≥ 70% = green)
 } as const;
 
-// ─── XP Badge Thresholds ─────────────────────────────────────────────────────
-export const BADGE_THRESHOLDS = [
-  { tier: 'bronze',   minXP:    0, color: '#CD7F32', label: 'Bronze' },
-  { tier: 'silver',   minXP:  200, color: '#C0C0C0', label: 'Silver' },
-  { tier: 'gold',     minXP:  500, color: '#FFD700', label: 'Gold'   },
-  { tier: 'platinum', minXP: 1000, color: '#E5E4E2', label: 'Platinum' },
-] as const;
-
-export function getBadgeTier(xpTotal: number) {
-  return [...BADGE_THRESHOLDS]
-    .reverse()
-    .find(b => xpTotal >= b.minXP) ?? BADGE_THRESHOLDS[0];
-}
-
-export function formatXP(xp: number): string {
-  if (xp >= 1000) return `${(xp / 1000).toFixed(1)}k`;
-  return String(xp);
-}
-
 // ─── Streak Milestones ────────────────────────────────────────────────────────
 export const STREAK_MILESTONES = [7, 30, 60, 100] as const;
 

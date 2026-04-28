@@ -353,51 +353,6 @@ export async function submitQuestionReport(params: {
   }
 }
 
-export type BadgeType = 'bronze' | 'silver' | 'gold' | 'platinum';
-
-const BADGE_THRESHOLDS: { type: BadgeType; xp: number }[] = [
-  { type: 'bronze', xp: 50 },
-  { type: 'silver', xp: 150 },
-  { type: 'gold', xp: 400 },
-  { type: 'platinum', xp: 1000 },
-];
-
-export async function checkAndAwardBadges(
-  userId: string,
-  level: string,
-  xpTotal: number
-): Promise<BadgeType | null> {
-  const eligible = BADGE_THRESHOLDS.filter((b) => xpTotal >= b.xp);
-  if (eligible.length === 0) return null;
-
-  const { data: existing } = await supabase
-    .from('user_badges')
-    .select('badge_type')
-    .eq('user_id', userId)
-    .eq('level', level);
-
-  const existingTypes = new Set(((existing ?? []) as unknown as BadgeRow[]).map((b) => b.badge_type));
-
-  let newBadge: BadgeType | null = null;
-  for (const badge of eligible) {
-    if (!existingTypes.has(badge.type)) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (supabase.from('user_badges') as any).insert({
-        user_id: userId,
-        badge_type: badge.type,
-        level,
-        awarded_at: new Date().toISOString(),
-      });
-      if (!error) {
-        newBadge = badge.type;
-      } else {
-        console.log('checkAndAwardBadges insert error', error);
-      }
-    }
-  }
-
-  return newBadge;
-}
 
 function shuffleArray<T>(array: T[]): T[] {
   const shuffled = [...array];

@@ -12,7 +12,6 @@ import {
   Flame,
   Headphones,
   Sparkles,
-  Star,
   Zap,
 } from 'lucide-react-native';
 import * as Sentry from '@sentry/react-native';
@@ -41,13 +40,10 @@ import { fontFamily, fontSize, PAID_TIERS } from '@/theme';
 import { useBadgeLadder, getBadgeByStreak } from '@/hooks/useBadgeLadder';
 import { useGameState, useInvalidateGameState } from '@/hooks/useGameState';
 import { TEIL_NAMES } from '@/theme/constants';
-import { didCrossBadgeThreshold, formatXp, getBadgeTier } from '@/lib/badgeHelpers';
 import {
-  checkAndAwardBadges,
   fetchSectionAccuracy,
   updateReadinessScore,
   updateXpAndStreak,
-  type BadgeType,
 } from '@/lib/streamHelpers';
 import {
   advanceSession,
@@ -111,7 +107,7 @@ export default function TestStreamScreen() {
   const [localReadiness, setLocalReadiness] = useState<number>(profile?.readiness_score ?? 0);
   const [localXp, setLocalXp] = useState<number>(profile?.xp_total ?? 0);
   const [localStreak, setLocalStreak] = useState<number>(profile?.streak_count ?? 0);
-  const [celebrationBadge, setCelebrationBadge] = useState<BadgeType | null>(null);
+  const [celebrationBadge, setCelebrationBadge] = useState<string | null>(null);
   const [streakToast, setStreakToast] = useState<string | null>(null);
   const [showBottomSheet, setShowBottomSheet] = useState<boolean>(false);
   const [reportQuestionId, setReportQuestionId] = useState<string | null>(null);
@@ -135,8 +131,6 @@ export default function TestStreamScreen() {
   // ── Derived values ─────────────────────────────────────────────────────────
   const currentQuestion = questions[currentIndex] ?? null;
   const totalQuestions = questions.length;
-  const badgeTier = useMemo(() => getBadgeTier(localXp), [localXp]);
-  const formattedXp = useMemo(() => formatXp(localXp), [localXp]);
 
   const isPaidUser = PAID_TIERS.has(profile?.subscription_tier ?? 'free_trial');
   const isTrial = !isPaidUser && (profile?.subscription_tier === 'free_trial' || (access.trial_hours_remaining ?? 0) > 0);
@@ -297,17 +291,20 @@ export default function TestStreamScreen() {
 
       if (isCorrect && profile) {
         try {
-          const oldXp = localXp;
+          const oldTierName = getBadgeByStreak(localStreak, badgeLadder ?? [])?.name ?? '';
           const { newXp, newStreak } = await updateXpAndStreak(userId, { ...profile, xp_total: localXp, streak_count: localStreak, last_active_date: profile.last_active_date });
           setLocalXp(newXp);
-          const crossedBadge = didCrossBadgeThreshold(oldXp, newXp);
-          if (crossedBadge) showStreakToastBanner(`🏅 You reached ${crossedBadge.label}!`);
-          if (newStreak !== localStreak) setLocalStreak(newStreak);
+          if (newStreak !== localStreak) {
+            setLocalStreak(newStreak);
+            const newTierName = getBadgeByStreak(newStreak, badgeLadder ?? [])?.name ?? '';
+            if (newTierName && newTierName !== oldTierName) {
+              setCelebrationBadge(newTierName);
+            }
+          }
         } catch {}
       }
 
       if (newCount % 5 === 0) {
-        checkAndAwardBadges(userId, targetLevel, localXp).then((badge) => { if (badge) setCelebrationBadge(badge); }).catch(() => {});
         refreshProfile().catch(() => {});
       }
 
@@ -316,7 +313,7 @@ export default function TestStreamScreen() {
     },
     [sessionId, userId, profile, localXp, localStreak, targetLevel, sessionAnsweredCount,
      correctStreak, decrementStreamRemaining, incrementDailyStreamCount, triggerXpBurst,
-     showStreakToastBanner, showComboToastBanner, refreshProfile, invalidateGameState]
+     showComboToastBanner, refreshProfile, invalidateGameState, badgeLadder]
   );
 
   // ── Handle Next ────────────────────────────────────────────────────────────
@@ -531,14 +528,11 @@ export default function TestStreamScreen() {
           <Flame color={B.warning} size={18} />
           <Text style={s.motItemText}>{localStreak}</Text>
         </View>
-        <View style={s.motItem}>
-          <Star color={B.accent} size={18} />
-          <Text style={s.motItemText}>{formattedXp}</Text>
-          <Text style={s.motItemText}>XP</Text>
-        </View>
-        <View style={s.motBadge}>
-          <Text style={s.motBadgeText}>{badgeTier.label}</Text>
-        </View>
+        {badgeName ? (
+          <View style={s.motBadge}>
+            <Text style={s.motBadgeText}>{badgeName}</Text>
+          </View>
+        ) : null}
       </View>
 
       {/* Toasts and overlays (unchanged logic) */}
@@ -555,7 +549,7 @@ export default function TestStreamScreen() {
       ) : null}
 
       {celebrationBadge ? (
-        <CelebrationOverlay badgeType={celebrationBadge} level={targetLevel} onDismiss={() => setCelebrationBadge(null)} />
+        <CelebrationOverlay tierName={celebrationBadge} level={targetLevel} onDismiss={() => setCelebrationBadge(null)} />
       ) : null}
 
       {streakToast ? (

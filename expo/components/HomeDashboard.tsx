@@ -27,7 +27,8 @@ import { ReadinessBar } from '@/components/ReadinessBar';
 import { ReadinessBottomSheet } from '@/components/ReadinessBottomSheet';
 import Colors from '@/constants/colors';
 import { colors, fontSize, radius, shadows, spacing } from '@/theme';
-import { formatXp, getBadgeTier } from '@/lib/badgeHelpers';
+import { formatXp, getTierColor } from '@/lib/badgeHelpers';
+import { useBadgeLadder, getBadgeByStreak } from '@/hooks/useBadgeLadder';
 import { fetchSectionAccuracy } from '@/lib/streamHelpers';
 import { supabase } from '@/lib/supabaseClient';
 import { useAccess } from '@/providers/AccessProvider';
@@ -92,6 +93,7 @@ export function HomeDashboard({ onStartPractice }: HomeDashboardProps) {
   const { profile, user } = useAuth();
   useAccess();
   const router = useRouter();
+  const { data: badgeLadder } = useBadgeLadder();
   const userId = user?.id ?? '';
   const targetLevel = profile?.target_level ?? 'A1';
   const examType = profile?.exam_type ?? 'TELC';
@@ -208,7 +210,7 @@ export function HomeDashboard({ onStartPractice }: HomeDashboardProps) {
   const readiness = profile?.readiness_score ?? 0;
   const streak = profile?.streak_count ?? 0;
   const xp = profile?.xp_total ?? 0;
-  const badgeTier = useMemo(() => getBadgeTier(xp), [xp]);
+  const currentTier = useMemo(() => getBadgeByStreak(streak, badgeLadder ?? []), [streak, badgeLadder]);
   const formattedXp = useMemo(() => formatXp(xp), [xp]);
   const daysToExam = getDaysUntilExam(profile?.exam_date ?? null);
 
@@ -343,8 +345,8 @@ export function HomeDashboard({ onStartPractice }: HomeDashboardProps) {
               </View>
               <View style={styles.statDivider} />
               <View style={styles.statItem}>
-                <View style={[styles.badgeDot, { backgroundColor: badgeTier.color }]} />
-                <Text style={styles.statValue}>{badgeTier.label}</Text>
+                <View style={[styles.badgeDot, { backgroundColor: getTierColor(currentTier?.name ?? '') }]} />
+                <Text style={styles.statValue}>{currentTier?.name ?? '—'}</Text>
                 <Text style={styles.statLabel}>tier</Text>
               </View>
             </View>

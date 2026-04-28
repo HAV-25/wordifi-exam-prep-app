@@ -1,7 +1,8 @@
 import { Audio } from 'expo-av';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
-import { AlertCircle, ChevronLeft, Mic, MicOff, PhoneOff, RefreshCw, Timer } from 'lucide-react-native';
+import { AlertCircle, ChevronLeft, Mic, MicOff, PhoneOff, RefreshCw, Share2, Timer } from 'lucide-react-native';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { SPRECHEN_STAGES } from '@/constants/evaluationStages';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const CTA_BUTTON_HEIGHT = 56;
@@ -13,6 +14,7 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  Share as RNShare,
   StyleSheet,
   Text,
   View,
@@ -55,6 +57,112 @@ type ScreenState =
   | 'scoring'
   | 'results'
   | 'error';
+
+function SprechenScoringLoader() {
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const dot1 = useRef(new Animated.Value(0.3)).current;
+  const dot2 = useRef(new Animated.Value(0.3)).current;
+  const dot3 = useRef(new Animated.Value(0.3)).current;
+  const [stageIndex, setStageIndex] = useState(0);
+  const [showReassurance, setShowReassurance] = useState(false);
+
+  useEffect(() => {
+    Animated.timing(fadeAnim, { toValue: 1, duration: 300, useNativeDriver: true }).start();
+  }, [fadeAnim]);
+
+  useEffect(() => {
+    const createDotLoop = (dot: Animated.Value, delay: number) =>
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(delay),
+          Animated.timing(dot, { toValue: 1, duration: 400, useNativeDriver: true }),
+          Animated.timing(dot, { toValue: 0.3, duration: 400, useNativeDriver: true }),
+        ])
+      );
+    const l1 = createDotLoop(dot1, 0);
+    const l2 = createDotLoop(dot2, 150);
+    const l3 = createDotLoop(dot3, 300);
+    l1.start(); l2.start(); l3.start();
+    return () => { l1.stop(); l2.stop(); l3.stop(); };
+  }, [dot1, dot2, dot3]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setStageIndex((prev) => Math.min(prev + 1, SPRECHEN_STAGES.length - 1));
+    }, 3000);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const t = setTimeout(() => setShowReassurance(true), 3000);
+    return () => clearTimeout(t);
+  }, []);
+
+  const stage = SPRECHEN_STAGES[stageIndex] ?? SPRECHEN_STAGES[0]!;
+
+  return (
+    <Animated.View style={[scoringLoaderStyles.wrap, { opacity: fadeAnim }]}>
+      <View style={scoringLoaderStyles.dotsRow}>
+        <Animated.View style={[scoringLoaderStyles.dot, { opacity: dot1 }]} />
+        <Animated.View style={[scoringLoaderStyles.dot, { opacity: dot2 }]} />
+        <Animated.View style={[scoringLoaderStyles.dot, { opacity: dot3 }]} />
+      </View>
+      <Text style={scoringLoaderStyles.stageDe}>{stage.de}</Text>
+      <Text style={scoringLoaderStyles.stageEn}>{stage.en}</Text>
+      {showReassurance ? (
+        <View style={scoringLoaderStyles.reassurance}>
+          <Text style={scoringLoaderStyles.reassuranceDe}>Das kann ein paar Sekunden dauern</Text>
+          <Text style={scoringLoaderStyles.reassuranceEn}>This may take a few seconds</Text>
+        </View>
+      ) : null}
+    </Animated.View>
+  );
+}
+
+const scoringLoaderStyles = StyleSheet.create({
+  wrap: {
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 32,
+  },
+  dotsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 8,
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#2B70EF',
+  },
+  stageDe: {
+    fontSize: 16,
+    fontWeight: '600' as const,
+    color: '#0F1F3D',
+    textAlign: 'center',
+  },
+  stageEn: {
+    fontSize: 13,
+    color: '#94A3B8',
+    textAlign: 'center',
+  },
+  reassurance: {
+    marginTop: 8,
+    alignItems: 'center',
+    gap: 4,
+  },
+  reassuranceDe: {
+    fontSize: 13,
+    color: '#94A3B8',
+    textAlign: 'center',
+  },
+  reassuranceEn: {
+    fontSize: 12,
+    color: '#CBD5E1',
+    textAlign: 'center',
+  },
+});
 
 export default function SprechenRealtimeScreen() {
   const insets = useSafeAreaInsets();
@@ -720,17 +828,19 @@ export default function SprechenRealtimeScreen() {
 
         {/* Dual-circle avatar section — vertical stack */}
         <View style={styles.avatarSection}>
-          {/* AI partner circle — pulses when AI speaks */}
-          <View style={styles.avatarItem}>
-            <Animated.View style={[
-              styles.avatarCircle,
-              styles.avatarCircleAi,
-              { opacity: convState === 'ai_speaking' ? pulseAnim : 0.3 },
-            ]} />
-            <Text style={styles.avatarName}>{aiPartnerNameRef.current}</Text>
-          </View>
+          {/* AI partner circle — dialogue only */}
+          {!isMonologue && (
+            <View style={styles.avatarItem}>
+              <Animated.View style={[
+                styles.avatarCircle,
+                styles.avatarCircleAi,
+                { opacity: convState === 'ai_speaking' ? pulseAnim : 0.3 },
+              ]} />
+              <Text style={styles.avatarName}>{aiPartnerNameRef.current}</Text>
+            </View>
+          )}
 
-          {/* Status text sits between the two circles */}
+          {/* Status text */}
           <Text style={[styles.avatarStatus, { color: statusColor }]}>{statusLabel}</Text>
 
           {/* User circle — pulses when user speaks */}
@@ -832,10 +942,7 @@ export default function SprechenRealtimeScreen() {
         <Stack.Screen options={{ headerShown: false }} />
         <AppHeader />
         <View style={styles.center}>
-          <View style={styles.connectingAvatar}>
-            <ActivityIndicator color={colors.white} size="large" />
-          </View>
-          <Text style={styles.loadingText}>Your answer is being evaluated...</Text>
+          <SprechenScoringLoader />
         </View>
       </View>
     );
@@ -1053,11 +1160,38 @@ export default function SprechenRealtimeScreen() {
         </ScrollView>
 
         <View style={[styles.footer, { bottom: insets.bottom }]}>
+          <Pressable
+            onPress={async () => {
+              const passLabel = passed ? 'Passed' : 'Needs Improvement';
+              const message = `wordifi — Sprechen ${level} Teil ${teil}\n${overallNum}/${maxScore} — ${passLabel}\n\nwordifi.app`;
+              try {
+                if (Platform.OS === 'web') {
+                  if (navigator.share) await navigator.share({ text: message });
+                } else {
+                  await RNShare.share({ message });
+                }
+              } catch (err) {
+                console.log('sprechen share error', err);
+              }
+            }}
+            style={styles.shareBtn}
+            testID="realtime-share"
+          >
+            <Share2 color={colors.blue} size={18} />
+            <Text style={styles.shareBtnText}>Share your result</Text>
+          </Pressable>
           <CTAButton
-            label="Back to overview"
+            label="Back to Tests"
             onPress={() => router.replace('/(tabs)/tests')}
             testID="realtime-back-to-tests"
           />
+          <Pressable
+            onPress={() => router.replace('/')}
+            style={styles.homeBtn}
+            testID="realtime-home"
+          >
+            <Text style={styles.homeBtnText}>Home</Text>
+          </Pressable>
         </View>
       </View>
     );
@@ -1107,6 +1241,33 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.lg,
     backgroundColor: colors.surface,
     gap: spacing.sm,
+  },
+  shareBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.white,
+    borderRadius: radius.lg,
+    paddingVertical: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+  },
+  shareBtnText: {
+    fontSize: fontSize.bodyMd,
+    color: colors.blue,
+    fontWeight: '700' as const,
+  },
+  homeBtn: {
+    minHeight: 48,
+    borderRadius: radius.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  homeBtnText: {
+    fontSize: fontSize.bodyMd,
+    color: colors.blue,
+    fontWeight: '700' as const,
   },
 
   // ── Loading / Error ──────────────────────────────────────────────────────
@@ -1448,6 +1609,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: spacing.xl,
+    paddingTop: 32,
     gap: 56,
   },
   avatarItem: {
