@@ -28,6 +28,7 @@ export async function gate(
   category: Category,
   eventKey?: string,
   config?: NotifConfig,
+  conditions?: Record<string, unknown>,
 ): Promise<GateResult> {
   // Welcome email dedup: suppress if already sent on this channel
   if (eventKey === 'notif.welcome_email') {
@@ -75,6 +76,42 @@ export async function gate(
   const channelKey = `${channel}_enabled`;
   if (prefs[channelKey] === false) {
     return { ok: false, reason: 'channel_disabled' };
+  }
+
+  // Step 2.5 — subscription eligibility for monetisation trial events
+  // Prevents trial-ending notifications from firing after a user has converted to paid.
+  // BLOCKER: must be deployed before the trial notification scheduler goes live.
+  // Redeploy needed for: notify-user, scheduled-sends-processor, gamification-event-worker,
+  //                      streak-at-risk-cron, no-activity-cron (all import _shared/gating.ts).
+  if (category === 'monetisation' && eventKey?.startsWith('notif.trial_')) {
+    const { data: p } = await supabase
+      .from('user_profiles')
+      .select('trial_active, subscription_tier')
+      .eq('id', userId)
+      .maybeSingle() as { data: Row | null };
+    if (!p?.trial_active || p.subscription_tier !== 'free_trial') {
+      return { ok: false, reason: 'trial_not_active' };
+    }
+  }
+
+  // Step 2.6 — journey conditions
+  // Currently supports: requires_no_session_today — suppresses the send if the user has already
+  // completed practice questions today (as tracked by daily_activity_rollup).
+  if (conditions?.requires_no_session_today) {
+    const tz = await resolveTimezone();
+    // 'en-CA' locale yields ISO YYYY-MM-DD reliably across all runtimes.
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: tz });
+
+    const { data: rollup } = await supabase
+      .from('daily_activity_rollup')
+      .select('total_questions_counted_for_streak')
+      .eq('user_id', userId)
+      .eq('activity_date', today)
+      .maybeSingle() as { data: Row | null };
+
+    if ((rollup?.total_questions_counted_for_streak ?? 0) > 0) {
+      return { ok: false, reason: 'session_already_completed' };
+    }
   }
 
   // Step 3 — category opted in (transactional always passes)

@@ -1,8 +1,7 @@
 /**
- * PaywallBottomSheet — Soft-nudge intermediary modal shown before the
- * full Adapty paywall for contextual upgrade prompts.
+ * PaywallBottomSheet — Soft-nudge intermediary modal shown for contextual upgrade prompts.
  *
- * "Unlock Unlimited" → calls onUnlock() (parent opens PaywallModal / Adapty)
+ * "Unlock Unlimited" → calls onUnlock() (parent opens PaywallModal)
  * "Maybe Tomorrow"   → calls onDismiss()
  *
  * Analytics emitted here: paywall_viewed, paywall_dismissed, paywall_cta_tapped

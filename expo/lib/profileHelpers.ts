@@ -51,6 +51,12 @@ export async function ensureUserProfile(user: User): Promise<UserProfile> {
   const googlePicture: string | null =
     (user.user_metadata?.picture as string | undefined) ?? null;
 
+  // Capture device timezone at signup so journey-scheduler can compute
+  // time_of_day notifications in the user's local time from day one.
+  // Falls back to 'Europe/Berlin' when the runtime doesn't provide a timezone.
+  const deviceTimezone =
+    Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/Berlin';
+
   const { data: inserted, error: insertError } = await supabase
     .from('user_profiles')
     .insert({
@@ -67,6 +73,7 @@ export async function ensureUserProfile(user: User): Promise<UserProfile> {
       notifications_permission: 'not_asked',
       notifications_enabled: false,
       tc_accepted: false,
+      timezone: deviceTimezone,
     } as never)
     .select('*')
     .single();

@@ -45,16 +45,21 @@ Deno.serve(async (req: Request) => {
   for (let i = 0; i < pending.length; i += BATCH_SIZE) {
     const batch = pending.slice(i, i + BATCH_SIZE);
     const results = await Promise.allSettled(
-      batch.map((row) =>
-        dispatchChannel(supabase, {
+      batch.map((row) => {
+        // Extract journey conditions from payload (set by journey-scheduler).
+        // Passed to gate() so Step 2.6 can enforce send-time eligibility rules
+        // such as requires_no_session_today without re-querying notification_events.
+        const { conditions, ...restPayload } = row.payload ?? {};
+        return dispatchChannel(supabase, {
           userId: row.user_id,
           eventKey: row.event_key,
           channel: row.channel as Channel,
           category: row.category as Category,
           config,
-          payload: row.payload ?? {},
-        })
-      )
+          payload: restPayload,
+          conditions: conditions as Record<string, unknown> | undefined,
+        });
+      })
     );
 
     // Update each row based on result

@@ -11,6 +11,7 @@ export type DispatchInput = {
   category: Category;
   config: NotifConfig;
   payload?: Record<string, unknown>;
+  conditions?: Record<string, unknown>;
 };
 
 export type DispatchResult = {
@@ -114,8 +115,8 @@ async function writeUserNotification(
   const { error } = await supabase.from('user_notifications').insert({
     user_id: userId,
     type: eventKey,
-    title: rendered.body.slice(0, 60),
-    body: rendered.body,
+    title: rendered.headings.en.slice(0, 60),
+    body: rendered.contents.en,
     action_url: rendered.deep_link ?? null,
     metadata: payload,
     read_at: null,
@@ -129,11 +130,11 @@ export async function dispatchChannel(
   supabase: SupabaseClient,
   input: DispatchInput,
 ): Promise<DispatchResult> {
-  const { userId, eventKey, channel, category, config, payload = {} } = input;
+  const { userId, eventKey, channel, category, config, payload = {}, conditions } = input;
 
   try {
     // Gating
-    const gateResult = await gate(supabase, userId, channel, category, eventKey, config);
+    const gateResult = await gate(supabase, userId, channel, category, eventKey, config, conditions);
     if (!gateResult.ok) {
       await logEvent(supabase, userId, eventKey, channel, category, 'suppressed', {
         suppression_reason: gateResult.reason,

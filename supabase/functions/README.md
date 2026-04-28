@@ -9,7 +9,7 @@ Server-side push/email/in-app dispatch layer. All functions are Deno-based Supab
 | Function | Trigger | Purpose |
 |---|---|---|
 | `notify-user` | HTTP POST (internal) | Core dispatcher — gating pipeline + provider calls |
-| `adapty-webhook` | HTTP POST from Adapty | Trial lifecycle → schedule T-3/T-1/T-0 notifications |
+| `revenuecat-webhook` | HTTP POST from RevenueCat | Subscription lifecycle → update user_profiles + write notification_intents |
 | `scheduled-sends-processor` | pg_cron every 5 min | Drains `notification_events` queue |
 | `gamification-event-worker` | pg_cron every 1 min | Polls `gamification_event_log`, maps events to notifications |
 | `streak-at-risk-cron` | pg_cron every hour :30 | T1 detection — fires at 7 PM local per user |
@@ -26,7 +26,7 @@ Set these in **Supabase Dashboard → Edge Functions → Secrets** (or `supabase
 | `ONESIGNAL_APP_ID` | `80019919-1ccf-4629-ad57-067fcb7af435` |
 | `ONESIGNAL_REST_API_KEY` | OneSignal REST API key |
 | `RESEND_API_KEY` | Resend API key |
-| `ADAPTY_WEBHOOK_SECRET` | **Payal must add this** — generate a random 32-char string |
+| `REVENUECAT_WEBHOOK_SECRET` | Set in RevenueCat Dashboard → Webhooks → Authorization header |
 | `SUPABASE_URL` | Auto-provided by Supabase |
 | `SUPABASE_SERVICE_ROLE_KEY` | Auto-provided by Supabase |
 
@@ -61,22 +61,22 @@ Or paste each SQL file in the Supabase SQL editor in order:
 ### 4. Deploy Edge Functions
 ```bash
 supabase functions deploy notify-user
-supabase functions deploy adapty-webhook
+supabase functions deploy revenuecat-webhook
 supabase functions deploy scheduled-sends-processor
 supabase functions deploy gamification-event-worker
 supabase functions deploy streak-at-risk-cron
 supabase functions deploy no-activity-cron
 ```
 
-### 5. Configure Adapty webhook
-In **Adapty Dashboard → Integrations → Webhooks**:
-- URL: `https://wwfiauhsbssjowaxmqyn.supabase.co/functions/v1/adapty-webhook`
-- Authorization header: `Bearer <ADAPTY_WEBHOOK_SECRET>`
-- Events: subscription_started, trial_started, subscription_renewed, subscription_cancelled, subscription_expired
+### 5. Configure RevenueCat webhook
+In **RevenueCat Dashboard → Project → Integrations → Webhooks**:
+- URL: `https://wwfiauhsbssjowaxmqyn.supabase.co/functions/v1/revenuecat-webhook`
+- Authorization header: `Bearer <REVENUECAT_WEBHOOK_SECRET>`
+- Events: INITIAL_PURCHASE, RENEWAL, CANCELLATION, EXPIRATION, BILLING_ISSUE, PRODUCT_CHANGE
 
-### 6. Add ADAPTY_WEBHOOK_SECRET in Supabase
+### 6. Add REVENUECAT_WEBHOOK_SECRET in Supabase
 ```bash
-supabase secrets set ADAPTY_WEBHOOK_SECRET=<your_generated_secret>
+supabase secrets set REVENUECAT_WEBHOOK_SECRET=<your_generated_secret>
 ```
 
 ### 7. Configure OneSignal in-app message rules

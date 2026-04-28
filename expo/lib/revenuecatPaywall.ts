@@ -1,8 +1,7 @@
 /**
  * RevenueCat Paywall Integration
  *
- * Replaces adaptyPaywall.ts. Presents the RevenueCat paywall UI and syncs
- * subscription state with Supabase after purchase or restore.
+ * Presents the RevenueCat paywall UI and syncs subscription state with Supabase after purchase or restore.
  *
  * Tier mapping:
  *   $rc_monthly      → subscription_tier: 'monthly'

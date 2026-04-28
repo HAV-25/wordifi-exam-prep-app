@@ -107,15 +107,23 @@ export function useNotificationPreferences(userId: string | undefined) {
   }, [userId]);
 
   // ── Silently sync device timezone ─────────────────────────────────────────
+  // Writes deviceTz to both notification_preferences.timezone AND
+  // user_profiles.timezone so journey-scheduler always has the correct
+  // local timezone regardless of which table it reads.
   useEffect(() => {
     if (!userId || !prefs) return;
     const deviceTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    if (prefs.timezone === deviceTz) return;
-    void supabase
-      .from('notification_preferences')
-      .update({ timezone: deviceTz, updated_at: new Date().toISOString() } as never)
-      .eq('user_id', userId)
-      .then(() => setPrefs((p) => (p ? { ...p, timezone: deviceTz } : p)));
+    if (!deviceTz || prefs.timezone === deviceTz) return;
+    void Promise.all([
+      supabase
+        .from('notification_preferences')
+        .update({ timezone: deviceTz, updated_at: new Date().toISOString() } as never)
+        .eq('user_id', userId),
+      supabase
+        .from('user_profiles')
+        .update({ timezone: deviceTz } as never)
+        .eq('id', userId),
+    ]).then(() => setPrefs((p) => (p ? { ...p, timezone: deviceTz } : p)));
   }, [userId, prefs?.timezone]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Optimistic write ──────────────────────────────────────────────────────

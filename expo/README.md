@@ -279,7 +279,6 @@ Monetize your app:
 **Paywall Optimization:**
 
 - **Superwall** - Paywall A/B testing and optimization - [React Native SDK](https://docs.superwall.com/docs/react-native)
-- **Adapty** - Mobile subscription analytics and paywalls - [Expo Integration](https://docs.adapty.io/docs/expo)
 
 ## I want to use a custom domain - is that possible?
 
