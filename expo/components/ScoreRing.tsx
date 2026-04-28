@@ -8,9 +8,10 @@ type ScoreRingProps = {
   score: number;
   label: string;
   size?: number;
+  color?: string;
 };
 
-export function ScoreRing({ score, label, size = 104 }: ScoreRingProps) {
+export function ScoreRing({ score, label, size = 104, color = Colors.accent }: ScoreRingProps) {
   const strokeWidth = 10;
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
@@ -27,7 +28,7 @@ export function ScoreRing({ score, label, size = 104 }: ScoreRingProps) {
               cx={size / 2}
               cy={size / 2}
               r={radius}
-              stroke={Colors.accent}
+              stroke={color}
               strokeWidth={strokeWidth}
               fill="none"
               strokeDasharray={`${circumference} ${circumference}`}
@@ -41,7 +42,7 @@ export function ScoreRing({ score, label, size = 104 }: ScoreRingProps) {
             cx={size / 2}
             cy={size / 2}
             r={radius}
-            stroke={Colors.accent}
+            stroke={color}
             strokeWidth={strokeWidth}
             fill="none"
             strokeDasharray={`${circumference} ${circumference}`}
@@ -52,8 +53,8 @@ export function ScoreRing({ score, label, size = 104 }: ScoreRingProps) {
           />
         )}
       </Svg>
-      <View style={styles.center}>
-        <Text style={styles.score}>{Math.round(progress)}%</Text>
+      <View style={[styles.center, { height: size }]}>
+        <Text style={[styles.score, { color }]}>{Math.round(progress)}%</Text>
       </View>
       <Text style={styles.label}>{label}</Text>
     </View>
@@ -68,7 +69,6 @@ const styles = StyleSheet.create({
   center: {
     position: 'absolute',
     top: 0,
-    bottom: 0,
     left: 0,
     right: 0,
     alignItems: 'center',
@@ -77,7 +77,6 @@ const styles = StyleSheet.create({
   score: {
     fontSize: 22,
     fontWeight: '800',
-    color: Colors.primary,
   },
   label: {
     fontSize: 13,

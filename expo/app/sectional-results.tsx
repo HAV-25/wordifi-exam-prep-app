@@ -175,7 +175,7 @@ export default function SectionalResultsScreen() {
                 <Text style={styles.timeLine}>⏱ {formatDuration(timeTaken)}</Text>
               ) : null}
             </View>
-            <ScoreRing label="Score" score={scorePct} size={80} />
+            <ScoreRing label="Score" score={scorePct} size={80} color={sColor} />
           </View>
         </View>
 
