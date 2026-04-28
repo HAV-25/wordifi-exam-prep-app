@@ -1,5 +1,5 @@
 import { Stack, router, useLocalSearchParams } from 'expo-router';
-import { PenLine, Share2, X } from 'lucide-react-native';
+import { ChevronRight, PenLine, Share2, X } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -12,17 +12,19 @@ import {
   Platform,
   Pressable,
   ScrollView,
-  Share as RNShare,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 
 import { AppHeader } from '@/components/AppHeader';
+import ConfettiBurst, { type ConfettiBurstRef } from '@/components/ConfettiBurst';
 import { CTAButton } from '@/components/CTAButton';
 import { EmptyState } from '@/components/EmptyState';
 import { SchreibenQuestion } from '@/components/SchreibenQuestion';
 import { SchreibenResult } from '@/components/SchreibenResult';
+import ShareResultSheet from '@/components/ShareResultSheet';
+import Colors from '@/constants/colors';
 import { B } from '@/theme/banani';
 import { fontFamily, fontSize } from '@/theme/typography';
 import { colors, radius, shadows, spacing } from '@/theme';
@@ -75,8 +77,12 @@ export default function SchreibenTestScreen() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [totalScore, setTotalScore] = useState<number>(0);
   const [totalMaxScore, setTotalMaxScore] = useState<number>(0);
+  const [sheetVisible, setSheetVisible] = useState(false);
   const progressAnim = useRef(new Animated.Value(0)).current;
   const sessionStartTimeRef = useRef<number>(Date.now());
+  const confettiRef = useRef<ConfettiBurstRef>(null);
+  const shareButtonRef = useRef<View>(null);
+  const rootViewRef = useRef<View>(null);
 
   useEffect(() => {
     if (questions.length === 0 || !userId) return;
@@ -387,12 +393,19 @@ export default function SchreibenTestScreen() {
 
   const isLoadingCached = currentState.isLoadingCached;
 
+  const currentAssessment = questionStates[currentIndex]?.assessment ?? null;
+  const shareScorePct = currentAssessment
+    ? Math.round((currentAssessment.overall_score / Math.max(currentAssessment.max_score, 1)) * 100)
+    : 0;
+
   return (
     <KeyboardAvoidingView
+      ref={rootViewRef}
       style={[styles.screen, { paddingTop: insets.top }]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 24}
     >
+      <ConfettiBurst ref={confettiRef} />
       <Stack.Screen options={{ headerShown: false }} />
 
       {/* Brand header — Wordifi logo always visible */}
@@ -466,25 +479,22 @@ export default function SchreibenTestScreen() {
       {currentState.assessment && !currentState.isLoading ? (
         <View style={[styles.footer, { bottom: insets.bottom }]}>
           <Pressable
-            onPress={async () => {
-              const a = currentState.assessment!;
-              const passLabel = a.passed ? 'Passed' : 'Not passed';
-              const message = `wordifi — Schreiben ${level} Teil ${teil}\n${a.overall_score}/${a.max_score} — ${passLabel}\n\n${a.encouragement}\n\nwordifi.app`;
-              try {
-                if (Platform.OS === 'web') {
-                  if (navigator.share) await navigator.share({ text: message });
-                } else {
-                  await RNShare.share({ message });
-                }
-              } catch (err) {
-                console.log('schreiben share error', err);
-              }
+            ref={shareButtonRef}
+            accessibilityLabel="Share your result"
+            onPress={() => {
+              shareButtonRef.current?.measureInWindow((bx, by, bw, bh) => {
+                rootViewRef.current?.measureInWindow((rx, ry) => {
+                  confettiRef.current?.burst(bx - rx + bw / 2, by - ry + bh / 2);
+                });
+              });
+              setTimeout(() => setSheetVisible(true), 600);
             }}
             style={styles.shareBtn}
             testID="schreiben-share"
           >
-            <Share2 color={colors.blue} size={18} />
+            <Share2 size={20} color={Colors.accent} />
             <Text style={styles.shareBtnText}>Share your result</Text>
+            <ChevronRight size={16} color={Colors.textMuted} style={styles.shareChevron} />
           </Pressable>
           <CTAButton
             label="Back to Tests"
@@ -503,6 +513,19 @@ export default function SchreibenTestScreen() {
           ) : null}
         </View>
       ) : null}
+
+      <ShareResultSheet
+        visible={sheetVisible}
+        onClose={() => setSheetVisible(false)}
+        section="Schreiben"
+        level={level}
+        teilNameEn={taskLabel}
+        teilNameDe=""
+        score={currentAssessment?.overall_score ?? 0}
+        total={currentAssessment?.max_score ?? 0}
+        scorePct={shareScorePct}
+        examType={profile?.exam_type ?? 'German language'}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -626,30 +649,36 @@ const styles = StyleSheet.create({
     marginHorizontal: 0,
   },
   shareBtn: {
+    height: 56,
+    borderRadius: 16,
+    backgroundColor: Colors.primaryDeep,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    backgroundColor: colors.white,
-    borderRadius: radius.lg,
-    paddingVertical: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
+    paddingHorizontal: 20,
+    gap: 12,
   },
   shareBtnText: {
-    fontSize: fontSize.bodyMd,
-    color: colors.blue,
-    fontWeight: '700' as const,
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '800' as const,
+    color: Colors.white,
+    fontFamily: 'Outfit_800ExtraBold',
   },
+  shareChevron: {
+    marginLeft: 'auto',
+  } as object,
   homeBtn: {
     minHeight: 48,
-    borderRadius: radius.lg,
+    borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   homeBtnText: {
     fontSize: fontSize.bodyMd,
-    color: colors.blue,
+    color: Colors.primary,
     fontWeight: '700' as const,
   },
   errorWrap: {
