@@ -39,6 +39,7 @@ import type {
   TranscriptEntry,
   IRealtimeSession,
 } from '@/lib/realtimeSession';
+import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/providers/AuthProvider';
 import type { AppQuestion } from '@/types/database';
 
@@ -424,6 +425,27 @@ export default function SprechenRealtimeScreen() {
 
       setScores(result);
       setScreenState('results');
+
+      // Persist completed session so the Tests tab can show the checkmark + last score
+      if (_userId) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (supabase.from('test_sessions') as any).insert({
+          user_id: _userId,
+          session_type: 'sectional',
+          level,
+          section: 'Sprechen',
+          teil,
+          exam_type: profile?.exam_type ?? 'TELC',
+          score_pct: result.overall_score,
+          questions_total: 1,
+          questions_correct: result.passed ? 1 : 0,
+          time_taken_seconds: durationSeconds,
+          is_timed: false,
+          completed_at: new Date().toISOString(),
+        }).then(({ error }: { error: unknown }) => {
+          if (error) console.log('[SprechenRealtime] session save error', error);
+        });
+      }
     } catch (err) {
       console.log('[SprechenRealtime] Scoring error:', err);
       setScores({
@@ -448,7 +470,7 @@ export default function SprechenRealtimeScreen() {
       });
       setScreenState('results');
     }
-  }, [question, accessToken, rubricCard]);
+  }, [question, accessToken, rubricCard, _userId, level, teil, profile]);
 
   useEffect(() => {
     handleEndRef.current = handleEndConversation;
