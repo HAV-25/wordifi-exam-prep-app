@@ -29,7 +29,7 @@ export function FlameStrip({ days }: Props) {
       {slots.map((met, i) =>
         met ? (
           <View key={i} style={styles.slot}>
-            <AnimatedFlame size={22} animated={false} />
+            <AnimatedFlame size={18} animated={false} />
           </View>
         ) : (
           <View key={i} style={[styles.slot, styles.emptySlot]} />
@@ -46,14 +46,14 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   slot: {
-    width: 22,
-    height: 22,
+    width: 18,
+    height: 18,
     alignItems: 'center',
     justifyContent: 'center',
   },
   emptySlot: {
-    width: 16,
-    height: 16,
+    width: 18,
+    height: 18,
     borderRadius: 3,
     borderWidth: 1.5,
     borderColor: 'rgba(255,255,255,0.35)',

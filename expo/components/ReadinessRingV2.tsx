@@ -18,7 +18,7 @@ const VIEWBOX   = 200;
 const CX        = 100;
 const CY        = 100;
 const R         = 78;
-const SW        = 22;
+const SW        = 15;
 const CIRCUM    = 2 * Math.PI * R; // ≈ 490.09
 
 // Pre-computed arc lengths for each band (fraction of circumference)
@@ -38,11 +38,8 @@ type Props = {
 };
 
 export function ReadinessRingV2({ normalizedScore, size = 200 }: Props) {
-  const score   = Math.min(Math.max(normalizedScore, 0), 100);
-  const label   = getBandLabel(score);
-  const labelColor = READINESS_BANDS.find(
-    (b) => score >= b.min && score <= b.max,
-  )?.color ?? '#1D9E75';
+  const score = Math.min(Math.max(normalizedScore, 0), 100);
+  const label = getBandLabel(score);
 
   // ── Animated mask arc (Reanimated — UI thread) ──────────────────────────────
   const filledTarget = (score / 100) * CIRCUM;
@@ -83,7 +80,7 @@ export function ReadinessRingV2({ normalizedScore, size = 200 }: Props) {
   const maskId = `readiness-mask-${Math.round(score)}`;
 
   return (
-    <View style={[styles.wrap, { width: size, height: size }]}>
+    <View style={[styles.wrap, { width: size }]}>
       <Svg
         viewBox={`0 0 ${VIEWBOX} ${VIEWBOX}`}
         width={size}
@@ -151,7 +148,7 @@ export function ReadinessRingV2({ normalizedScore, size = 200 }: Props) {
       </View>
 
       {/* Band label below ring */}
-      <Text style={[styles.bandLabel, { color: labelColor }]}>{label}</Text>
+      <Text style={styles.bandLabel}>{label}</Text>
     </View>
   );
 }
@@ -165,29 +162,33 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    bottom: 28, // offset upward to sit in ring centre, not counting label
+    // bottom offset ≈ label height (13px line-height) + marginTop (8px) + a bit of padding
+    // keeps the number+subline visually centred in the ring regardless of `size`
+    bottom: 30,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 2,
+    gap: 4,
   },
   scoreText: {
     fontFamily: fontFamily.display,
-    fontSize: 34,
+    fontSize: 72,
     fontWeight: '800',
     color: colors.onSurface,
-    lineHeight: 36,
-    letterSpacing: -1,
+    lineHeight: 76,
+    letterSpacing: -2,
   },
   denomText: {
     fontFamily: fontFamily.bodyRegular,
-    fontSize: 13,
+    fontSize: 14,
     color: colors.mutedGray,
-    lineHeight: 16,
+    lineHeight: 18,
   },
   bandLabel: {
     fontFamily: fontFamily.bodySemiBold,
     fontSize: 13,
-    marginTop: 6,
+    marginTop: 8,
     textAlign: 'center',
+    // Always white/muted — component renders on the blue hero card
+    color: 'rgba(255,255,255,0.75)',
   },
 });

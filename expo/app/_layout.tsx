@@ -30,7 +30,9 @@ Sentry.init({
   enabled: !!process.env.EXPO_PUBLIC_SENTRY_DSN,
   environment: __DEV__ ? 'development' : 'production',
   tracesSampleRate: 0.2,
-  debug: __DEV__,
+  // debug: false suppresses Sentry's internal native-listener warnings
+  // (the "[Native] [Sentry] addListener…" error toast seen in dev builds)
+  debug: false,
   sendDefaultPii: true,
   enableLogs: true,
   replaysSessionSampleRate: 0.1,

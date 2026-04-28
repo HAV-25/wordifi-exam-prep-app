@@ -13,8 +13,6 @@ import {
   Mic,
   PenTool,
   Sparkles,
-  Star,
-  TrendingUp,
   Zap,
 } from 'lucide-react-native';
 import {
@@ -36,15 +34,12 @@ import { PaywallModal } from '@/components/PaywallModal';
 import { PracticeStatsCards } from '@/components/PracticeStatsCards';
 import { ReadinessBottomSheet } from '@/components/ReadinessBottomSheet';
 import { ReadinessRingV2 } from '@/components/ReadinessRingV2';
-import { Sparkline } from '@/components/Sparkline';
 import { StreakStatusIcon } from '@/components/StreakStatusIcon';
 import { InfoTooltip } from '@/components/InfoTooltip';
 import { WordifiLogo } from '@/components/WordifiLogo';
-import { formatXp } from '@/lib/badgeHelpers';
-import { getReadinessStub, getStreakStub, getDailyRollupStub } from '@/lib/gamificationStubs';
-import { getBaseStreakRequirement } from '@/lib/gamificationHelpers';
 import { useHomeData, type LeaderboardNeighbor } from '@/lib/useHomeData';
 import { getBadgeByStreak, useBadgeLadder } from '@/hooks/useBadgeLadder';
+import { useDailyRollup7Days } from '@/hooks/useDailyRollup7Days';
 import { useGameState } from '@/hooks/useGameState';
 import { useAccess } from '@/providers/AccessProvider';
 import { useAuth } from '@/providers/AuthProvider';
@@ -128,6 +123,8 @@ export default function HomeScreen() {
       void queryClient.invalidateQueries({ queryKey: ['7day-trend', userId] });
       void queryClient.invalidateQueries({ queryKey: ['leaderboard-neighbors', userId, targetLevel] });
       void queryClient.invalidateQueries({ queryKey: ['leaderboard-percentile', userId, targetLevel] });
+      void queryClient.invalidateQueries({ queryKey: ['daily-rollup-7days', userId] });
+      void queryClient.invalidateQueries({ queryKey: ['game_state', targetLevel, userId] });
     }, [queryClient, userId, targetLevel])
   );
 
@@ -140,9 +137,10 @@ export default function HomeScreen() {
   const isPaidUser = PAID_TIERS.has(data.subscriptionTier);
   const showUpgradeBanner = !isPaidUser;
 
-  // Trigger #9 home variant — streak requirement exceeds free cap
+  // Gamification state — live RPC (replaces stubs)
   const { data: gameState } = useGameState(targetLevel, userId);
   const { data: ladder = [] } = useBadgeLadder();
+  const { data: rollup7 = [] } = useDailyRollup7Days(userId);
 
   const isTrial = !isPaidUser && (
     (data.subscriptionTier as string) === 'free_trial' ||
@@ -168,27 +166,7 @@ export default function HomeScreen() {
     !requirementMet &&
     questionsRemaining === 0;
 
-  const formattedXp = useMemo(() => formatXp(data.xp), [data.xp]);
   const initial = (data.firstName ?? user?.email ?? '?').charAt(0).toUpperCase();
-  const scoreInt = Math.round(data.readiness);
-
-  // ── Gamification v2.8 stub data (TODO: replace with RPC in next sprint) ──
-  // Using 'paid30' scenario as the default visual state for development.
-  const gamReadiness = getReadinessStub('paid30');
-  const gamStreak    = getStreakStub('paid30');
-  const gamRollup    = getDailyRollupStub('paid30');
-  const gamBaseReq   = getBaseStreakRequirement(gamStreak.current_streak_days);
-  const gamTodayReq  = gamBaseReq + gamStreak.daily_requirement_tier_adjustment;
-
-  // Sparkline data arrays (7 values)
-  const xpSparkData = useMemo(
-    () => data.trendData.map((d) => d.daily_xp),
-    [data.trendData],
-  );
-  const trendSparkData = useMemo(
-    () => data.trendData.map((d) => (d.cumulative_accuracy ?? 0)),
-    [data.trendData],
-  );
 
   // Leaderboard: find current user's rank for percentile display
   const myRank = data.leaderboardNeighbors.find((n) => n.is_current_user);
@@ -358,8 +336,8 @@ export default function HomeScreen() {
           {/* Readiness ring v2 — multi-colour progressive (display-only, no tap) */}
           <View style={s.scoreZone}>
             <ReadinessRingV2
-              normalizedScore={gamReadiness.normalized_score}
-              size={140}
+              normalizedScore={gameState?.readiness.current_score ?? 0}
+              size={210}
             />
           </View>
 
@@ -368,7 +346,7 @@ export default function HomeScreen() {
             <View style={s.streakFlameWrap}>
               <AnimatedFlame size={16} animated />
             </View>
-            <Text style={s.streakNum}>{gamStreak.current_streak_days}</Text>
+            <Text style={s.streakNum}>{streakDays}</Text>
             <Text style={s.streakWord}>day streak</Text>
             <View style={{ marginLeft: 8 }}>
               <StreakStatusIcon
@@ -381,37 +359,19 @@ export default function HomeScreen() {
               />
             </View>
             <View style={{ flex: 1, alignItems: 'flex-end' }}>
-              <FlameStrip days={gamRollup} />
+              <FlameStrip days={rollup7} />
             </View>
           </View>
           {/* Today's requirement — below streak row, full width */}
-          <Text style={s.streakReqLabel}>Today: {gamTodayReq} questions</Text>
-
-          {/* Stats row: XP + 7-day trend */}
-          <View style={s.statsRow}>
-            <View style={s.statChip}>
-              <View style={s.statTop}>
-                <Text style={s.statLabel}>XP</Text>
-                <Star color="#DDD6FE" size={17} />
-              </View>
-              <Text style={s.statValue}>{formattedXp}</Text>
-              <Sparkline data={xpSparkData.length === 7 ? xpSparkData : [0,0,0,0,0,0,0]} color="#DDD6FE" height={24} />
-            </View>
-            <View style={s.statChip}>
-              <View style={s.statTop}>
-                <Text style={s.statLabel}>7-DAY TREND</Text>
-                <TrendingUp color={BANANI.success} size={17} />
-              </View>
-              <Text style={s.statValue}>
-                {data.trendPercentage !== null ? `${data.trendPercentage > 0 ? '+' : ''}${data.trendPercentage}%` : '—'}
-              </Text>
-              <Sparkline data={trendSparkData.length === 7 ? trendSparkData : [0,0,0,0,0,0,0]} color={BANANI.success} height={24} />
-            </View>
-          </View>
+          <Text style={s.streakReqLabel}>
+            {streakDays > 0
+              ? `Today: Do your ${todayRequirement} questions to maintain streak`
+              : `Today: Do your ${todayRequirement} questions to start your streak`}
+          </Text>
 
           {/* Practice stats: Total Practiced + Accuracy */}
           <View style={s.practiceStatsWrap}>
-            <PracticeStatsCards rollup={gamRollup} />
+            <PracticeStatsCards rollup={rollup7} />
           </View>
 
           {/* Divider */}
@@ -909,11 +869,11 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 14,
+    borderRadius: 14,
     backgroundColor: 'rgba(255,255,255,0.15)',
-    marginBottom: 4,
+    marginBottom: 6,
     zIndex: 1,
   },
   streakFlameWrap: {
@@ -927,15 +887,15 @@ const s = StyleSheet.create({
   },
   streakNum: {
     fontFamily: fontFamily.bodySemiBold,
-    fontSize: 15,
+    fontSize: 20,
     color: '#FFFFFF',
-    lineHeight: 18,
+    lineHeight: 22,
   },
   streakWord: {
     fontFamily: fontFamily.bodyRegular,
-    fontSize: 9,
+    fontSize: 11,
     color: 'rgba(255,255,255,0.75)',
-    lineHeight: 13,
+    lineHeight: 14,
   },
   streakReqLabel: {
     fontFamily: fontFamily.bodyRegular,
@@ -947,41 +907,6 @@ const s = StyleSheet.create({
   practiceStatsWrap: {
     marginBottom: 16,
     zIndex: 1,
-  },
-
-  // Stats row
-  statsRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 16,
-    zIndex: 1,
-  },
-  statChip: {
-    flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    borderRadius: 20,
-    padding: 14,
-    gap: 12,
-    minHeight: 92,
-  },
-  statTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 8,
-  },
-  statLabel: {
-    fontFamily: fontFamily.bodyBold,
-    fontSize: 11,
-    letterSpacing: 0.7,
-    color: 'rgba(255,255,255,0.72)',
-  },
-  statValue: {
-    fontFamily: fontFamily.display,
-    fontSize: 24,
-    color: BANANI.primaryFg,
-    letterSpacing: -1,
-    lineHeight: 24,
   },
 
   // Divider

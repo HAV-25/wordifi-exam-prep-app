@@ -134,7 +134,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: CARD_BG,
     borderRadius: 12,
-    padding: 12,
+    padding: 14,
     gap: 0,
     minHeight: 92,
   },
