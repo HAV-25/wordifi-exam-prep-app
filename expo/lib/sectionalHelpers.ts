@@ -486,14 +486,6 @@ export async function completeSectionalSession(params: {
     }
 
     const today = new Date().toISOString().split('T')[0] ?? '';
-    const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0] ?? '';
-    const prevStreak = profile?.streak_count ?? 0;
-    let newStreak = prevStreak;
-    if (profile?.last_active_date === yesterday) {
-      newStreak = prevStreak + 1;
-    } else if (profile?.last_active_date !== today) {
-      newStreak = 1;
-    }
 
     const xpRate = XP_RATES[profile?.target_level ?? 'A1'] ?? 1;
     const xpGain = correctCount * xpRate;
@@ -503,7 +495,6 @@ export async function completeSectionalSession(params: {
       .update({
         xp_total: (profile?.xp_total ?? 0) + xpGain,
         last_active_date: today,
-        streak_count: newStreak,
         updated_at: new Date().toISOString(),
       })
       .eq('id', userId);
@@ -513,11 +504,6 @@ export async function completeSectionalSession(params: {
       Sentry.captureException(profileError, { tags: { context: 'sectional' } });
     }
 
-    if (profile?.last_active_date === yesterday) {
-      track('streak_extended', { streak_count: newStreak });
-    } else if (profile?.last_active_date !== today && prevStreak > 1) {
-      track('streak_broken', { prev_streak: prevStreak });
-    }
   } catch (err) {
     console.log('completeSectionalSession unexpected error', err);
     Sentry.captureException(err, { tags: { context: 'sectional' } });
@@ -654,21 +640,12 @@ export async function completeSprachbausteineSession(params: {
     }
 
     const today = new Date().toISOString().split('T')[0] ?? '';
-    const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0] ?? '';
-    const prevStreak = profile?.streak_count ?? 0;
-    let newStreak = prevStreak;
-    if (profile?.last_active_date === yesterday) {
-      newStreak = prevStreak + 1;
-    } else if (profile?.last_active_date !== today) {
-      newStreak = 1;
-    }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error: profileError } = await (supabase.from('user_profiles') as any)
       .update({
         xp_total: (profile?.xp_total ?? 0) + totalCorrect,
         last_active_date: today,
-        streak_count: newStreak,
         updated_at: new Date().toISOString(),
       })
       .eq('id', userId);
@@ -676,12 +653,6 @@ export async function completeSprachbausteineSession(params: {
     if (profileError) {
       console.log('completeSprachbausteineSession profile update error', profileError);
       Sentry.captureException(profileError, { tags: { context: 'sectional' } });
-    }
-
-    if (profile?.last_active_date === yesterday) {
-      track('streak_extended', { streak_count: newStreak });
-    } else if (profile?.last_active_date !== today && prevStreak > 1) {
-      track('streak_broken', { prev_streak: prevStreak });
     }
   } catch (err) {
     console.log('completeSprachbausteineSession unexpected error', err);

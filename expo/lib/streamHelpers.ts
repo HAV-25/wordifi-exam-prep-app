@@ -291,15 +291,6 @@ export async function updateXpAndStreak(
   profile: UserProfile
 ): Promise<{ newXp: number; newStreak: number }> {
   const today = new Date().toISOString().split('T')[0] ?? '';
-  const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0] ?? '';
-
-  const prevStreak = profile.streak_count;
-  let newStreak = prevStreak;
-  if (profile.last_active_date === yesterday) {
-    newStreak = profile.streak_count + 1;
-  } else if (profile.last_active_date !== today) {
-    newStreak = 1;
-  }
 
   const xpGain = XP_PER_LEVEL[profile.target_level ?? 'A1'] ?? 5;
   const newXp = profile.xp_total + xpGain;
@@ -308,7 +299,6 @@ export async function updateXpAndStreak(
   const { error } = await (supabase.from('user_profiles') as any)
     .update({
       xp_total: newXp,
-      streak_count: newStreak,
       last_active_date: today,
       updated_at: new Date().toISOString(),
     })
@@ -318,13 +308,9 @@ export async function updateXpAndStreak(
     console.log('updateXpAndStreak error', error);
   }
 
-  if (profile.last_active_date === yesterday) {
-    track('streak_extended', { streak_count: newStreak });
-  } else if (profile.last_active_date !== today && prevStreak > 1) {
-    track('streak_broken', { prev_streak: prevStreak });
-  }
-
-  return { newXp, newStreak };
+  // Streak is maintained authoritatively by user_streak_state (backend).
+  // Return the existing streak so callers that still reference newStreak don't break.
+  return { newXp, newStreak: profile.streak_count };
 }
 
 export async function submitQuestionReport(params: {

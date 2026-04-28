@@ -106,7 +106,6 @@ export default function TestStreamScreen() {
   // ── Gamification state ─────────────────────────────────────────────────────
   const [localReadiness, setLocalReadiness] = useState<number>(profile?.readiness_score ?? 0);
   const [localXp, setLocalXp] = useState<number>(profile?.xp_total ?? 0);
-  const [localStreak, setLocalStreak] = useState<number>(profile?.streak_count ?? 0);
   const [celebrationBadge, setCelebrationBadge] = useState<string | null>(null);
   const [streakToast, setStreakToast] = useState<string | null>(null);
   const [showBottomSheet, setShowBottomSheet] = useState<boolean>(false);
@@ -146,6 +145,18 @@ export default function TestStreamScreen() {
   const requirementMet  = gameState?.today?.requirement_met ?? false;
   const badgeName       = getBadgeByStreak(streakDays, badgeLadder ?? [])?.name ?? '';
 
+  // Detect badge tier changes when streakDays updates (after gameState invalidation)
+  const prevStreakDaysRef = useRef<number>(streakDays);
+  useEffect(() => {
+    const prev = prevStreakDaysRef.current;
+    if (streakDays !== prev && badgeLadder && badgeLadder.length > 0) {
+      const oldTier = getBadgeByStreak(prev, badgeLadder)?.name ?? '';
+      const newTier = getBadgeByStreak(streakDays, badgeLadder)?.name ?? '';
+      if (newTier && newTier !== oldTier) setCelebrationBadge(newTier);
+    }
+    prevStreakDaysRef.current = streakDays;
+  }, [streakDays, badgeLadder]);
+
   /** True when free user's streak requirement has escalated past the 5-question free cap */
   const isStreakReqExceedsFree =
     !isPaidUser &&
@@ -159,7 +170,6 @@ export default function TestStreamScreen() {
     if (profile) {
       setLocalReadiness(profile.readiness_score ?? 0);
       setLocalXp(profile.xp_total ?? 0);
-      setLocalStreak(profile.streak_count ?? 0);
     }
   }, [profile]);
 
@@ -291,16 +301,8 @@ export default function TestStreamScreen() {
 
       if (isCorrect && profile) {
         try {
-          const oldTierName = getBadgeByStreak(localStreak, badgeLadder ?? [])?.name ?? '';
-          const { newXp, newStreak } = await updateXpAndStreak(userId, { ...profile, xp_total: localXp, streak_count: localStreak, last_active_date: profile.last_active_date });
+          const { newXp } = await updateXpAndStreak(userId, { ...profile, xp_total: localXp });
           setLocalXp(newXp);
-          if (newStreak !== localStreak) {
-            setLocalStreak(newStreak);
-            const newTierName = getBadgeByStreak(newStreak, badgeLadder ?? [])?.name ?? '';
-            if (newTierName && newTierName !== oldTierName) {
-              setCelebrationBadge(newTierName);
-            }
-          }
         } catch {}
       }
 
@@ -311,9 +313,9 @@ export default function TestStreamScreen() {
       // Invalidate game state so trigger #9 check sees fresh requirement_met / questions_remaining
       invalidateGameState(targetLevel, userId || undefined);
     },
-    [sessionId, userId, profile, localXp, localStreak, targetLevel, sessionAnsweredCount,
+    [sessionId, userId, profile, localXp, targetLevel, sessionAnsweredCount,
      correctStreak, decrementStreamRemaining, incrementDailyStreamCount, triggerXpBurst,
-     showComboToastBanner, refreshProfile, invalidateGameState, badgeLadder]
+     showComboToastBanner, refreshProfile, invalidateGameState]
   );
 
   // ── Handle Next ────────────────────────────────────────────────────────────
@@ -526,7 +528,7 @@ export default function TestStreamScreen() {
       <View style={s.motivationalBar}>
         <View style={s.motItem}>
           <Flame color={B.warning} size={18} />
-          <Text style={s.motItemText}>{localStreak}</Text>
+          <Text style={s.motItemText}>{streakDays}</Text>
         </View>
         {badgeName ? (
           <View style={s.motBadge}>
@@ -558,7 +560,7 @@ export default function TestStreamScreen() {
         </Animated.View>
       ) : null}
 
-      <ReadinessBottomSheet visible={showBottomSheet} onClose={() => setShowBottomSheet(false)} level={targetLevel} overallScore={localReadiness} horenPct={horenPct} lesenPct={lesenPct} streak={localStreak} lastActiveDate={profile?.last_active_date ?? null} />
+      <ReadinessBottomSheet visible={showBottomSheet} onClose={() => setShowBottomSheet(false)} level={targetLevel} overallScore={localReadiness} horenPct={horenPct} lesenPct={lesenPct} streak={streakDays} lastActiveDate={profile?.last_active_date ?? null} />
       <ReportModal visible={Boolean(reportQuestionId)} questionId={reportQuestionId ?? ''} userId={userId} onClose={() => setReportQuestionId(null)} />
       <PaywallModal visible={showPaywall} variant="stream_limit" onUpgrade={() => setShowPaywall(false)} onDismiss={() => setShowPaywall(false)} />
       <PaywallBottomSheet

@@ -515,20 +515,12 @@ export async function completeMockTest(params: {
     }
 
     const today = new Date().toISOString().split('T')[0] ?? '';
-    const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0] ?? '';
-    let newStreak = profile?.streak_count ?? 0;
-    if (profile?.last_active_date === yesterday) {
-      newStreak = (profile?.streak_count ?? 0) + 1;
-    } else if (profile?.last_active_date !== today) {
-      newStreak = 1;
-    }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error: profErr } = await (supabase.from('user_profiles') as any)
       .update({
         xp_total: (profile?.xp_total ?? 0) + totalCorrect,
         last_active_date: today,
-        streak_count: newStreak,
         readiness_score: Math.min(100, Math.max(0, overallPct * 0.8 + (profile?.readiness_score ?? 0) * 0.2)),
         updated_at: new Date().toISOString(),
       })
